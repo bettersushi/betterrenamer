@@ -472,6 +472,10 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
         setPreview(previewList)
       }
     } catch (err) {
+      if (err.status === 401 && onTokenRefresh) {
+        const newToken = await onTokenRefresh()
+        if (newToken) { handleGeneratePreview(); return }
+      }
       setPreviewError('Errore: ' + err.message)
     } finally {
       setPreviewLoading(false)
