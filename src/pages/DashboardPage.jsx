@@ -620,8 +620,8 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
           </div>
           <div style={{ fontSize: '11px', color: selectedFiles.length > 0 ? '#3b82f6' : '#bbb', textAlign: 'center', padding: '4px 0' }}>
             {selectedFiles.length > 0
-              ? `${selectedFiles.length} selezionato${selectedFiles.length > 1 ? 'i' : ''} · ␣ per anteprima`
-              : 'Click per selezionare · Cmd+click per più file · ␣ anteprima'}
+              ? `${selectedFiles.length} selezionato${selectedFiles.length > 1 ? 'i' : ''} · Spazio per anteprima`
+              : 'Click · Cmd+click per più · Spazio anteprima'}
           </div>
           {recentFolders.length > 0 && (
             <div className="recent-folders">
