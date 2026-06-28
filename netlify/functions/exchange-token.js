@@ -1,4 +1,4 @@
-export const handler = async (event) => {
+exports.handler = async (event) => {
   try {
     const { code } = JSON.parse(event.body);
 
@@ -50,4 +50,18 @@ export const handler = async (event) => {
 
     return {
       statusCode: 200,
-      body:
+      body: JSON.stringify({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_in: data.expires_in,
+        email: payload.email,
+      }),
+    };
+  } catch (error) {
+    console.error('Exchange token error:', error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: error.message }),
+    };
+  }
+};
