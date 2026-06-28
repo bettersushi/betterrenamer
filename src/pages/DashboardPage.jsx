@@ -495,6 +495,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
   const runningJobs = queue.filter(j => j.status === 'running')
   const pendingJobs = queue.filter(j => j.status === 'pending')
   const doneJobs = queue.filter(j => j.status === 'done' || j.status === 'error')
+  const activeFolderIds = new Set([...runningJobs, ...pendingJobs].map(j => j.rootFolderId))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -589,15 +590,16 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                   const isSelected = selectedFiles.some(f => f.id === file.id)
                   const isFolder = file.mimeType === 'application/vnd.google-apps.folder'
                   const isChecked = checkedFolders.has(file.id)
+                  const isActive = isFolder && activeFolderIds.has(file.id)
                   return (
                     <div
                       key={file.id}
                       onClick={(e) => handleFileClick(file, e)}
-                      className={`file-item ${isFolder ? 'folder' : ''}`}
+                      className={`file-item ${isFolder ? 'folder' : ''} ${isActive ? 'folder-active' : ''}`}
                       style={{
                         fontSize: '13px', padding: 0,
                         background: isChecked ? 'color-mix(in srgb, var(--primary) 8%, transparent)' : isSelected ? '#eff6ff' : undefined,
-                        borderLeft: isChecked ? '3px solid var(--primary)' : isSelected ? '3px solid #3b82f6' : '3px solid transparent',
+                        borderLeft: isChecked ? '3px solid var(--primary)' : isActive ? '3px solid var(--primary)' : isSelected ? '3px solid #3b82f6' : '3px solid transparent',
                       }}
                       onMouseEnter={isFolder ? (e) => handleFolderEnter(e, file) : (e) => handleThumbEnter(e, file)}
                       onMouseMove={isFolder ? handleFolderMove : handleThumbMove}
