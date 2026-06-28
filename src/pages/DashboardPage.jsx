@@ -303,8 +303,10 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
 
   const handleThumbEnter = (e, file) => {
     if (!file.thumbnailLink) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    setThumbTooltip({ url: file.thumbnailLink, x: rect.right + 10, y: rect.top })
+    setThumbTooltip({ url: file.thumbnailLink, x: e.clientX + 16, y: e.clientY + 16 })
+  }
+  const handleThumbMove = (e) => {
+    if (thumbTooltip) setThumbTooltip(t => ({ ...t, x: e.clientX + 16, y: e.clientY + 16 }))
   }
   const handleThumbLeave = () => setThumbTooltip(null)
 
@@ -465,6 +467,9 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
                         background: isChecked ? 'color-mix(in srgb, var(--primary) 8%, transparent)' : isSelected ? '#eff6ff' : undefined,
                         borderLeft: isChecked ? '3px solid var(--primary)' : isSelected ? '3px solid #3b82f6' : '3px solid transparent',
                       }}
+                      onMouseEnter={!isFolder ? (e) => handleThumbEnter(e, file) : undefined}
+                      onMouseMove={!isFolder ? handleThumbMove : undefined}
+                      onMouseLeave={!isFolder ? handleThumbLeave : undefined}
                     >
                       {mode === 'legacy' && isFolder && (
                         <div style={{ paddingLeft: '10px', display: 'flex', alignItems: 'center' }} onClick={e => toggleFolder(file.id, e)}>
@@ -484,8 +489,6 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
                       <div
                         className="file-preview-col"
                         style={{ opacity: isFolder ? 0 : undefined }}
-                        onMouseEnter={!isFolder ? (e) => handleThumbEnter(e, file) : undefined}
-                        onMouseLeave={!isFolder ? handleThumbLeave : undefined}
                         onClick={e => e.stopPropagation()}
                       >
                         {!isFolder && <IconEye />}
