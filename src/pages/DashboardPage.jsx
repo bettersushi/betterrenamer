@@ -449,9 +449,15 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     setPreviewFolder(currentFolder)
     try {
       if (mode === 'legacy') {
-        const groups = await listFilesRecursive(auth.accessToken, currentFolder.id, currentFolder.name, includeRoot)
-        const filtered = checkedFolders.size > 0 ? groups.filter(g => checkedFolders.has(g.folderId)) : groups
-        const built = buildLegacyPreview(filtered)
+        let groups
+        if (checkedFolders.size > 0) {
+          const selectedFolders = files.filter(f => checkedFolders.has(f.id))
+          const results = await Promise.all(selectedFolders.map(f => listFilesRecursive(auth.accessToken, f.id, f.name, true)))
+          groups = results.flat()
+        } else {
+          groups = await listFilesRecursive(auth.accessToken, currentFolder.id, currentFolder.name, includeRoot)
+        }
+        const built = buildLegacyPreview(groups)
         if (built.length === 0) {
           setPreviewError('Nessun file media trovato' + (includeRoot ? '' : ' nelle sottocartelle') + '.')
         } else {
