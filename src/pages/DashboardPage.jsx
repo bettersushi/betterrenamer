@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listFiles, listFilesRecursive, batchRenameFiles, getOrCreateFolder, moveFile } from '../drive'
 import { saveSession } from '../logs'
+import QuickLookModal from '../components/QuickLookModal'
 import './DashboardPage.css'
 
 const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
@@ -53,6 +54,10 @@ export default function DashboardPage({ auth, onLogout }) {
   const [files, setFiles] = useState([])
   const [browserLoading, setBrowserLoading] = useState(false)
   const [browserError, setBrowserError] = useState('')
+
+  // Quick Look
+  const [selectedFiles, setSelectedFiles] = useState([])
+  const [quickLookOpen, setQuickLookOpen] = useState(false)
 
   // Config
   const [mode, setMode] = useState('legacy')
@@ -196,6 +201,37 @@ export default function DashboardPage({ auth, onLogout }) {
     }
   }
 
+  const handleFileClick = (file, e) => {
+    if (file.mimeType === 'application/vnd.google-apps.folder') {
+      handleFolderClick(file)
+      setSelectedFiles([])
+      return
+    }
+    if (e.metaKey || e.ctrlKey) {
+      setSelectedFiles(prev =>
+        prev.find(f => f.id === file.id)
+          ? prev.filter(f => f.id !== file.id)
+          : [...prev, file]
+      )
+    } else {
+      setSelectedFiles(prev => prev.length === 1 && prev[0].id === file.id ? [] : [file])
+    }
+  }
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return
+      if (e.code === 'Space') {
+        e.preventDefault()
+        if (quickLookOpen) setQuickLookOpen(false)
+        else if (selectedFiles.length > 0) setQuickLookOpen(true)
+      }
+      if (e.code === 'Escape') setQuickLookOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedFiles, quickLookOpen])
+
   const handleGeneratePreview = async () => {
     setPreviewLoading(true)
     setPreviewError('')
@@ -284,19 +320,32 @@ export default function DashboardPage({ auth, onLogout }) {
             ) : files.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '13px' }}>Nessun file</div>
             ) : (
-              files.map(file => (
-                <div
-                  key={file.id}
-                  onClick={() => { if (file.mimeType === 'application/vnd.google-apps.folder') handleFolderClick(file) }}
-                  className={`file-item ${file.mimeType === 'application/vnd.google-apps.folder' ? 'folder' : ''}`}
-                  style={{ fontSize: '13px', padding: '6px 10px' }}
-                >
-                  <span className="file-icon">{file.mimeType === 'application/vnd.google-apps.folder' ? '📁' : '📄'}</span>
-                  <span className="file-name">{file.name}</span>
-                </div>
-              ))
+              files.map(file => {
+                const isSelected = selectedFiles.some(f => f.id === file.id)
+                const isFolder = file.mimeType === 'application/vnd.google-apps.folder'
+                return (
+                  <div
+                    key={file.id}
+                    onClick={(e) => handleFileClick(file, e)}
+                    className={`file-item ${isFolder ? 'folder' : ''}`}
+                    style={{
+                      fontSize: '13px', padding: '6px 10px',
+                      background: isSelected ? '#eff6ff' : undefined,
+                      borderLeft: isSelected ? '3px solid #3b82f6' : '3px solid transparent',
+                    }}
+                  >
+                    <span className="file-icon">{isFolder ? '📁' : '📄'}</span>
+                    <span className="file-name">{file.name}</span>
+                  </div>
+                )
+              })
             )}
           </div>
+          {selectedFiles.length > 0 && (
+            <div style={{ fontSize: '11px', color: '#3b82f6', textAlign: 'center', padding: '4px 0' }}>
+              {selectedFiles.length} selezionato{selectedFiles.length > 1 ? 'i' : ''} · premi ␣ per anteprima
+            </div>
+          )}
           {folderPath.length > 1 && (
             <button onClick={handleBackClick} className="btn-secondary" style={{ width: '100%', fontSize: '13px', padding: '6px' }}>← Indietro</button>
           )}
@@ -474,6 +523,9 @@ export default function DashboardPage({ auth, onLogout }) {
             })}
           </div>
         </div>
+      )}
+      {quickLookOpen && (
+        <QuickLookModal files={selectedFiles} onClose={() => setQuickLookOpen(false)} />
       )}
     </div>
   )
