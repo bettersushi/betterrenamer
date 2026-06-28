@@ -1,8 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listFiles, listFilesRecursive, batchRenameFiles } from '../drive'
+import { listFiles, listFilesRecursive, batchRenameFiles, getOrCreateFolder, moveFile } from '../drive'
 import { saveSession } from '../logs'
 import './DashboardPage.css'
+
+const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
+const MEDIA_MIMETYPES = ['image/', 'video/']
+
+function isMediaFile(file) {
+  const ext = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.')).toLowerCase() : ''
+  if (MEDIA_EXTENSIONS.has(ext)) return true
+  if (file.mimeType && MEDIA_MIMETYPES.some(m => file.mimeType.startsWith(m))) return true
+  return false
+}
 
 function generateLegacyName(folderName, file, counter) {
   const sanitized = folderName.toLowerCase().replace(/[^a-z0-9]/g, '-')
@@ -18,8 +28,9 @@ function buildLegacyPreview(groups, startCounter = 100000) {
   for (const group of groups) {
     let counter = startCounter
     for (const file of group.files) {
+      if (!isMediaFile(file)) continue
       const newName = generateLegacyName(group.folderName, file, counter)
-      preview.push({ id: file.id, oldName: file.name, newName, folderName: group.folderName })
+      preview.push({ id: file.id, oldName: file.name, newName, folderName: group.folderName, folderId: group.folderId, mimeType: file.mimeType })
       counter += Math.floor(Math.random() * 1000) + 100
     }
   }
@@ -42,12 +53,15 @@ export default function DashboardPage({ auth, onLogout }) {
   const [startNumber, setStartNumber] = useState(1)
   const [padding, setPadding] = useState(3)
 
+  // Opzioni legacy
+  const [organizeMedia, setOrganizeMedia] = useState(true)
+
   // Preview e risultati
   const [preview, setPreview] = useState([])
   const [results, setResults] = useState([])
 
   // Progress
-  const [progress, setProgress] = useState({ current: 0, total: 0, currentFile: '' })
+  const [progress, setProgress] = useState({ current: 0, total: 0, currentFile: '', phase: '' })
 
   const loadFolder = async (folderId) => {
     setLoading(true)
@@ -118,24 +132,65 @@ export default function DashboardPage({ auth, onLogout }) {
   const handleApplyRenames = async () => {
     setStep('processing')
     setError('')
-    setProgress({ current: 0, total: preview.length, currentFile: '' })
-
     const entries = []
+    const currentFolder = folderPath[folderPath.length - 1]
 
-    for (let i = 0; i < preview.length; i++) {
-      const item = preview[i]
-      setProgress({ current: i + 1, total: preview.length, currentFile: item.oldName })
-      try {
-        await batchRenameFiles(auth.accessToken, [{ id: item.id, oldName: item.oldName, newName: item.newName }])
-        entries.push({ ...item, success: true })
-      } catch (err) {
-        entries.push({ ...item, success: false, error: err.message })
+    // Cache cartelle vid/gif per parentId per non ricrearle ogni volta
+    const folderCache = {}
+    const getMediaFolder = async (parentId, parentName, suffix) => {
+      const key = `${parentId}:${suffix}`
+      if (!folderCache[key]) {
+        folderCache[key] = await getOrCreateFolder(auth.accessToken, `${parentName} ${suffix}`, parentId)
+      }
+      return folderCache[key]
+    }
+
+    // Fase 1: sposta video e gif (solo modalità legacy con organizeMedia attivo)
+    const moveItems = mode === 'legacy' && organizeMedia
+      ? preview.filter(item => {
+          const ext = item.oldName.includes('.') ? item.oldName.substring(item.oldName.lastIndexOf('.')).toLowerCase() : ''
+          return item.mimeType?.includes('video') || ext === '.gif'
+        })
+      : []
+
+    const total = moveItems.length + preview.length
+    let current = 0
+
+    if (moveItems.length > 0) {
+      for (const item of moveItems) {
+        current++
+        const ext = item.oldName.includes('.') ? item.oldName.substring(item.oldName.lastIndexOf('.')).toLowerCase() : ''
+        const isGif = ext === '.gif'
+        const suffix = isGif ? 'Gif' : 'Vid'
+        setProgress({ current, total, currentFile: item.oldName, phase: `Sposto in ${item.folderName} ${suffix}` })
+        try {
+          const destFolder = await getMediaFolder(item.folderId, item.folderName, suffix)
+          await moveFile(auth.accessToken, item.id, destFolder.id, item.folderId)
+          // Aggiorna folderId e folderName nel preview per il rename successivo
+          item.folderId = destFolder.id
+          item.folderName = destFolder.name
+          entries.push({ type: 'move', oldName: item.oldName, newName: item.oldName, folderName: `${item.folderName}`, destFolder: destFolder.name, success: true })
+        } catch (err) {
+          entries.push({ type: 'move', oldName: item.oldName, newName: item.oldName, folderName: item.folderName, success: false, error: err.message })
+        }
       }
     }
 
-    setResults(entries)
+    // Fase 2: rinomina tutti i file (pausa ogni 50 op per rispettare rate limit Drive)
+    for (let i = 0; i < preview.length; i++) {
+      const item = preview[i]
+      current++
+      setProgress({ current, total, currentFile: item.oldName, phase: 'Rinomino' })
+      try {
+        await batchRenameFiles(auth.accessToken, [{ id: item.id, oldName: item.oldName, newName: item.newName }])
+        entries.push({ type: 'rename', ...item, success: true })
+      } catch (err) {
+        entries.push({ type: 'rename', ...item, success: false, error: err.message })
+      }
+      if ((i + 1) % 50 === 0) await new Promise(r => setTimeout(r, 500))
+    }
 
-    const currentFolder = folderPath[folderPath.length - 1]
+    setResults(entries)
     saveSession({
       date: new Date().toISOString(),
       rootFolder: currentFolder.name,
@@ -229,18 +284,16 @@ export default function DashboardPage({ auth, onLogout }) {
             </div>
 
             {mode === 'legacy' && (
-              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <input
-                  type="checkbox"
-                  id="includeRoot"
-                  checked={includeRoot}
-                  onChange={(e) => setIncludeRoot(e.target.checked)}
-                  style={{ width: 'auto', margin: 0 }}
-                />
-                <label htmlFor="includeRoot" style={{ margin: 0, cursor: 'pointer' }}>
-                  Includi file nella cartella selezionata
-                </label>
-              </div>
+              <>
+                <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input type="checkbox" id="includeRoot" checked={includeRoot} onChange={(e) => setIncludeRoot(e.target.checked)} style={{ width: 'auto', margin: 0 }} />
+                  <label htmlFor="includeRoot" style={{ margin: 0, cursor: 'pointer' }}>Includi file nella cartella selezionata</label>
+                </div>
+                <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input type="checkbox" id="organizeMedia" checked={organizeMedia} onChange={(e) => setOrganizeMedia(e.target.checked)} style={{ width: 'auto', margin: 0 }} />
+                  <label htmlFor="organizeMedia" style={{ margin: 0, cursor: 'pointer' }}>Sposta video/gif in sottocartelle <em>(es. Air Vid, Air Gif)</em></label>
+                </div>
+              </>
             )}
 
             {mode === 'legacy' && (
@@ -338,7 +391,7 @@ export default function DashboardPage({ auth, onLogout }) {
         <div className="header"><h1>⏳ Rinominazione in corso...</h1></div>
         <div style={{ marginTop: '40px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
-            <span>{progress.currentFile}</span>
+            <span><strong style={{ color: 'var(--primary, #3b82f6)', marginRight: '6px' }}>{progress.phase}</strong>{progress.currentFile}</span>
             <span>{progress.current} / {progress.total}</span>
           </div>
           <div style={{ background: '#e5e7eb', borderRadius: '999px', height: '12px', overflow: 'hidden' }}>
