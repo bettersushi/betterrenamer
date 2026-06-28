@@ -246,7 +246,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
         item.folderName = destFolder.name
         entries.push({ type: 'move', oldName: item.oldName, newName: item.newName, folderName: destFolder.name, success: true })
       } catch (err) {
-        entries.push({ type: 'move', oldName: item.oldName, newName: item.oldName, folderName: item.folderName, success: false, error: err.message })
+        entries.push({ type: 'move', oldName: item.oldName, newName: item.newName, folderName: item.folderName, success: false, error: err.message })
       }
     }
 
