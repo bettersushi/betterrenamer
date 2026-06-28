@@ -560,13 +560,14 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
                         <span className="file-icon" style={{ color: isFolder ? '#f59e0b' : '#6b7280' }}>{isFolder ? <IconFolder /> : <IconFile />}</span>
                         <span className="file-name">{file.name}</span>
                       </div>
-                      <div
-                        className="file-preview-col"
-                        style={{ opacity: isFolder ? 0 : undefined }}
-                        onClick={e => e.stopPropagation()}
-                      >
-                        {!isFolder && <IconEye />}
-                      </div>
+                      {!isFolder && (
+                        <div className="file-thumb-col" onClick={e => e.stopPropagation()}>
+                          {file.thumbnailLink
+                            ? <img src={file.thumbnailLink} className="file-thumb-img" alt="" />
+                            : <span className="file-thumb-empty"><IconEye /></span>
+                          }
+                        </div>
+                      )}
                     </div>
                   )
                 })}
