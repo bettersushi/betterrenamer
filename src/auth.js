@@ -18,7 +18,7 @@ export const generateAuthUrl = () => {
 };
 
 export const exchangeCodeForToken = async (code) => {
-  const response = await fetch('/.netlify/functions/exchange-token', {
+  const response = await fetch('/api/exchange-token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code }),
@@ -29,7 +29,7 @@ export const exchangeCodeForToken = async (code) => {
 };
 
 export const refreshAccessToken = async (refreshToken) => {
-  const response = await fetch('/.netlify/functions/refresh-token', {
+  const response = await fetch('/api/refresh-token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refreshToken }),
@@ -40,7 +40,7 @@ export const refreshAccessToken = async (refreshToken) => {
 };
 
 export const verifyTwoFA = async (secret, token) => {
-  const response = await fetch('/.netlify/functions/verify-2fa', {
+  const response = await fetch('/api/verify-2fa', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ secret, token }),

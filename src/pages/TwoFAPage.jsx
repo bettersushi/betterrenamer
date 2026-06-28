@@ -16,7 +16,7 @@ export default function TwoFAPage({ auth, onLogin }) {
     // Genera il secret 2FA al caricamento
     const generateSecret = async () => {
       try {
-        const response = await fetch('/.netlify/functions/generate-2fa')
+        const response = await fetch('/api/generate-2fa')
         const data = await response.json()
         setSecret(data.secret)
         setQrCode(data.qrCode)
