@@ -5,21 +5,31 @@ import { saveSession } from '../logs'
 import './DashboardPage.css'
 
 const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
+const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
 const MEDIA_MIMETYPES = ['image/', 'video/']
 
+function getExt(name) {
+  return name.includes('.') ? name.substring(name.lastIndexOf('.')).toLowerCase() : ''
+}
+
 function isMediaFile(file) {
-  const ext = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.')).toLowerCase() : ''
+  const ext = getExt(file.name)
   if (MEDIA_EXTENSIONS.has(ext)) return true
   if (file.mimeType && MEDIA_MIMETYPES.some(m => file.mimeType.startsWith(m))) return true
   return false
 }
 
-function generateLegacyName(folderName, file, counter) {
+function isVideoFile(name, mimeType) {
+  if (mimeType && mimeType.includes('video')) return true
+  return VIDEO_EXTENSIONS.has(getExt(name))
+}
+
+function generateLegacyName(folderName, fileName, mimeType, counter) {
   const sanitized = folderName.toLowerCase().replace(/[^a-z0-9]/g, '-')
-  const ext = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.')) : ''
+  const ext = fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : ''
   let prefix = ''
-  if (file.mimeType && file.mimeType.includes('video')) prefix = 'vid-'
-  else if (ext.toLowerCase() === '.gif') prefix = 'gif-'
+  if (isVideoFile(fileName, mimeType)) prefix = 'vid-'
+  else if (getExt(fileName) === '.gif') prefix = 'gif-'
   return `${sanitized}-${prefix}${counter}${ext}`
 }
 
@@ -29,7 +39,7 @@ function buildLegacyPreview(groups, startCounter = 100000) {
     let counter = startCounter
     for (const file of group.files) {
       if (!isMediaFile(file)) continue
-      const newName = generateLegacyName(group.folderName, file, counter)
+      const newName = generateLegacyName(group.folderName, file.name, file.mimeType, counter)
       preview.push({ id: file.id, oldName: file.name, newName, folderName: group.folderName, folderId: group.folderId, mimeType: file.mimeType })
       counter += Math.floor(Math.random() * 1000) + 100
     }
@@ -147,10 +157,7 @@ export default function DashboardPage({ auth, onLogout }) {
 
     // Fase 1: sposta video e gif (solo modalità legacy con organizeMedia attivo)
     const moveItems = mode === 'legacy' && organizeMedia
-      ? preview.filter(item => {
-          const ext = item.oldName.includes('.') ? item.oldName.substring(item.oldName.lastIndexOf('.')).toLowerCase() : ''
-          return item.mimeType?.includes('video') || ext === '.gif'
-        })
+      ? preview.filter(item => isVideoFile(item.oldName, item.mimeType) || getExt(item.oldName) === '.gif')
       : []
 
     const total = moveItems.length + preview.length
