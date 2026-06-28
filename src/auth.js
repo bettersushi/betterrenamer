@@ -1,7 +1,7 @@
 export const googleAuthConfig = {
   clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID,
   redirectUri: import.meta.env.VITE_REDIRECT_URI,
-  scope: 'https://www.googleapis.com/auth/drive',
+  scope: 'openid profile email https://www.googleapis.com/auth/drive',
 };
 
 export const generateAuthUrl = () => {
