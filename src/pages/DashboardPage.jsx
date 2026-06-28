@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import logoSrc from '../assets/logo-br.svg'
 import { useNavigate } from 'react-router-dom'
 import { listFiles, listFilesRecursive, batchRenameFiles, getOrCreateFolder, moveFile } from '../drive'
@@ -145,6 +145,33 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
   const [previewError, setPreviewError] = useState('')
   const [previewFolder, setPreviewFolder] = useState(null) // cartella a cui si riferisce la preview
 
+  // Folder checkbox selection (legacy mode only)
+  const [checkedFolders, setCheckedFolders] = useState(new Set())
+  const selectAllRef = useRef(null)
+
+  const visibleFolders = useMemo(() => files.filter(f => f.mimeType === 'application/vnd.google-apps.folder'), [files])
+  const allChecked = visibleFolders.length > 0 && visibleFolders.every(f => checkedFolders.has(f.id))
+  const someChecked = visibleFolders.some(f => checkedFolders.has(f.id))
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someChecked && !allChecked
+    }
+  }, [someChecked, allChecked])
+
+  const toggleFolder = (id, e) => {
+    e.stopPropagation()
+    setCheckedFolders(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const toggleAllFolders = () => {
+    setCheckedFolders(allChecked ? new Set() : new Set(visibleFolders.map(f => f.id)))
+  }
+
   // Queue
   const [queue, setQueue] = useState([])
   const queueRef = useRef([])
@@ -262,6 +289,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
     const newPath = [...folderPath, folder]
     setFolderPath(newPath)
     loadFolder(folder.id)
+    setCheckedFolders(new Set())
   }
 
   const handleBackClick = () => {
@@ -269,6 +297,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
       const newPath = folderPath.slice(0, -1)
       setFolderPath(newPath)
       loadFolder(newPath[newPath.length - 1].id)
+      setCheckedFolders(new Set())
     }
   }
 
@@ -319,7 +348,8 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
     try {
       if (mode === 'legacy') {
         const groups = await listFilesRecursive(auth.accessToken, currentFolder.id, currentFolder.name, includeRoot)
-        const built = buildLegacyPreview(groups)
+        const filtered = checkedFolders.size > 0 ? groups.filter(g => checkedFolders.has(g.folderId)) : groups
+        const built = buildLegacyPreview(filtered)
         if (built.length === 0) {
           setPreviewError('Nessun file media trovato' + (includeRoot ? '' : ' nelle sottocartelle') + '.')
         } else {
@@ -381,7 +411,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
       <div className="tool-body">
 
         {/* Sidebar browser */}
-        <div style={{ width: '30%', minWidth: '300px', flexShrink: 0, overflowY: 'auto', borderRight: '1px solid #e5e7eb', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div className="sidebar">
           <div className="breadcrumb" style={{ fontSize: '12px', margin: 0 }}>
             {folderPath.map((folder, idx) => (
               <span key={idx}>
@@ -392,6 +422,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
                     const newPath = folderPath.slice(0, idx + 1)
                     setFolderPath(newPath)
                     loadFolder(newPath[newPath.length - 1].id)
+                    setCheckedFolders(new Set())
                   }}>{folder.name}</a>
                 )}
               </span>
@@ -404,36 +435,65 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
             ) : files.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '13px' }}>Nessun file</div>
             ) : (
-              files.map(file => {
-                const isSelected = selectedFiles.some(f => f.id === file.id)
-                const isFolder = file.mimeType === 'application/vnd.google-apps.folder'
-                return (
-                  <div
-                    key={file.id}
-                    onClick={(e) => handleFileClick(file, e)}
-                    className={`file-item ${isFolder ? 'folder' : ''}`}
-                    style={{
-                      fontSize: '13px', padding: 0,
-                      background: isSelected ? '#eff6ff' : undefined,
-                      borderLeft: isSelected ? '3px solid #3b82f6' : '3px solid transparent',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, padding: '6px 10px', minWidth: 0 }}>
-                      <span className="file-icon" style={{ color: isFolder ? '#f59e0b' : '#6b7280' }}>{isFolder ? <IconFolder /> : <IconFile />}</span>
-                      <span className="file-name">{file.name}</span>
-                    </div>
-                    <div
-                      className="file-preview-col"
-                      style={{ opacity: isFolder ? 0 : undefined }}
-                      onMouseEnter={!isFolder ? (e) => handleThumbEnter(e, file) : undefined}
-                      onMouseLeave={!isFolder ? handleThumbLeave : undefined}
+              <>
+                {mode === 'legacy' && visibleFolders.length > 0 && (
+                  <div className="folder-select-header" onClick={toggleAllFolders}>
+                    <input
+                      type="checkbox"
+                      ref={selectAllRef}
+                      checked={allChecked}
+                      onChange={toggleAllFolders}
                       onClick={e => e.stopPropagation()}
-                    >
-                      {!isFolder && <IconEye />}
-                    </div>
+                      style={{ width: 'auto', margin: 0, cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', userSelect: 'none' }}>
+                      {checkedFolders.size > 0 ? `${checkedFolders.size} selezionat${checkedFolders.size === 1 ? 'a' : 'e'}` : 'Tutte le cartelle'}
+                    </span>
                   </div>
-                )
-              })
+                )}
+                {files.map(file => {
+                  const isSelected = selectedFiles.some(f => f.id === file.id)
+                  const isFolder = file.mimeType === 'application/vnd.google-apps.folder'
+                  const isChecked = checkedFolders.has(file.id)
+                  return (
+                    <div
+                      key={file.id}
+                      onClick={(e) => handleFileClick(file, e)}
+                      className={`file-item ${isFolder ? 'folder' : ''}`}
+                      style={{
+                        fontSize: '13px', padding: 0,
+                        background: isChecked ? 'color-mix(in srgb, var(--primary) 8%, transparent)' : isSelected ? '#eff6ff' : undefined,
+                        borderLeft: isChecked ? '3px solid var(--primary)' : isSelected ? '3px solid #3b82f6' : '3px solid transparent',
+                      }}
+                    >
+                      {mode === 'legacy' && isFolder && (
+                        <div style={{ paddingLeft: '10px', display: 'flex', alignItems: 'center' }} onClick={e => toggleFolder(file.id, e)}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {}}
+                            onClick={e => toggleFolder(file.id, e)}
+                            style={{ width: 'auto', margin: 0, cursor: 'pointer' }}
+                          />
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, padding: '6px 10px', minWidth: 0 }}>
+                        <span className="file-icon" style={{ color: isFolder ? '#f59e0b' : '#6b7280' }}>{isFolder ? <IconFolder /> : <IconFile />}</span>
+                        <span className="file-name">{file.name}</span>
+                      </div>
+                      <div
+                        className="file-preview-col"
+                        style={{ opacity: isFolder ? 0 : undefined }}
+                        onMouseEnter={!isFolder ? (e) => handleThumbEnter(e, file) : undefined}
+                        onMouseLeave={!isFolder ? handleThumbLeave : undefined}
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {!isFolder && <IconEye />}
+                      </div>
+                    </div>
+                  )
+                })}
+              </>
             )}
           </div>
           <div style={{ fontSize: '11px', color: selectedFiles.length > 0 ? '#3b82f6' : '#bbb', textAlign: 'center', padding: '4px 0' }}>
