@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import logoSrc from '../assets/logo-br.svg'
 import { useNavigate } from 'react-router-dom'
 import { listFiles, listFilesRecursive, batchRenameFiles, getOrCreateFolder, moveFile } from '../drive'
-import { saveSession } from '../logs'
+import { saveSession, getSessions, clearSessions, downloadCSV } from '../logs'
 import QuickLookModal from '../components/QuickLookModal'
 import './DashboardPage.css'
 
@@ -125,9 +125,26 @@ const IconMoon = () => (
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
   </svg>
 )
+const IconTrash = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+    <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+  </svg>
+)
+const IconXSmall = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+)
 
 export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme }) {
   const navigate = useNavigate()
+  const [logsOpen, setLogsOpen] = useState(false)
+  const [logSessions, setLogSessions] = useState([])
+  const [logsExpanded, setLogsExpanded] = useState(null)
+
+  const openLogs = () => { setLogSessions(getSessions()); setLogsOpen(true) }
+  const closeLogs = () => setLogsOpen(false)
 
   // Browser state
   const [folderPath, setFolderPath] = useState([{ id: 'root', name: 'My Drive' }])
@@ -227,7 +244,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
         await moveFile(auth.accessToken, item.id, destFolder.id, item.folderId)
         item.folderId = destFolder.id
         item.folderName = destFolder.name
-        entries.push({ type: 'move', oldName: item.oldName, newName: item.oldName, folderName: destFolder.name, success: true })
+        entries.push({ type: 'move', oldName: item.oldName, newName: item.newName, folderName: destFolder.name, success: true })
       } catch (err) {
         entries.push({ type: 'move', oldName: item.oldName, newName: item.oldName, folderName: item.folderName, success: false, error: err.message })
       }
@@ -465,7 +482,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
           <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px' }}>
             {isDark ? <IconSun /> : <IconMoon />}
           </button>
-          <button onClick={() => navigate('/logs')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><IconList /> Logs</button>
+          <button onClick={openLogs} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><IconList /> Logs</button>
           <button onClick={handleLogout} className="btn-secondary">Logout</button>
         </div>
       </div>
@@ -671,7 +688,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
 
             {previewError && <div className="error-message" style={{ fontSize: '12px' }}>{previewError}</div>}
 
-            <div style={{ overflowY: 'auto', maxHeight: '320px', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+            <div style={{ overflowY: 'auto', maxHeight: '320px', border: '1px dashed var(--border)', borderRadius: '8px' }}>
               {preview.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '30px 20px', color: 'var(--text-muted)', fontSize: '13px' }}>
                   {previewLoading ? 'Analisi cartelle in corso...' : 'Genera una preview per vedere i file che verranno rinominati.'}
@@ -680,9 +697,9 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
                 <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
                   <thead style={{ position: 'sticky', top: 0, background: '#f9fafb', zIndex: 1 }}>
                     <tr>
-                      <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Cartella</th>
-                      <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Originale</th>
-                      <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Nuovo nome</th>
+                      <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>Cartella</th>
+                      <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>Originale</th>
+                      <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>Nuovo nome</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -784,6 +801,76 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
           </div>
         </div>
       )}
+      {/* Logs sidebar */}
+      {logsOpen && (
+        <div onClick={closeLogs} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.33)', zIndex: 3000 }} />
+      )}
+      <div className={`logs-drawer${logsOpen ? ' open' : ''}`}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <IconList />
+            <strong style={{ fontSize: '15px' }}>Logs</strong>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Storico sessioni</span>
+          </div>
+          <button onClick={closeLogs} className="nav-icon-btn" title="Chiudi"><IconX /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+          {logSessions.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: '13px' }}>Nessuna sessione registrata.</div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+                <button onClick={() => { clearSessions(); setLogSessions([]) }} className="btn-secondary" style={{ fontSize: '12px', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <IconTrash /> Elimina tutti
+                </button>
+              </div>
+              {logSessions.map((session, idx) => {
+                const successCount = session.entries.filter(e => e.success).length
+                const failCount = session.entries.length - successCount
+                const isOpen = logsExpanded === idx
+                return (
+                  <div key={idx} className="session-card" style={{ marginBottom: '10px' }}>
+                    <div onClick={() => setLogsExpanded(isOpen ? null : idx)} className={`session-header${isOpen ? ' open' : ''}`}>
+                      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', minWidth: 0 }}>
+                        <strong style={{ fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>{session.rootFolder}</strong>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(session.date).toLocaleString('it-IT')}</span>
+                        <span className="badge-success">{successCount} ok</span>
+                        {failCount > 0 && <span className="badge-error">{failCount} err</span>}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+                        <button onClick={(e) => { e.stopPropagation(); downloadCSV(session) }} className="btn-secondary" style={{ fontSize: '11px', padding: '3px 8px' }}>CSV</button>
+                      </div>
+                    </div>
+                    {isOpen && (
+                      <div className="session-body" style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr>
+                              <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 600 }}>St.</th>
+                              <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 600 }}>Originale</th>
+                              <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 600 }}>Nuovo</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {session.entries.map((entry, i) => (
+                              <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                                <td style={{ padding: '5px 10px' }}>{entry.success ? <IconCheck /> : <IconXSmall />}</td>
+                                <td style={{ padding: '5px 10px', color: 'var(--text-secondary)' }}>{entry.oldName}</td>
+                                <td style={{ padding: '5px 10px', color: entry.success ? 'var(--success)' : 'var(--danger)', fontWeight: 500 }}>{entry.success ? entry.newName : entry.error}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </>
+          )}
+        </div>
+      </div>
+
       {thumbTooltip && (
         <div ref={tooltipRef} style={{
           position: 'fixed', left: thumbTooltip.cx + 16, top: thumbTooltip.cy + 16,
