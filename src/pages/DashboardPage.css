@@ -82,3 +82,19 @@
   font-size: 13px;
   color: var(--text-secondary);
 }
+
+.file-thumb-btn {
+  opacity: 0;
+  font-size: 13px;
+  cursor: default;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+  margin-left: auto;
+  padding-left: 6px;
+}
+.file-item:hover .file-thumb-btn {
+  opacity: 0.6;
+}
+.file-thumb-btn:hover {
+  opacity: 1 !important;
+}

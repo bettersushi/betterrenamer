@@ -58,6 +58,7 @@ export default function DashboardPage({ auth, onLogout }) {
   // Quick Look
   const [selectedFiles, setSelectedFiles] = useState([])
   const [quickLookOpen, setQuickLookOpen] = useState(false)
+  const [thumbTooltip, setThumbTooltip] = useState(null)
 
   // Config
   const [mode, setMode] = useState('legacy')
@@ -201,6 +202,13 @@ export default function DashboardPage({ auth, onLogout }) {
     }
   }
 
+  const handleThumbEnter = (e, file) => {
+    if (!file.thumbnailLink) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    setThumbTooltip({ url: file.thumbnailLink, x: rect.right + 10, y: rect.top })
+  }
+  const handleThumbLeave = () => setThumbTooltip(null)
+
   const handleFileClick = (file, e) => {
     if (file.mimeType === 'application/vnd.google-apps.folder') {
       handleFolderClick(file)
@@ -336,16 +344,24 @@ export default function DashboardPage({ auth, onLogout }) {
                   >
                     <span className="file-icon">{isFolder ? '📁' : '📄'}</span>
                     <span className="file-name">{file.name}</span>
+                    {!isFolder && (
+                      <span
+                        className="file-thumb-btn"
+                        onMouseEnter={(e) => handleThumbEnter(e, file)}
+                        onMouseLeave={handleThumbLeave}
+                        onClick={e => e.stopPropagation()}
+                      >👁</span>
+                    )}
                   </div>
                 )
               })
             )}
           </div>
-          {selectedFiles.length > 0 && (
-            <div style={{ fontSize: '11px', color: '#3b82f6', textAlign: 'center', padding: '4px 0' }}>
-              {selectedFiles.length} selezionato{selectedFiles.length > 1 ? 'i' : ''} · premi ␣ per anteprima
-            </div>
-          )}
+          <div style={{ fontSize: '11px', color: selectedFiles.length > 0 ? '#3b82f6' : '#bbb', textAlign: 'center', padding: '4px 0' }}>
+            {selectedFiles.length > 0
+              ? `${selectedFiles.length} selezionato${selectedFiles.length > 1 ? 'i' : ''} · ␣ per anteprima`
+              : 'Click per selezionare · Cmd+click per più file · ␣ anteprima'}
+          </div>
           {folderPath.length > 1 && (
             <button onClick={handleBackClick} className="btn-secondary" style={{ width: '100%', fontSize: '13px', padding: '6px' }}>← Indietro</button>
           )}
@@ -524,6 +540,18 @@ export default function DashboardPage({ auth, onLogout }) {
           </div>
         </div>
       )}
+      {thumbTooltip && (
+        <div style={{
+          position: 'fixed', left: thumbTooltip.x, top: thumbTooltip.y,
+          zIndex: 2000, pointerEvents: 'none',
+          background: 'white', borderRadius: '8px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+          padding: '4px', maxWidth: '220px',
+        }}>
+          <img src={thumbTooltip.url} style={{ width: '100%', borderRadius: '4px', display: 'block' }} alt="" />
+        </div>
+      )}
+
       {quickLookOpen && (
         <QuickLookModal files={selectedFiles} onClose={() => setQuickLookOpen(false)} />
       )}

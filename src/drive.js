@@ -6,7 +6,7 @@ export const listFiles = async (accessToken, folderId = 'root') => {
     const params = new URLSearchParams({
       q: `'${folderId}' in parents and trashed = false`,
       spaces: 'drive',
-      fields: 'files(id,name,mimeType,size,createdTime,modifiedTime),nextPageToken',
+      fields: 'files(id,name,mimeType,size,createdTime,modifiedTime,thumbnailLink),nextPageToken',
       pageSize: 1000,
       orderBy: 'folder,name',
     })
