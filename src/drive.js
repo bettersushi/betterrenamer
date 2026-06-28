@@ -2,7 +2,7 @@ export const listFiles = async (accessToken, folderId = 'root', pageToken = null
   const params = new URLSearchParams({
     q: `'${folderId}' in parents and trashed = false`,
     spaces: 'drive',
-    fields: 'files(id,name,mimeType,size,createdTime),nextPageToken',
+    fields: 'files(id,name,mimeType,size,createdTime,modifiedTime),nextPageToken',
     pageSize: 1000,
     orderBy: 'folder,name',
     pageToken: pageToken || '',
@@ -15,6 +15,28 @@ export const listFiles = async (accessToken, folderId = 'root', pageToken = null
   if (!response.ok) throw new Error('Failed to list files');
   return response.json();
 };
+
+const traverseFolder = async (accessToken, folderId, folderName, isRoot, includeRoot, results) => {
+  const data = await listFiles(accessToken, folderId)
+  const allItems = data.files || []
+  const subfolders = allItems.filter(f => f.mimeType === 'application/vnd.google-apps.folder')
+  const files = allItems.filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
+
+  if (!isRoot || includeRoot) {
+    const sorted = [...files].sort((a, b) => new Date(a.modifiedTime) - new Date(b.modifiedTime))
+    if (sorted.length > 0) results.push({ folderName, folderId, files: sorted })
+  }
+
+  for (const subfolder of subfolders) {
+    await traverseFolder(accessToken, subfolder.id, subfolder.name, false, includeRoot, results)
+  }
+}
+
+export const listFilesRecursive = async (accessToken, rootFolderId, rootFolderName, includeRoot) => {
+  const results = []
+  await traverseFolder(accessToken, rootFolderId, rootFolderName, true, includeRoot, results)
+  return results
+}
 
 export const renameFile = async (accessToken, fileId, newName) => {
   const response = await fetch(

@@ -1,7 +1,30 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listFiles, batchRenameFiles } from '../drive'
+import { listFiles, listFilesRecursive, batchRenameFiles } from '../drive'
+import { saveSession } from '../logs'
 import './DashboardPage.css'
+
+function generateLegacyName(folderName, file, counter) {
+  const sanitized = folderName.toLowerCase().replace(/[^a-z0-9]/g, '-')
+  const ext = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.')) : ''
+  let prefix = ''
+  if (file.mimeType && file.mimeType.includes('video')) prefix = 'vid-'
+  else if (ext.toLowerCase() === '.gif') prefix = 'gif-'
+  return `${sanitized}-${prefix}${counter}${ext}`
+}
+
+function buildLegacyPreview(groups, startCounter = 100000) {
+  const preview = []
+  for (const group of groups) {
+    let counter = startCounter
+    for (const file of group.files) {
+      const newName = generateLegacyName(group.folderName, file, counter)
+      preview.push({ id: file.id, oldName: file.name, newName, folderName: group.folderName })
+      counter += Math.floor(Math.random() * 1000) + 100
+    }
+  }
+  return preview
+}
 
 export default function DashboardPage({ auth, onLogout }) {
   const navigate = useNavigate()
@@ -9,17 +32,23 @@ export default function DashboardPage({ auth, onLogout }) {
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [step, setStep] = useState('browse') // browse, configure, preview, processing
+  const [step, setStep] = useState('browse')
 
-  // Pattern configurazione
+  // Configurazione
+  const [mode, setMode] = useState('legacy') // legacy | custom
+  const [includeRoot, setIncludeRoot] = useState(false)
   const [pattern, setPattern] = useState('folder-ext-seq')
   const [separator, setSeparator] = useState('_')
   const [startNumber, setStartNumber] = useState(1)
   const [padding, setPadding] = useState(3)
+
+  // Preview e risultati
   const [preview, setPreview] = useState([])
   const [results, setResults] = useState([])
 
-  // Carica i file della cartella corrente
+  // Progress
+  const [progress, setProgress] = useState({ current: 0, total: 0, currentFile: '' })
+
   const loadFolder = async (folderId) => {
     setLoading(true)
     setError('')
@@ -33,9 +62,7 @@ export default function DashboardPage({ auth, onLogout }) {
     }
   }
 
-  useEffect(() => {
-    loadFolder('root')
-  }, [auth.accessToken])
+  useEffect(() => { loadFolder('root') }, [auth.accessToken])
 
   const handleFolderClick = (folder) => {
     const newPath = [...folderPath, folder]
@@ -51,99 +78,101 @@ export default function DashboardPage({ auth, onLogout }) {
     }
   }
 
-  const handleGeneratePreview = () => {
-    const nonFolderFiles = files.filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
-    const currentFolder = folderPath[folderPath.length - 1]
-
-    const previewList = nonFolderFiles.map((file, index) => {
-      const num = (startNumber + index).toString().padStart(padding, '0')
-      const ext = file.name.substring(file.name.lastIndexOf('.')) || ''
-      const extName = ext.slice(1) || 'file'
-
-      let newName = ''
-      if (pattern === 'folder-ext-seq') {
-        newName = `${currentFolder.name}${separator}${extName}${separator}${num}${ext}`
-      } else if (pattern === 'seq-ext') {
-        newName = `${num}${separator}${extName}${ext}`
-      } else if (pattern === 'folder-seq') {
-        newName = `${currentFolder.name}${separator}${num}${ext}`
-      }
-
-      return {
-        id: file.id,
-        oldName: file.name,
-        newName: newName,
-      }
-    })
-
-    setPreview(previewList)
-    setStep('preview')
-  }
-
-  const handleApplyRenames = async () => {
-    setStep('processing')
+  const handleGeneratePreview = async () => {
     setLoading(true)
     setError('')
-
     try {
-      const renameList = preview.map(p => ({
-        id: p.id,
-        oldName: p.oldName,
-        newName: p.newName,
-      }))
+      const currentFolder = folderPath[folderPath.length - 1]
 
-      const renameResults = await batchRenameFiles(auth.accessToken, renameList)
-      setResults(renameResults)
-      setStep('done')
-      // Ricarica i file dopo il rename
-      await new Promise(r => setTimeout(r, 1000))
-      loadFolder(folderPath[folderPath.length - 1].id)
-    } catch (err) {
-      setError('Errore durante il rename: ' + err.message)
+      if (mode === 'legacy') {
+        const groups = await listFilesRecursive(auth.accessToken, currentFolder.id, currentFolder.name, includeRoot)
+        if (groups.length === 0 || groups.every(g => g.files.length === 0)) {
+          setError('Nessun file trovato' + (includeRoot ? '' : ' nelle sottocartelle') + '.')
+          setLoading(false)
+          return
+        }
+        setPreview(buildLegacyPreview(groups))
+      } else {
+        const nonFolderFiles = files.filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
+        const previewList = nonFolderFiles.map((file, index) => {
+          const num = (startNumber + index).toString().padStart(padding, '0')
+          const ext = file.name.substring(file.name.lastIndexOf('.')) || ''
+          const extName = ext.slice(1) || 'file'
+          let newName = ''
+          if (pattern === 'folder-ext-seq') newName = `${currentFolder.name}${separator}${extName}${separator}${num}${ext}`
+          else if (pattern === 'seq-ext') newName = `${num}${separator}${extName}${ext}`
+          else if (pattern === 'folder-seq') newName = `${currentFolder.name}${separator}${num}${ext}`
+          return { id: file.id, oldName: file.name, newName, folderName: currentFolder.name }
+        })
+        setPreview(previewList)
+      }
+
       setStep('preview')
+    } catch (err) {
+      setError('Errore nella generazione preview: ' + err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleLogout = () => {
-    onLogout()
-    navigate('/login')
-  }
-
-  const handleResetToDashboard = () => {
-    setStep('browse')
-    setPreview([])
-    setResults([])
+  const handleApplyRenames = async () => {
+    setStep('processing')
     setError('')
+    setProgress({ current: 0, total: preview.length, currentFile: '' })
+
+    const entries = []
+
+    for (let i = 0; i < preview.length; i++) {
+      const item = preview[i]
+      setProgress({ current: i + 1, total: preview.length, currentFile: item.oldName })
+      try {
+        await batchRenameFiles(auth.accessToken, [{ id: item.id, oldName: item.oldName, newName: item.newName }])
+        entries.push({ ...item, success: true })
+      } catch (err) {
+        entries.push({ ...item, success: false, error: err.message })
+      }
+    }
+
+    setResults(entries)
+
+    const currentFolder = folderPath[folderPath.length - 1]
+    saveSession({
+      date: new Date().toISOString(),
+      rootFolder: currentFolder.name,
+      mode,
+      entries,
+    })
+
+    setStep('done')
+    await new Promise(r => setTimeout(r, 500))
+    loadFolder(currentFolder.id)
   }
 
-  // === STEP: BROWSE ===
+  const handleLogout = () => { onLogout(); navigate('/login') }
+  const handleReset = () => { setStep('browse'); setPreview([]); setResults([]); setError('') }
+
+  // === BROWSE ===
   if (step === 'browse') {
     return (
       <div className="container">
         <div className="header">
           <div>
             <h1>🔄 BetterRenamer</h1>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              Batch rename per Google Drive
-            </p>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>Batch rename per Google Drive</p>
           </div>
           <div className="header-actions">
             <div className="user-info">
               <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Autenticato come</div>
               <div style={{ fontWeight: 600 }}>{auth.email}</div>
             </div>
-            <button onClick={handleLogout} className="btn-secondary">
-              Logout
-            </button>
+            <button onClick={() => navigate('/logs')} className="btn-secondary">📋 Logs</button>
+            <button onClick={handleLogout} className="btn-secondary">Logout</button>
           </div>
         </div>
 
         {error && <div className="error-message">{error}</div>}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          {/* Sinistra: File browser */}
           <div>
             <h3 style={{ marginBottom: '12px' }}>Esplora cartelle</h3>
             <div className="breadcrumb">
@@ -153,17 +182,12 @@ export default function DashboardPage({ auth, onLogout }) {
                   {idx === folderPath.length - 1 ? (
                     <strong>{folder.name}</strong>
                   ) : (
-                    <a
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        const newPath = folderPath.slice(0, idx + 1)
-                        setFolderPath(newPath)
-                        loadFolder(newPath[newPath.length - 1].id)
-                      }}
-                    >
-                      {folder.name}
-                    </a>
+                    <a href="#" onClick={(e) => {
+                      e.preventDefault()
+                      const newPath = folderPath.slice(0, idx + 1)
+                      setFolderPath(newPath)
+                      loadFolder(newPath[newPath.length - 1].id)
+                    }}>{folder.name}</a>
                   )}
                 </span>
               ))}
@@ -171,27 +195,17 @@ export default function DashboardPage({ auth, onLogout }) {
 
             <div className="file-list">
               {loading ? (
-                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
-                  Caricamento...
-                </div>
+                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>Caricamento...</div>
               ) : files.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
-                  Nessun file
-                </div>
+                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>Nessun file</div>
               ) : (
                 files.map((file) => (
                   <div
                     key={file.id}
-                    onClick={() => {
-                      if (file.mimeType === 'application/vnd.google-apps.folder') {
-                        handleFolderClick(file)
-                      }
-                    }}
+                    onClick={() => { if (file.mimeType === 'application/vnd.google-apps.folder') handleFolderClick(file) }}
                     className={`file-item ${file.mimeType === 'application/vnd.google-apps.folder' ? 'folder' : ''}`}
                   >
-                    <span className="file-icon">
-                      {file.mimeType === 'application/vnd.google-apps.folder' ? '📁' : '📄'}
-                    </span>
+                    <span className="file-icon">{file.mimeType === 'application/vnd.google-apps.folder' ? '📁' : '📄'}</span>
                     <span className="file-name">{file.name}</span>
                   </div>
                 ))
@@ -199,47 +213,72 @@ export default function DashboardPage({ auth, onLogout }) {
             </div>
 
             {folderPath.length > 1 && (
-              <button onClick={handleBackClick} className="btn-secondary" style={{ width: '100%', marginTop: '12px' }}>
-                ← Indietro
-              </button>
+              <button onClick={handleBackClick} className="btn-secondary" style={{ width: '100%', marginTop: '12px' }}>← Indietro</button>
             )}
           </div>
 
-          {/* Destra: Configurazione */}
           <div>
             <h3 style={{ marginBottom: '12px' }}>Configura pattern</h3>
 
             <div className="form-group">
-              <label>Pattern di rename</label>
-              <select value={pattern} onChange={(e) => setPattern(e.target.value)}>
-                <option value="folder-ext-seq">Cartella + Estensione + Sequenza</option>
-                <option value="seq-ext">Sequenza + Estensione</option>
-                <option value="folder-seq">Cartella + Sequenza</option>
+              <label>Modalità</label>
+              <select value={mode} onChange={(e) => setMode(e.target.value)}>
+                <option value="legacy">Legacy (cartella-counter)</option>
+                <option value="custom">Custom</option>
               </select>
             </div>
 
-            <div className="form-group">
-              <label>Separatore</label>
-              <input
-                type="text"
-                value={separator}
-                onChange={(e) => setSeparator(e.target.value)}
-                maxLength="3"
-              />
-            </div>
+            {mode === 'legacy' && (
+              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <input
+                  type="checkbox"
+                  id="includeRoot"
+                  checked={includeRoot}
+                  onChange={(e) => setIncludeRoot(e.target.checked)}
+                  style={{ width: 'auto', margin: 0 }}
+                />
+                <label htmlFor="includeRoot" style={{ margin: 0, cursor: 'pointer' }}>
+                  Includi file nella cartella selezionata
+                </label>
+              </div>
+            )}
 
-            <div className="form-group">
-              <label>Numero iniziale</label>
-              <input type="number" value={startNumber} onChange={(e) => setStartNumber(parseInt(e.target.value))} />
-            </div>
+            {mode === 'legacy' && (
+              <div style={{ background: 'var(--bg-secondary, #f5f5f5)', borderRadius: '8px', padding: '12px', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                Pattern: <code>cartella-[prefix]counter.ext</code><br />
+                Prefissi: <code>vid-</code> per video, <code>gif-</code> per gif<br />
+                Ordinamento: data modifica (dal più vecchio)<br />
+                Ricorsivo: processa tutte le sottocartelle
+              </div>
+            )}
 
-            <div className="form-group">
-              <label>Padding numerico</label>
-              <input type="number" value={padding} onChange={(e) => setPadding(parseInt(e.target.value))} min="1" max="10" />
-            </div>
+            {mode === 'custom' && (
+              <>
+                <div className="form-group">
+                  <label>Pattern di rename</label>
+                  <select value={pattern} onChange={(e) => setPattern(e.target.value)}>
+                    <option value="folder-ext-seq">Cartella + Estensione + Sequenza</option>
+                    <option value="seq-ext">Sequenza + Estensione</option>
+                    <option value="folder-seq">Cartella + Sequenza</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Separatore</label>
+                  <input type="text" value={separator} onChange={(e) => setSeparator(e.target.value)} maxLength="3" />
+                </div>
+                <div className="form-group">
+                  <label>Numero iniziale</label>
+                  <input type="number" value={startNumber} onChange={(e) => setStartNumber(parseInt(e.target.value))} />
+                </div>
+                <div className="form-group">
+                  <label>Padding numerico</label>
+                  <input type="number" value={padding} onChange={(e) => setPadding(parseInt(e.target.value))} min="1" max="10" />
+                </div>
+              </>
+            )}
 
-            <button onClick={handleGeneratePreview} className="btn-primary" style={{ width: '100%' }}>
-              Genera preview
+            <button onClick={handleGeneratePreview} className="btn-primary" style={{ width: '100%' }} disabled={loading}>
+              {loading ? 'Analisi in corso...' : 'Genera preview'}
             </button>
           </div>
         </div>
@@ -247,28 +286,26 @@ export default function DashboardPage({ auth, onLogout }) {
     )
   }
 
-  // === STEP: PREVIEW ===
+  // === PREVIEW ===
   if (step === 'preview') {
-    const successCount = preview.length
     return (
       <div className="container">
         <div className="header">
           <h1>🔄 Preview rinominazioni</h1>
           <div className="header-actions">
-            <button onClick={handleLogout} className="btn-secondary">
-              Logout
-            </button>
+            <button onClick={handleLogout} className="btn-secondary">Logout</button>
           </div>
         </div>
 
         <div style={{ marginBottom: '20px' }}>
-          <div className="badge success">{successCount} file da rinominare</div>
+          <div className="badge success">{preview.length} file da rinominare</div>
         </div>
 
         <div className="table-container">
           <table>
             <thead>
               <tr>
+                <th>Cartella</th>
                 <th>Nome attuale</th>
                 <th>Nuovo nome</th>
               </tr>
@@ -276,6 +313,7 @@ export default function DashboardPage({ auth, onLogout }) {
             <tbody>
               {preview.map((file, idx) => (
                 <tr key={idx}>
+                  <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{file.folderName}</td>
                   <td style={{ color: 'var(--text-secondary)' }}>{file.oldName}</td>
                   <td style={{ color: 'var(--success)', fontWeight: 600 }}>{file.newName}</td>
                 </tr>
@@ -285,45 +323,55 @@ export default function DashboardPage({ auth, onLogout }) {
         </div>
 
         <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
-          <button onClick={() => setStep('browse')} className="btn-secondary" style={{ flex: 1 }}>
-            Modifica configurazione
-          </button>
-          <button onClick={handleApplyRenames} disabled={loading} className="btn-primary" style={{ flex: 1 }}>
-            {loading ? 'Rinominando...' : 'Applica rinominazioni'}
-          </button>
+          <button onClick={() => setStep('browse')} className="btn-secondary" style={{ flex: 1 }}>Modifica configurazione</button>
+          <button onClick={handleApplyRenames} className="btn-primary" style={{ flex: 1 }}>Applica rinominazioni</button>
         </div>
       </div>
     )
   }
 
-  // === STEP: DONE ===
-  if (step === 'done') {
-    const successCount = results.filter((r) => r.success).length
-    const failCount = results.filter((r) => !r.success).length
+  // === PROCESSING ===
+  if (step === 'processing') {
+    const pct = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0
+    return (
+      <div className="container">
+        <div className="header"><h1>⏳ Rinominazione in corso...</h1></div>
+        <div style={{ marginTop: '40px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
+            <span>{progress.currentFile}</span>
+            <span>{progress.current} / {progress.total}</span>
+          </div>
+          <div style={{ background: '#e5e7eb', borderRadius: '999px', height: '12px', overflow: 'hidden' }}>
+            <div style={{ background: 'var(--primary, #3b82f6)', height: '100%', width: `${pct}%`, transition: 'width 0.2s ease' }} />
+          </div>
+          <div style={{ textAlign: 'center', marginTop: '12px', color: 'var(--text-muted)', fontSize: '13px' }}>{pct}%</div>
+        </div>
+      </div>
+    )
+  }
 
+  // === DONE ===
+  if (step === 'done') {
+    const successCount = results.filter(r => r.success).length
+    const failCount = results.filter(r => !r.success).length
     return (
       <div className="container">
         <div className="header">
           <h1>✅ Operazione completata</h1>
           <div className="header-actions">
-            <button onClick={handleLogout} className="btn-secondary">
-              Logout
-            </button>
+            <button onClick={() => navigate('/logs')} className="btn-secondary">📋 Logs</button>
+            <button onClick={handleLogout} className="btn-secondary">Logout</button>
           </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '20px' }}>
           <div className="stat-card">
-            <div className="stat-value" style={{ color: 'var(--success)' }}>
-              {successCount}
-            </div>
+            <div className="stat-value" style={{ color: 'var(--success)' }}>{successCount}</div>
             <div className="stat-label">Rinominati</div>
           </div>
           {failCount > 0 && (
             <div className="stat-card">
-              <div className="stat-value" style={{ color: 'var(--danger)' }}>
-                {failCount}
-              </div>
+              <div className="stat-value" style={{ color: 'var(--danger)' }}>{failCount}</div>
               <div className="stat-label">Errori</div>
             </div>
           )}
@@ -332,31 +380,22 @@ export default function DashboardPage({ auth, onLogout }) {
         <div className="table-container">
           <table>
             <thead>
-              <tr>
-                <th>Status</th>
-                <th>File</th>
-                <th>Messaggio</th>
-              </tr>
+              <tr><th>Status</th><th>Cartella</th><th>File</th><th>Messaggio</th></tr>
             </thead>
             <tbody>
-              {results.map((result, idx) => (
+              {results.map((r, idx) => (
                 <tr key={idx}>
-                  <td style={{ textAlign: 'center' }}>
-                    <span style={{ fontSize: '18px' }}>{result.success ? '✅' : '❌'}</span>
-                  </td>
-                  <td style={{ color: 'var(--text-secondary)' }}>{result.oldName}</td>
-                  <td style={{ color: result.success ? 'var(--success)' : 'var(--danger)' }}>
-                    {result.message}
-                  </td>
+                  <td style={{ textAlign: 'center' }}><span style={{ fontSize: '18px' }}>{r.success ? '✅' : '❌'}</span></td>
+                  <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{r.folderName}</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>{r.oldName}</td>
+                  <td style={{ color: r.success ? 'var(--success)' : 'var(--danger)' }}>{r.success ? r.newName : r.error}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        <button onClick={handleResetToDashboard} className="btn-primary" style={{ width: '100%', marginTop: '20px' }}>
-          Nuova sessione
-        </button>
+        <button onClick={handleReset} className="btn-primary" style={{ width: '100%', marginTop: '20px' }}>Nuova sessione</button>
       </div>
     )
   }
