@@ -1,4 +1,4 @@
-export const handler = async (event) => {
+exports.handler = async (event) => {
   const { refreshToken } = JSON.parse(event.body);
 
   if (!refreshToken) {

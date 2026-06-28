@@ -1,4 +1,4 @@
-export const handler = async (event) => {
+exports.handler = async (event) => {
   const { secret, token } = JSON.parse(event.body);
 
   if (!secret || !token) {
