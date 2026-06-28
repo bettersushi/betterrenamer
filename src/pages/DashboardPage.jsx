@@ -137,7 +137,7 @@ const IconXSmall = () => (
   </svg>
 )
 
-export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme }) {
+export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, onTokenRefresh }) {
   const navigate = useNavigate()
   const [logsOpen, setLogsOpen] = useState(false)
   const [logSessions, setLogSessions] = useState([])
@@ -300,13 +300,24 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
     startPending()
   }
 
-  const loadFolder = async (folderId) => {
+  const loadFolder = async (folderId, token) => {
     setBrowserLoading(true)
     setBrowserError('')
+    const accessToken = token || auth.accessToken
     try {
-      const data = await listFiles(auth.accessToken, folderId)
+      const data = await listFiles(accessToken, folderId)
       setFiles(data.files || [])
     } catch (err) {
+      if (err.status === 401 && onTokenRefresh) {
+        const newToken = await onTokenRefresh()
+        if (newToken) {
+          try {
+            const data = await listFiles(newToken, folderId)
+            setFiles(data.files || [])
+            return
+          } catch {}
+        }
+      }
       setBrowserError('Errore nel caricamento: ' + err.message)
     } finally {
       setBrowserLoading(false)

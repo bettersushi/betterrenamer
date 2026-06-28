@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
 import CallbackPage from './pages/CallbackPage'
 import DashboardPage from './pages/DashboardPage'
 import LogsPage from './pages/LogsPage'
+import { refreshAccessToken } from './auth'
 import './App.css'
 
 function App() {
@@ -38,6 +39,20 @@ function App() {
     localStorage.removeItem('betterrenamer_auth')
   }
 
+  const handleTokenRefresh = useCallback(async () => {
+    if (!auth?.refreshToken) { handleLogout(); return null }
+    try {
+      const data = await refreshAccessToken(auth.refreshToken)
+      const updated = { ...auth, accessToken: data.access_token }
+      setAuth(updated)
+      localStorage.setItem('betterrenamer_auth', JSON.stringify(updated))
+      return data.access_token
+    } catch {
+      handleLogout()
+      return null
+    }
+  }, [auth])
+
   if (loading) {
     return <div className="loading">Caricamento...</div>
   }
@@ -47,7 +62,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
         <Route path="/callback" element={<CallbackPage onLogin={handleLogin} />} />
-        <Route path="/" element={auth ? <DashboardPage auth={auth} onLogout={handleLogout} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} /> : <Navigate to="/login" />} />
+        <Route path="/" element={auth ? <DashboardPage auth={auth} onLogout={handleLogout} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} onTokenRefresh={handleTokenRefresh} /> : <Navigate to="/login" />} />
         <Route path="/logs" element={auth ? <LogsPage onLogout={handleLogout} /> : <Navigate to="/login" />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

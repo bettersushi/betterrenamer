@@ -15,6 +15,7 @@ export const listFiles = async (accessToken, folderId = 'root') => {
     const response = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
+    if (response.status === 401) throw Object.assign(new Error('Failed to list files'), { status: 401 })
     if (!response.ok) throw new Error('Failed to list files')
     const data = await response.json()
     allFiles.push(...(data.files || []))
