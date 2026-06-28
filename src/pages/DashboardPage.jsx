@@ -312,6 +312,11 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
   }
 
   const tooltipRef = useRef(null)
+  const folderTooltipRef = useRef(null)
+  const folderHoverTimer = useRef(null)
+  const folderThumbCache = useRef({})
+  const [folderTooltip, setFolderTooltip] = useState(null)
+
   const handleThumbEnter = (e, file) => {
     if (!file.thumbnailLink) return
     setThumbTooltip({ url: file.thumbnailLink, cx: e.clientX, cy: e.clientY })
@@ -320,15 +325,44 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
     if (thumbTooltip) setThumbTooltip(t => ({ ...t, cx: e.clientX, cy: e.clientY }))
   }
   const handleThumbLeave = () => setThumbTooltip(null)
-  useEffect(() => {
-    if (!thumbTooltip || !tooltipRef.current) return
-    const el = tooltipRef.current
+
+  const handleFolderThumbEnter = (e, folder) => {
+    const cx = e.clientX, cy = e.clientY
+    folderHoverTimer.current = setTimeout(async () => {
+      let thumbs = folderThumbCache.current[folder.id]
+      if (!thumbs) {
+        try {
+          const data = await listFiles(auth.accessToken, folder.id)
+          thumbs = data.files.filter(f => f.thumbnailLink).slice(0, 10).map(f => f.thumbnailLink)
+          folderThumbCache.current[folder.id] = thumbs
+        } catch { thumbs = [] }
+      }
+      if (thumbs.length > 0) setFolderTooltip({ thumbs, cx, cy })
+    }, 400)
+  }
+  const handleFolderThumbMove = (e) => {
+    if (folderTooltip) setFolderTooltip(t => ({ ...t, cx: e.clientX, cy: e.clientY }))
+  }
+  const handleFolderThumbLeave = () => {
+    clearTimeout(folderHoverTimer.current)
+    setFolderTooltip(null)
+  }
+
+  const positionTooltip = (el, cx, cy) => {
     const { width, height } = el.getBoundingClientRect()
-    const { cx, cy } = thumbTooltip
     const x = cx + 16 + width > window.innerWidth ? cx - width - 8 : cx + 16
     const y = cy + 16 + height > window.innerHeight ? cy - height - 8 : cy + 16
     el.style.left = x + 'px'
     el.style.top = y + 'px'
+  }
+
+  useEffect(() => {
+    if (!thumbTooltip || !tooltipRef.current) return
+    positionTooltip(tooltipRef.current, thumbTooltip.cx, thumbTooltip.cy)
+  })
+  useEffect(() => {
+    if (!folderTooltip || !folderTooltipRef.current) return
+    positionTooltip(folderTooltipRef.current, folderTooltip.cx, folderTooltip.cy)
   })
 
   const handleFileClick = (file, e) => {
@@ -488,9 +522,9 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
                         background: isChecked ? 'color-mix(in srgb, var(--primary) 8%, transparent)' : isSelected ? '#eff6ff' : undefined,
                         borderLeft: isChecked ? '3px solid var(--primary)' : isSelected ? '3px solid #3b82f6' : '3px solid transparent',
                       }}
-                      onMouseEnter={!isFolder ? (e) => handleThumbEnter(e, file) : undefined}
-                      onMouseMove={!isFolder ? handleThumbMove : undefined}
-                      onMouseLeave={!isFolder ? handleThumbLeave : undefined}
+                      onMouseEnter={isFolder ? (e) => handleFolderThumbEnter(e, file) : (e) => handleThumbEnter(e, file)}
+                      onMouseMove={isFolder ? handleFolderThumbMove : handleThumbMove}
+                      onMouseLeave={isFolder ? handleFolderThumbLeave : handleThumbLeave}
                     >
                       {mode === 'legacy' && isFolder && (
                         <div style={{ paddingLeft: '10px', display: 'flex', alignItems: 'center' }} onClick={e => toggleFolder(file.id, e)}>
@@ -729,6 +763,21 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
           padding: '4px', maxWidth: '220px',
         }}>
           <img src={thumbTooltip.url} style={{ width: '100%', borderRadius: '4px', display: 'block' }} alt="" />
+        </div>
+      )}
+      {folderTooltip && (
+        <div ref={folderTooltipRef} style={{
+          position: 'fixed', left: folderTooltip.cx + 16, top: folderTooltip.cy + 16,
+          zIndex: 2000, pointerEvents: 'none',
+          background: 'white', borderRadius: '10px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+          padding: '6px', width: '220px',
+        }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px' }}>
+            {folderTooltip.thumbs.map((url, i) => (
+              <img key={i} src={url} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '4px', display: 'block' }} alt="" />
+            ))}
+          </div>
         </div>
       )}
 
