@@ -56,7 +56,7 @@ export default function DashboardPage({ auth, onLogout }) {
 
   // Config
   const [mode, setMode] = useState('legacy')
-  const [includeRoot, setIncludeRoot] = useState(false)
+  const [includeRoot, setIncludeRoot] = useState(true)
   const [organizeMedia, setOrganizeMedia] = useState(true)
   const [pattern, setPattern] = useState('folder-ext-seq')
   const [separator, setSeparator] = useState('_')
@@ -240,9 +240,9 @@ export default function DashboardPage({ auth, onLogout }) {
   const doneJobs = queue.filter(j => j.status === 'done' || j.status === 'error')
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       {/* Header */}
-      <div className="header" style={{ padding: '12px 24px' }}>
+      <div className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0 }}>
         <div>
           <h1 style={{ fontSize: '20px', margin: 0 }}>🔄 BetterRenamer</h1>
           <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Batch rename per Google Drive</p>
@@ -257,13 +257,12 @@ export default function DashboardPage({ auth, onLogout }) {
         </div>
       </div>
 
-      {/* Main content: 2 colonne */}
-      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '16px', padding: '16px 24px', flex: 1, minHeight: 0 }}>
+      {/* Main content: sidebar + pannello destro */}
+      <div className="tool-body">
 
-        {/* Colonna 1: Browser */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Esplora cartelle</h3>
-          <div className="breadcrumb" style={{ fontSize: '12px' }}>
+        {/* Sidebar browser */}
+        <div style={{ width: '30%', minWidth: '300px', flexShrink: 0, overflowY: 'auto', borderRight: '1px solid #e5e7eb', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div className="breadcrumb" style={{ fontSize: '12px', margin: 0 }}>
             {folderPath.map((folder, idx) => (
               <span key={idx}>
                 {idx > 0 && <span> / </span>}
@@ -279,7 +278,7 @@ export default function DashboardPage({ auth, onLogout }) {
             ))}
           </div>
           {browserError && <div className="error-message" style={{ fontSize: '12px' }}>{browserError}</div>}
-          <div className="file-list" style={{ flex: 1, overflowY: 'auto', maxHeight: 'calc(100vh - 220px)' }}>
+          <div className="file-list" style={{ flex: 1, overflowY: 'auto' }}>
             {browserLoading ? (
               <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)', fontSize: '13px' }}>Caricamento...</div>
             ) : files.length === 0 ? (
@@ -303,13 +302,11 @@ export default function DashboardPage({ auth, onLogout }) {
           )}
         </div>
 
-        {/* Colonna 2: Config + Preview */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0 }}>
+        {/* Pannello destro: Config + Preview */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
           {/* Config */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Configura pattern</h3>
-
             <div className="form-group">
               <label>Modalità</label>
               <select value={mode} onChange={(e) => { setMode(e.target.value); setPreview([]) }}>

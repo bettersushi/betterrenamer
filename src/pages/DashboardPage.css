@@ -1,8 +1,14 @@
+.tool-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
 .breadcrumb {
   font-size: 13px;
   color: var(--text-secondary);
-  margin-bottom: 16px;
-  padding: 8px 0;
+  margin-bottom: 0;
+  padding: 0;
 }
 
 .breadcrumb a {
@@ -19,8 +25,8 @@
   background: var(--surface);
   border-radius: 8px;
   border: 1px solid var(--border);
-  max-height: 400px;
   overflow-y: auto;
+  flex: 1;
 }
 
 .file-item {
