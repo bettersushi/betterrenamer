@@ -9,9 +9,14 @@ import './App.css'
 function App() {
   const [auth, setAuth] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isDark, setIsDark] = useState(() => localStorage.getItem('br_theme') === 'dark')
 
   useEffect(() => {
-    // Controlla se l'utente è già autenticato
+    document.documentElement.dataset.theme = isDark ? 'dark' : 'light'
+    localStorage.setItem('br_theme', isDark ? 'dark' : 'light')
+  }, [isDark])
+
+  useEffect(() => {
     const storedAuth = localStorage.getItem('betterrenamer_auth')
     if (storedAuth) {
       try {
@@ -42,7 +47,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
         <Route path="/callback" element={<CallbackPage onLogin={handleLogin} />} />
-<Route path="/" element={auth ? <DashboardPage auth={auth} onLogout={handleLogout} /> : <Navigate to="/login" />} />
+        <Route path="/" element={auth ? <DashboardPage auth={auth} onLogout={handleLogout} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} /> : <Navigate to="/login" />} />
         <Route path="/logs" element={auth ? <LogsPage onLogout={handleLogout} /> : <Navigate to="/login" />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

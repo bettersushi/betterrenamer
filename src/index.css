@@ -12,6 +12,53 @@
   --border: #d3d1c7;
 }
 
+[data-theme="dark"] {
+  --primary: #5a9ee8;
+  --primary-dark: #3a7dcc;
+  --success: #7ec842;
+  --danger: #f06060;
+  --warning: #e0962a;
+  --bg: #111111;
+  --surface: #1c1c1c;
+  --text-primary: #e8e6e0;
+  --text-secondary: #9a9890;
+  --text-muted: #5a5854;
+  --border: #2e2e2a;
+}
+
+[data-theme="dark"] body {
+  background: var(--bg);
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+  background: #2a2a2a;
+}
+
+[data-theme="dark"] thead {
+  background: #242424;
+}
+
+[data-theme="dark"] tbody tr:hover {
+  background: #222222;
+}
+
+[data-theme="dark"] .file-item.folder:hover {
+  background: #222222;
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: #1c1c1c;
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] code {
+  background: #2a2a2a;
+  color: #aaa;
+}
+
 * {
   margin: 0;
   padding: 0;
