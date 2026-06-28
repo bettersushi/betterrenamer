@@ -335,8 +335,9 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
   }
   const handleThumbLeave = () => setThumbTooltip(null)
 
+  const folderCursorRef = useRef({ x: 0, y: 0 })
   const handleFolderEnter = (e, folder) => {
-    const rect = e.currentTarget.getBoundingClientRect()
+    folderCursorRef.current = { x: e.clientX, y: e.clientY }
     folderHoverTimer.current = setTimeout(async () => {
       let names = folderFileCache.current[folder.id]
       if (!names) {
@@ -346,8 +347,15 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
           folderFileCache.current[folder.id] = names
         } catch { names = [] }
       }
-      if (names.length > 0) setFolderTooltip({ names, x: rect.right + 8, y: rect.top })
+      if (names.length > 0) {
+        const { x, y } = folderCursorRef.current
+        setFolderTooltip({ names, x: x + 16, y: y + 16 })
+      }
     }, 350)
+  }
+  const handleFolderMove = (e) => {
+    folderCursorRef.current = { x: e.clientX, y: e.clientY }
+    if (folderTooltip) setFolderTooltip(t => ({ ...t, x: e.clientX + 16, y: e.clientY + 16 }))
   }
   const handleFolderLeave = () => {
     clearTimeout(folderHoverTimer.current)
@@ -542,7 +550,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
                         borderLeft: isChecked ? '3px solid var(--primary)' : isSelected ? '3px solid #3b82f6' : '3px solid transparent',
                       }}
                       onMouseEnter={isFolder ? (e) => handleFolderEnter(e, file) : (e) => handleThumbEnter(e, file)}
-                      onMouseMove={!isFolder ? handleThumbMove : undefined}
+                      onMouseMove={isFolder ? handleFolderMove : handleThumbMove}
                       onMouseLeave={isFolder ? handleFolderLeave : handleThumbLeave}
                     >
                       {mode === 'legacy' && isFolder && (
@@ -684,7 +692,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
                         <td style={{ padding: '4px 6px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             {item.thumbnailLink
-                              ? <img src={item.thumbnailLink} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} alt="" />
+                              ? <img src={`${item.thumbnailLink}&access_token=${auth.accessToken}`} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} alt="" />
                               : <span style={{ width: '56px', height: '56px', flexShrink: 0, background: 'var(--border)', borderRadius: '4px', display: 'block' }} />
                             }
                             <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{item.oldName}</span>
@@ -784,7 +792,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
           boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
           padding: '4px', maxWidth: '220px',
         }}>
-          <img src={thumbTooltip.url} style={{ width: '100%', borderRadius: '4px', display: 'block' }} alt="" />
+          <img src={`${thumbTooltip.url}&access_token=${auth.accessToken}`} style={{ width: '100%', borderRadius: '4px', display: 'block' }} alt="" />
         </div>
       )}
       {folderTooltip && (
