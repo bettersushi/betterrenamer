@@ -469,7 +469,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
                   <input type="checkbox" id="organizeMedia" checked={organizeMedia} onChange={(e) => setOrganizeMedia(e.target.checked)} style={{ width: 'auto', margin: 0 }} />
                   <label htmlFor="organizeMedia" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Sposta video/gif in sottocartelle <em>(Air Vid, Air Gif)</em></label>
                 </div>
-                <div style={{ background: '#f5f5f5', borderRadius: '8px', padding: '8px 10px', fontSize: '12px', color: '#888', lineHeight: '1.6' }}>
+                <div className="pattern-info">
                   Pattern: <code>cartella-[prefix]counter.ext</code> · Prefissi: <code>vid-</code> <code>gif-</code> · Sort: data modifica · Ricorsivo
                 </div>
               </>
@@ -552,7 +552,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
 
       {/* Queue panel */}
       {queueHasItems && (
-        <div style={{ borderTop: '2px solid #e5e7eb', background: '#fafafa', padding: '12px 24px', maxHeight: '260px', overflowY: 'auto' }}>
+        <div className="queue-panel">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
               <IconList /> Coda
@@ -578,7 +578,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
               const failCount = job.entries.filter(e => !e.success).length
 
               return (
-                <div key={job.id} style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '10px 14px' }}>
+                <div key={job.id} className="queue-job">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: job.status === 'running' ? '6px' : 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ display: 'flex', color: '#888' }}>
@@ -608,7 +608,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
                         <span><strong style={{ color: '#3b82f6' }}>{job.progress.phase}</strong> {job.progress.currentFile}</span>
                         <span>{pct}%</span>
                       </div>
-                      <div style={{ background: '#e5e7eb', borderRadius: '999px', height: '6px', overflow: 'hidden' }}>
+                      <div className="queue-progress-bg">
                         <div style={{ background: '#3b82f6', height: '100%', width: `${pct}%`, transition: 'width 0.2s ease' }} />
                       </div>
                     </>

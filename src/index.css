@@ -66,7 +66,8 @@
 }
 
 body {
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'Sora', system-ui, -apple-system, sans-serif;
+  font-size: 15px;
   color: var(--text-primary);
   background: var(--bg);
   line-height: 1.6;

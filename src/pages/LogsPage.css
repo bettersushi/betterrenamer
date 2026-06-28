@@ -1,0 +1,57 @@
+.session-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.session-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  cursor: pointer;
+  background: var(--surface);
+  transition: background 0.15s;
+}
+
+.session-header.open,
+.session-header:hover {
+  background: var(--bg);
+}
+
+[data-theme="dark"] .session-header.open,
+[data-theme="dark"] .session-header:hover {
+  background: #1a1a18;
+}
+
+.session-body {
+  border-top: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.badge-success {
+  font-size: 12px;
+  background: #dcfce7;
+  color: #16a34a;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+[data-theme="dark"] .badge-success {
+  background: #14301a;
+  color: #4ade80;
+}
+
+.badge-error {
+  font-size: 12px;
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+[data-theme="dark"] .badge-error {
+  background: #2f1111;
+  color: #f87171;
+}
