@@ -37,7 +37,7 @@ function buildLegacyPreview(groups) {
     for (const file of group.files) {
       if (!isMediaFile(file)) continue
       const newName = generateLegacyName(group.folderName, file.name, file.mimeType, counter)
-      preview.push({ id: file.id, oldName: file.name, newName, folderName: group.folderName, folderId: group.folderId, mimeType: file.mimeType })
+      preview.push({ id: file.id, oldName: file.name, newName, folderName: group.folderName, folderId: group.folderId, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || null })
       counter += Math.floor(Math.random() * 1000) + 100
     }
   }
@@ -420,7 +420,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
           if (pattern === 'folder-ext-seq') newName = `${currentFolder.name}${separator}${extName}${separator}${num}${ext}`
           else if (pattern === 'seq-ext') newName = `${num}${separator}${extName}${ext}`
           else if (pattern === 'folder-seq') newName = `${currentFolder.name}${separator}${num}${ext}`
-          return { id: file.id, oldName: file.name, newName, folderName: currentFolder.name, folderId: currentFolder.id, mimeType: file.mimeType }
+          return { id: file.id, oldName: file.name, newName, folderName: currentFolder.name, folderId: currentFolder.id, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || null }
         })
         setPreview(previewList)
       }
@@ -561,11 +561,8 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
                         <span className="file-name">{file.name}</span>
                       </div>
                       {!isFolder && (
-                        <div className="file-thumb-col" onClick={e => e.stopPropagation()}>
-                          {file.thumbnailLink
-                            ? <img src={file.thumbnailLink} className="file-thumb-img" alt="" />
-                            : <span className="file-thumb-empty"><IconEye /></span>
-                          }
+                        <div className="file-preview-col" onClick={e => e.stopPropagation()}>
+                          <IconEye />
                         </div>
                       )}
                     </div>
@@ -682,10 +679,18 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
                   </thead>
                   <tbody>
                     {preview.map((item, idx) => (
-                      <tr key={idx} style={{ borderTop: idx > 0 ? '1px solid #f3f4f6' : 'none' }}>
-                        <td style={{ padding: '4px 10px', color: '#aaa', whiteSpace: 'nowrap' }}>{item.folderName}</td>
-                        <td style={{ padding: '4px 10px', color: 'var(--text-secondary)' }}>{item.oldName}</td>
-                        <td style={{ padding: '4px 10px', color: 'var(--success, #16a34a)', fontWeight: 500 }}>{item.newName}</td>
+                      <tr key={idx} style={{ borderTop: idx > 0 ? '1px solid var(--border)' : 'none' }}>
+                        <td style={{ padding: '4px 10px', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontSize: '11px' }}>{item.folderName}</td>
+                        <td style={{ padding: '4px 6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                            {item.thumbnailLink
+                              ? <img src={item.thumbnailLink} style={{ width: '28px', height: '28px', objectFit: 'cover', borderRadius: '3px', flexShrink: 0 }} alt="" />
+                              : <span style={{ width: '28px', height: '28px', flexShrink: 0 }} />
+                            }
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{item.oldName}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '4px 10px', color: 'var(--success, #16a34a)', fontWeight: 500, fontSize: '13px' }}>{item.newName}</td>
                       </tr>
                     ))}
                   </tbody>
