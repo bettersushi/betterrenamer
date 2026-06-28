@@ -359,7 +359,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     setThumbTooltip({ url: file.thumbnailLink, cx: e.clientX, cy: e.clientY })
   }
   const handleThumbMove = (e) => {
-    if (thumbTooltip) setThumbTooltip(t => ({ ...t, cx: e.clientX, cy: e.clientY }))
+    setThumbTooltip(t => t ? { ...t, cx: e.clientX, cy: e.clientY } : null)
   }
   const handleThumbLeave = () => setThumbTooltip(null)
 
@@ -391,7 +391,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
   }
   const handleFolderMove = (e) => {
     folderCursorRef.current = { x: e.clientX, y: e.clientY }
-    if (folderTooltip) setFolderTooltip(t => ({ ...t, x: e.clientX + 16, y: e.clientY + 16 }))
+    setFolderTooltip(t => t ? { ...t, x: e.clientX + 16, y: e.clientY + 16 } : null)
   }
   const handleFolderLeave = () => {
     activeFolderRef.current = null
@@ -902,7 +902,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
           <img src={`${thumbTooltip.url}`} style={{ width: '100%', borderRadius: '4px', display: 'block' }} alt="" />
         </div>
       )}
-      {folderTooltip && (
+      {folderTooltip?.items && (
         <div style={{
           position: 'fixed', left: folderTooltip.x, top: folderTooltip.y,
           zIndex: 2000, pointerEvents: 'none',
