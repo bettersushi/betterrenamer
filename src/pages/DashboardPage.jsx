@@ -301,12 +301,18 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
     }
   }
 
+  const clampTooltipPos = (cx, cy) => {
+    const W = 228, H = 180 // conservative estimate of tooltip size
+    const x = cx + 16 + W > window.innerWidth ? cx - W - 8 : cx + 16
+    const y = cy + 16 + H > window.innerHeight ? cy - H - 8 : cy + 16
+    return { x, y }
+  }
   const handleThumbEnter = (e, file) => {
     if (!file.thumbnailLink) return
-    setThumbTooltip({ url: file.thumbnailLink, x: e.clientX + 16, y: e.clientY + 16 })
+    setThumbTooltip({ url: file.thumbnailLink, ...clampTooltipPos(e.clientX, e.clientY) })
   }
   const handleThumbMove = (e) => {
-    if (thumbTooltip) setThumbTooltip(t => ({ ...t, x: e.clientX + 16, y: e.clientY + 16 }))
+    if (thumbTooltip) setThumbTooltip(t => ({ ...t, ...clampTooltipPos(e.clientX, e.clientY) }))
   }
   const handleThumbLeave = () => setThumbTooltip(null)
 
