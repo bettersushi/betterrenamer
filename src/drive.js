@@ -3,7 +3,8 @@ export const listFiles = async (accessToken, folderId = 'root', pageToken = null
     q: `'${folderId}' in parents and trashed = false`,
     spaces: 'drive',
     fields: 'files(id,name,mimeType,size,createdTime),nextPageToken',
-    pageSize: 50,
+    pageSize: 1000,
+    orderBy: 'folder,name',
     pageToken: pageToken || '',
   });
 
