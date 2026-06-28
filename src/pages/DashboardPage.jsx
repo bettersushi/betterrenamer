@@ -82,6 +82,16 @@ const IconRefresh = () => (
     <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
   </svg>
 )
+const IconHome = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+  </svg>
+)
+const IconChevronLeft = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 18 9 12 15 6"/>
+  </svg>
+)
 const IconClock = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
@@ -469,21 +479,42 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
 
         {/* Sidebar browser */}
         <div className="sidebar">
-          <div className="breadcrumb" style={{ fontSize: '12px', margin: 0 }}>
-            {folderPath.map((folder, idx) => (
-              <span key={idx}>
-                {idx > 0 && <span> / </span>}
-                {idx === folderPath.length - 1 ? <strong>{folder.name}</strong> : (
-                  <a href="#" onClick={(e) => {
-                    e.preventDefault()
-                    const newPath = folderPath.slice(0, idx + 1)
-                    setFolderPath(newPath)
-                    loadFolder(newPath[newPath.length - 1].id)
-                    setCheckedFolders(new Set())
-                  }}>{folder.name}</a>
-                )}
-              </span>
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div className="breadcrumb" style={{ fontSize: '12px', margin: 0, flex: 1, minWidth: 0 }}>
+              {folderPath.map((folder, idx) => (
+                <span key={idx}>
+                  {idx > 0 && <span> / </span>}
+                  {idx === folderPath.length - 1 ? <strong>{folder.name}</strong> : (
+                    <a href="#" onClick={(e) => {
+                      e.preventDefault()
+                      const newPath = folderPath.slice(0, idx + 1)
+                      setFolderPath(newPath)
+                      loadFolder(newPath[newPath.length - 1].id)
+                      setCheckedFolders(new Set())
+                    }}>{folder.name}</a>
+                  )}
+                </span>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '2px', flexShrink: 0 }}>
+              <button
+                className="nav-icon-btn"
+                onClick={handleBackClick}
+                disabled={folderPath.length <= 1}
+                title="Indietro"
+              ><IconChevronLeft /></button>
+              <button
+                className="nav-icon-btn"
+                onClick={() => { setFolderPath([{ id: 'root', name: 'My Drive' }]); loadFolder('root'); setCheckedFolders(new Set()) }}
+                disabled={folderPath.length <= 1}
+                title="Home"
+              ><IconHome /></button>
+              <button
+                className="nav-icon-btn"
+                onClick={() => loadFolder(folderPath[folderPath.length - 1].id)}
+                title="Ricarica"
+              ><IconRefresh /></button>
+            </div>
           </div>
           {browserError && <div className="error-message" style={{ fontSize: '12px' }}>{browserError}</div>}
           <div className="file-list" style={{ flex: 1, overflowY: 'auto' }}>
@@ -559,9 +590,6 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
               ? `${selectedFiles.length} selezionato${selectedFiles.length > 1 ? 'i' : ''} · ␣ per anteprima`
               : 'Click per selezionare · Cmd+click per più file · ␣ anteprima'}
           </div>
-          {folderPath.length > 1 && (
-            <button onClick={handleBackClick} className="btn-secondary" style={{ width: '100%', fontSize: '13px', padding: '6px' }}>← Indietro</button>
-          )}
           {recentFolders.length > 0 && (
             <div className="recent-folders">
               <div className="recent-folders-label">Recenti</div>
