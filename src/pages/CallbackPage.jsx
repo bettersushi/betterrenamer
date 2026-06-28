@@ -22,17 +22,14 @@ export default function CallbackPage({ onLogin }) {
         // Scambia il codice con il token
         const tokenData = await exchangeCodeForToken(code)
 
-        // Salva i dati di autenticazione e vai a 2FA
         onLogin({
           accessToken: tokenData.access_token,
           refreshToken: tokenData.refresh_token,
           expiresIn: tokenData.expires_in,
           email: tokenData.email,
-          twoFASecret: null,
         })
 
-        // Redirect a 2FA setup o dashboard
-        navigate('/2fa')
+        navigate('/')
       } catch (err) {
         setError('Errore durante l\'autenticazione: ' + err.message)
         setLoading(false)

@@ -38,14 +38,3 @@ export const refreshAccessToken = async (refreshToken) => {
   if (!response.ok) throw new Error('Token refresh failed');
   return response.json();
 };
-
-export const verifyTwoFA = async (secret, token) => {
-  const response = await fetch('/api/verify-2fa', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ secret, token }),
-  });
-
-  if (!response.ok) throw new Error('2FA verification failed');
-  return response.json();
-};

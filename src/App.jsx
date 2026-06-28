@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
 import CallbackPage from './pages/CallbackPage'
-import TwoFAPage from './pages/TwoFAPage'
 import DashboardPage from './pages/DashboardPage'
 import LogsPage from './pages/LogsPage'
 import './App.css'
@@ -43,8 +42,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
         <Route path="/callback" element={<CallbackPage onLogin={handleLogin} />} />
-        <Route path="/2fa" element={auth ? <TwoFAPage auth={auth} onLogin={handleLogin} /> : <Navigate to="/login" />} />
-        <Route path="/" element={auth ? <DashboardPage auth={auth} onLogout={handleLogout} /> : <Navigate to="/login" />} />
+<Route path="/" element={auth ? <DashboardPage auth={auth} onLogout={handleLogout} /> : <Navigate to="/login" />} />
         <Route path="/logs" element={auth ? <LogsPage onLogout={handleLogout} /> : <Navigate to="/login" />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
