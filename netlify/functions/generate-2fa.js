@@ -1,3 +1,5 @@
+const QRCode = require('qrcode');
+
 exports.handler = async (event) => {
   try {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -7,15 +9,14 @@ exports.handler = async (event) => {
     }
     const email = 'user@betterrenamer.app';
 
-    const qrCodeUrl = `https://chart.googleapis.com/chart?chs=200x200&chld=M|0&cht=qr&chl=${encodeURIComponent(
-      `otpauth://totp/BetterRenamer:${email}?secret=${secret}&issuer=BetterRenamer`
-    )}`;
+    const otpauth = `otpauth://totp/BetterRenamer:${email}?secret=${secret}&issuer=BetterRenamer`;
+    const qrCode = await QRCode.toDataURL(otpauth);
 
     return {
       statusCode: 200,
       body: JSON.stringify({
         secret,
-        qrCode: qrCodeUrl,
+        qrCode,
       }),
     };
   } catch (error) {
