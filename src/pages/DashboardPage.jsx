@@ -124,6 +124,9 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
   const [files, setFiles] = useState([])
   const [browserLoading, setBrowserLoading] = useState(false)
   const [browserError, setBrowserError] = useState('')
+  const [recentFolders, setRecentFolders] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('br_recent_folders') || '[]') } catch { return [] }
+  })
 
   // Quick Look
   const [selectedFiles, setSelectedFiles] = useState([])
@@ -290,6 +293,13 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
     setFolderPath(newPath)
     loadFolder(folder.id)
     setCheckedFolders(new Set())
+    if (folder.id !== 'root') {
+      setRecentFolders(prev => {
+        const updated = [folder, ...prev.filter(f => f.id !== folder.id)].slice(0, 8)
+        localStorage.setItem('br_recent_folders', JSON.stringify(updated))
+        return updated
+      })
+    }
   }
 
   const handleBackClick = () => {
@@ -517,6 +527,23 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
           </div>
           {folderPath.length > 1 && (
             <button onClick={handleBackClick} className="btn-secondary" style={{ width: '100%', fontSize: '13px', padding: '6px' }}>← Indietro</button>
+          )}
+          {recentFolders.length > 0 && (
+            <div className="recent-folders">
+              <div className="recent-folders-label">Recenti</div>
+              <div className="recent-folders-tags">
+                {recentFolders.map(f => (
+                  <button
+                    key={f.id}
+                    className="recent-tag"
+                    onClick={() => { setFolderPath([{ id: 'root', name: 'My Drive' }, f]); loadFolder(f.id); setCheckedFolders(new Set()) }}
+                    title={f.name}
+                  >
+                    {f.name}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
