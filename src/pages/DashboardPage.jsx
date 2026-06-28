@@ -257,8 +257,8 @@ export default function DashboardPage({ auth, onLogout }) {
         </div>
       </div>
 
-      {/* Main content */}
-      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr 1fr', gap: '16px', padding: '16px 24px', flex: 1, minHeight: 0 }}>
+      {/* Main content: 2 colonne */}
+      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '16px', padding: '16px 24px', flex: 1, minHeight: 0 }}>
 
         {/* Colonna 1: Browser */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -279,7 +279,7 @@ export default function DashboardPage({ auth, onLogout }) {
             ))}
           </div>
           {browserError && <div className="error-message" style={{ fontSize: '12px' }}>{browserError}</div>}
-          <div className="file-list" style={{ flex: 1, overflowY: 'auto', maxHeight: 'calc(100vh - 280px)' }}>
+          <div className="file-list" style={{ flex: 1, overflowY: 'auto', maxHeight: 'calc(100vh - 220px)' }}>
             {browserLoading ? (
               <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)', fontSize: '13px' }}>Caricamento...</div>
             ) : files.length === 0 ? (
@@ -303,109 +303,109 @@ export default function DashboardPage({ auth, onLogout }) {
           )}
         </div>
 
-        {/* Colonna 2: Config */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Configura pattern</h3>
+        {/* Colonna 2: Config + Preview */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0 }}>
 
-          <div className="form-group">
-            <label>Modalità</label>
-            <select value={mode} onChange={(e) => { setMode(e.target.value); setPreview([]) }}>
-              <option value="legacy">Legacy (cartella-counter)</option>
-              <option value="custom">Custom</option>
-            </select>
+          {/* Config */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Configura pattern</h3>
+
+            <div className="form-group">
+              <label>Modalità</label>
+              <select value={mode} onChange={(e) => { setMode(e.target.value); setPreview([]) }}>
+                <option value="legacy">Legacy (cartella-counter)</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+
+            {mode === 'legacy' && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input type="checkbox" id="includeRoot" checked={includeRoot} onChange={(e) => { setIncludeRoot(e.target.checked); setPreview([]) }} style={{ width: 'auto', margin: 0 }} />
+                  <label htmlFor="includeRoot" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Includi file nella cartella selezionata</label>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input type="checkbox" id="organizeMedia" checked={organizeMedia} onChange={(e) => setOrganizeMedia(e.target.checked)} style={{ width: 'auto', margin: 0 }} />
+                  <label htmlFor="organizeMedia" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Sposta video/gif in sottocartelle <em>(Air Vid, Air Gif)</em></label>
+                </div>
+                <div style={{ background: '#f5f5f5', borderRadius: '8px', padding: '8px 10px', fontSize: '12px', color: '#888', lineHeight: '1.6' }}>
+                  Pattern: <code>cartella-[prefix]counter.ext</code> · Prefissi: <code>vid-</code> <code>gif-</code> · Sort: data modifica · Ricorsivo
+                </div>
+              </>
+            )}
+
+            {mode === 'custom' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label>Pattern</label>
+                  <select value={pattern} onChange={(e) => { setPattern(e.target.value); setPreview([]) }}>
+                    <option value="folder-ext-seq">Cartella + Estensione + Sequenza</option>
+                    <option value="seq-ext">Sequenza + Estensione</option>
+                    <option value="folder-seq">Cartella + Sequenza</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Separatore</label>
+                  <input type="text" value={separator} onChange={(e) => { setSeparator(e.target.value); setPreview([]) }} maxLength="3" />
+                </div>
+                <div className="form-group">
+                  <label>Numero iniziale</label>
+                  <input type="number" value={startNumber} onChange={(e) => { setStartNumber(parseInt(e.target.value)); setPreview([]) }} />
+                </div>
+                <div className="form-group">
+                  <label>Padding numerico</label>
+                  <input type="number" value={padding} onChange={(e) => { setPadding(parseInt(e.target.value)); setPreview([]) }} min="1" max="10" />
+                </div>
+              </div>
+            )}
+
+            <button onClick={handleGeneratePreview} className="btn-primary" disabled={previewLoading}>
+              {previewLoading ? 'Analisi in corso...' : '🔍 Genera preview'}
+            </button>
           </div>
 
-          {mode === 'legacy' && (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input type="checkbox" id="includeRoot" checked={includeRoot} onChange={(e) => { setIncludeRoot(e.target.checked); setPreview([]) }} style={{ width: 'auto', margin: 0 }} />
-                <label htmlFor="includeRoot" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Includi file nella cartella selezionata</label>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input type="checkbox" id="organizeMedia" checked={organizeMedia} onChange={(e) => setOrganizeMedia(e.target.checked)} style={{ width: 'auto', margin: 0 }} />
-                <label htmlFor="organizeMedia" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Sposta video/gif in sottocartelle <em>(Air Vid, Air Gif)</em></label>
-              </div>
-              <div style={{ background: '#f5f5f5', borderRadius: '8px', padding: '10px', fontSize: '12px', color: '#888', lineHeight: '1.6' }}>
-                Pattern: <code>cartella-[prefix]counter.ext</code><br />
-                Prefissi: <code>vid-</code> video · <code>gif-</code> gif<br />
-                Sort: data modifica · Ricorsivo
-              </div>
-            </>
-          )}
-
-          {mode === 'custom' && (
-            <>
-              <div className="form-group">
-                <label>Pattern</label>
-                <select value={pattern} onChange={(e) => { setPattern(e.target.value); setPreview([]) }}>
-                  <option value="folder-ext-seq">Cartella + Estensione + Sequenza</option>
-                  <option value="seq-ext">Sequenza + Estensione</option>
-                  <option value="folder-seq">Cartella + Sequenza</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Separatore</label>
-                <input type="text" value={separator} onChange={(e) => { setSeparator(e.target.value); setPreview([]) }} maxLength="3" />
-              </div>
-              <div className="form-group">
-                <label>Numero iniziale</label>
-                <input type="number" value={startNumber} onChange={(e) => { setStartNumber(parseInt(e.target.value)); setPreview([]) }} />
-              </div>
-              <div className="form-group">
-                <label>Padding numerico</label>
-                <input type="number" value={padding} onChange={(e) => { setPadding(parseInt(e.target.value)); setPreview([]) }} min="1" max="10" />
-              </div>
-            </>
-          )}
-
-          <button onClick={handleGeneratePreview} className="btn-primary" disabled={previewLoading}>
-            {previewLoading ? 'Analisi in corso...' : '🔍 Genera preview'}
-          </button>
-        </div>
-
-        {/* Colonna 3: Preview inline */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {/* Preview */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: 0 }}>
             <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>
               Preview
               {preview.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', fontWeight: 400, color: 'var(--text-muted)' }}>{preview.length} file · {previewFolder?.name}</span>}
             </h3>
-          </div>
 
-          {previewError && <div className="error-message" style={{ fontSize: '12px' }}>{previewError}</div>}
+            {previewError && <div className="error-message" style={{ fontSize: '12px' }}>{previewError}</div>}
 
-          <div style={{ flex: 1, overflowY: 'auto', maxHeight: 'calc(100vh - 280px)', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
-            {preview.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)', fontSize: '13px' }}>
-                {previewLoading ? 'Analisi cartelle in corso...' : 'Genera una preview per vedere i file che verranno rinominati.'}
-              </div>
-            ) : (
-              <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
-                <thead style={{ position: 'sticky', top: 0, background: '#f9fafb', zIndex: 1 }}>
-                  <tr>
-                    <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Cartella</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Originale</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Nuovo nome</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.map((item, idx) => (
-                    <tr key={idx} style={{ borderTop: idx > 0 ? '1px solid #f3f4f6' : 'none' }}>
-                      <td style={{ padding: '5px 10px', color: '#aaa', whiteSpace: 'nowrap' }}>{item.folderName}</td>
-                      <td style={{ padding: '5px 10px', color: 'var(--text-secondary)' }}>{item.oldName}</td>
-                      <td style={{ padding: '5px 10px', color: 'var(--success, #16a34a)', fontWeight: 500 }}>{item.newName}</td>
+            <div style={{ overflowY: 'auto', maxHeight: '320px', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+              {preview.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '30px 20px', color: 'var(--text-muted)', fontSize: '13px' }}>
+                  {previewLoading ? 'Analisi cartelle in corso...' : 'Genera una preview per vedere i file che verranno rinominati.'}
+                </div>
+              ) : (
+                <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
+                  <thead style={{ position: 'sticky', top: 0, background: '#f9fafb', zIndex: 1 }}>
+                    <tr>
+                      <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Cartella</th>
+                      <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Originale</th>
+                      <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Nuovo nome</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {preview.map((item, idx) => (
+                      <tr key={idx} style={{ borderTop: idx > 0 ? '1px solid #f3f4f6' : 'none' }}>
+                        <td style={{ padding: '4px 10px', color: '#aaa', whiteSpace: 'nowrap' }}>{item.folderName}</td>
+                        <td style={{ padding: '4px 10px', color: 'var(--text-secondary)' }}>{item.oldName}</td>
+                        <td style={{ padding: '4px 10px', color: 'var(--success, #16a34a)', fontWeight: 500 }}>{item.newName}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {preview.length > 0 && (
+              <button onClick={handleAddToQueue} className="btn-primary">
+                ➕ Aggiungi alla coda ({preview.length} file)
+              </button>
             )}
           </div>
-
-          {preview.length > 0 && (
-            <button onClick={handleAddToQueue} className="btn-primary">
-              ➕ Aggiungi alla coda ({preview.length} file)
-            </button>
-          )}
         </div>
       </div>
 
