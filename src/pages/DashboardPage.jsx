@@ -301,20 +301,25 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
     }
   }
 
-  const clampTooltipPos = (cx, cy) => {
-    const W = 228, H = 180 // conservative estimate of tooltip size
-    const x = cx + 16 + W > window.innerWidth ? cx - W - 8 : cx + 16
-    const y = cy + 16 + H > window.innerHeight ? cy - H - 8 : cy + 16
-    return { x, y }
-  }
+  const tooltipRef = useRef(null)
   const handleThumbEnter = (e, file) => {
     if (!file.thumbnailLink) return
-    setThumbTooltip({ url: file.thumbnailLink, ...clampTooltipPos(e.clientX, e.clientY) })
+    setThumbTooltip({ url: file.thumbnailLink, cx: e.clientX, cy: e.clientY })
   }
   const handleThumbMove = (e) => {
-    if (thumbTooltip) setThumbTooltip(t => ({ ...t, ...clampTooltipPos(e.clientX, e.clientY) }))
+    if (thumbTooltip) setThumbTooltip(t => ({ ...t, cx: e.clientX, cy: e.clientY }))
   }
   const handleThumbLeave = () => setThumbTooltip(null)
+  useEffect(() => {
+    if (!thumbTooltip || !tooltipRef.current) return
+    const el = tooltipRef.current
+    const { width, height } = el.getBoundingClientRect()
+    const { cx, cy } = thumbTooltip
+    const x = cx + 16 + width > window.innerWidth ? cx - width - 8 : cx + 16
+    const y = cy + 16 + height > window.innerHeight ? cy - height - 8 : cy + 16
+    el.style.left = x + 'px'
+    el.style.top = y + 'px'
+  })
 
   const handleFileClick = (file, e) => {
     if (file.mimeType === 'application/vnd.google-apps.folder') {
@@ -689,8 +694,8 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
         </div>
       )}
       {thumbTooltip && (
-        <div style={{
-          position: 'fixed', left: thumbTooltip.x, top: thumbTooltip.y,
+        <div ref={tooltipRef} style={{
+          position: 'fixed', left: thumbTooltip.cx + 16, top: thumbTooltip.cy + 16,
           zIndex: 2000, pointerEvents: 'none',
           background: 'white', borderRadius: '8px',
           boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
