@@ -364,9 +364,13 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
   const handleThumbLeave = () => setThumbTooltip(null)
 
   const folderCursorRef = useRef({ x: 0, y: 0 })
+  const activeFolderRef = useRef(null)
   const handleFolderEnter = (e, folder) => {
     folderCursorRef.current = { x: e.clientX, y: e.clientY }
+    activeFolderRef.current = folder.id
+    clearTimeout(folderHoverTimer.current)
     folderHoverTimer.current = setTimeout(async () => {
+      if (activeFolderRef.current !== folder.id) return
       let items = folderFileCache.current[folder.id]
       if (!items) {
         try {
@@ -378,17 +382,19 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
           folderFileCache.current[folder.id] = items
         } catch { items = [] }
       }
+      if (activeFolderRef.current !== folder.id) return
       if (items.length > 0) {
         const { x, y } = folderCursorRef.current
         setFolderTooltip({ items, x: x + 16, y: y + 16 })
       }
-    }, 350)
+    }, 400)
   }
   const handleFolderMove = (e) => {
     folderCursorRef.current = { x: e.clientX, y: e.clientY }
     if (folderTooltip) setFolderTooltip(t => ({ ...t, x: e.clientX + 16, y: e.clientY + 16 }))
   }
   const handleFolderLeave = () => {
+    activeFolderRef.current = null
     clearTimeout(folderHoverTimer.current)
     setFolderTooltip(null)
   }
@@ -723,7 +729,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                         <td style={{ padding: '4px 6px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             {item.thumbnailLink
-                              ? <img src={`${item.thumbnailLink}&access_token=${auth.accessToken}`} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} alt="" />
+                              ? <img src={`${item.thumbnailLink}`} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} alt="" />
                               : <span style={{ width: '56px', height: '56px', flexShrink: 0, background: 'var(--border)', borderRadius: '4px', display: 'block' }} />
                             }
                             <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{item.oldName}</span>
@@ -893,7 +899,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
           boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
           padding: '4px', maxWidth: '220px',
         }}>
-          <img src={`${thumbTooltip.url}&access_token=${auth.accessToken}`} style={{ width: '100%', borderRadius: '4px', display: 'block' }} alt="" />
+          <img src={`${thumbTooltip.url}`} style={{ width: '100%', borderRadius: '4px', display: 'block' }} alt="" />
         </div>
       )}
       {folderTooltip && (
@@ -911,7 +917,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
               borderTop: i > 0 ? '1px solid var(--border)' : 'none',
             }}>
               {item.thumb
-                ? <img src={`${item.thumb}&access_token=${auth.accessToken}`} style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} alt="" />
+                ? <img src={item.thumb} style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} alt="" />
                 : <span style={{ width: '32px', height: '32px', borderRadius: '4px', background: 'var(--border)', flexShrink: 0, display: 'block' }} />
               }
               <span style={{ fontSize: '11px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
