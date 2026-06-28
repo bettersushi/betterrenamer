@@ -1,0 +1,22 @@
+[build]
+command = "npm run build"
+functions = "netlify/functions"
+publish = "dist"
+
+[dev]
+command = "npm run dev"
+port = 3000
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
+
+[env]
+[env.production]
+  VITE_GOOGLE_CLIENT_ID = ""
+  VITE_REDIRECT_URI = "https://courageous-stroopwafel-87ddee.netlify.app/callback"
+
+[env.development]
+  VITE_GOOGLE_CLIENT_ID = ""
+  VITE_REDIRECT_URI = "http://localhost:3000/callback"
