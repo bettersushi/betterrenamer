@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import logoSrc from '../assets/logo-br.svg'
 import { useNavigate } from 'react-router-dom'
 import { listFiles, listFilesRecursive, batchRenameFiles, getOrCreateFolder, moveFile } from '../drive'
 import { saveSession } from '../logs'
@@ -42,6 +43,60 @@ function buildLegacyPreview(groups) {
   }
   return preview
 }
+
+const IconFolder = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+  </svg>
+)
+const IconFile = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+  </svg>
+)
+const IconEye = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+    <circle cx="12" cy="12" r="3"/>
+  </svg>
+)
+const IconSearch = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+)
+const IconPlus = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+)
+const IconList = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+    <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+  </svg>
+)
+const IconRefresh = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+  </svg>
+)
+const IconClock = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+  </svg>
+)
+const IconCheck = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+)
+const IconX = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+)
 
 const MAX_PARALLEL = 2
 let jobIdCounter = 0
@@ -288,7 +343,10 @@ export default function DashboardPage({ auth, onLogout }) {
       {/* Header */}
       <div className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0 }}>
         <div>
-          <h1 style={{ fontSize: '20px', margin: 0 }}>🔄 BetterRenamer</h1>
+          <h1 style={{ fontSize: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <img src={logoSrc} alt="" style={{ height: '24px', width: 'auto' }} />
+            BetterRenamer
+          </h1>
           <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Batch rename per Google Drive</p>
         </div>
         <div className="header-actions">
@@ -296,7 +354,7 @@ export default function DashboardPage({ auth, onLogout }) {
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Autenticato come</div>
             <div style={{ fontWeight: 600, fontSize: '13px' }}>{auth.email}</div>
           </div>
-          <button onClick={() => navigate('/logs')} className="btn-secondary">📋 Logs</button>
+          <button onClick={() => navigate('/logs')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><IconList /> Logs</button>
           <button onClick={handleLogout} className="btn-secondary">Logout</button>
         </div>
       </div>
@@ -337,21 +395,24 @@ export default function DashboardPage({ auth, onLogout }) {
                     onClick={(e) => handleFileClick(file, e)}
                     className={`file-item ${isFolder ? 'folder' : ''}`}
                     style={{
-                      fontSize: '13px', padding: '6px 10px',
+                      fontSize: '13px', padding: 0,
                       background: isSelected ? '#eff6ff' : undefined,
                       borderLeft: isSelected ? '3px solid #3b82f6' : '3px solid transparent',
                     }}
                   >
-                    <span className="file-icon">{isFolder ? '📁' : '📄'}</span>
-                    <span className="file-name">{file.name}</span>
-                    {!isFolder && (
-                      <span
-                        className="file-thumb-btn"
-                        onMouseEnter={(e) => handleThumbEnter(e, file)}
-                        onMouseLeave={handleThumbLeave}
-                        onClick={e => e.stopPropagation()}
-                      >👁</span>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, padding: '6px 10px', minWidth: 0 }}>
+                      <span className="file-icon" style={{ color: isFolder ? '#f59e0b' : '#6b7280' }}>{isFolder ? <IconFolder /> : <IconFile />}</span>
+                      <span className="file-name">{file.name}</span>
+                    </div>
+                    <div
+                      className="file-preview-col"
+                      style={{ opacity: isFolder ? 0 : undefined }}
+                      onMouseEnter={!isFolder ? (e) => handleThumbEnter(e, file) : undefined}
+                      onMouseLeave={!isFolder ? handleThumbLeave : undefined}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {!isFolder && <IconEye />}
+                    </div>
                   </div>
                 )
               })
@@ -421,8 +482,8 @@ export default function DashboardPage({ auth, onLogout }) {
               </div>
             )}
 
-            <button onClick={handleGeneratePreview} className="btn-primary" disabled={previewLoading}>
-              {previewLoading ? 'Analisi in corso...' : '🔍 Genera preview'}
+            <button onClick={handleGeneratePreview} className="btn-primary" disabled={previewLoading} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <IconSearch /> {previewLoading ? 'Analisi in corso...' : 'Genera preview'}
             </button>
           </div>
 
@@ -463,8 +524,8 @@ export default function DashboardPage({ auth, onLogout }) {
             </div>
 
             {preview.length > 0 && (
-              <button onClick={handleAddToQueue} className="btn-primary">
-                ➕ Aggiungi alla coda ({preview.length} file)
+              <button onClick={handleAddToQueue} className="btn-primary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                <IconPlus /> Aggiungi alla coda ({preview.length} file)
               </button>
             )}
           </div>
@@ -475,8 +536,8 @@ export default function DashboardPage({ auth, onLogout }) {
       {queueHasItems && (
         <div style={{ borderTop: '2px solid #e5e7eb', background: '#fafafa', padding: '12px 24px', maxHeight: '260px', overflowY: 'auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>
-              📋 Coda
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <IconList /> Coda
               {runningJobs.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#3b82f6' }}>{runningJobs.length} in esecuzione</span>}
               {pendingJobs.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#888' }}>{pendingJobs.length} in attesa</span>}
               {doneJobs.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#16a34a' }}>{doneJobs.length} completati</span>}
@@ -502,11 +563,11 @@ export default function DashboardPage({ auth, onLogout }) {
                 <div key={job.id} style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '10px 14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: job.status === 'running' ? '6px' : 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '16px' }}>
-                        {job.status === 'pending' && '⏳'}
-                        {job.status === 'running' && '🔄'}
-                        {job.status === 'done' && '✅'}
-                        {job.status === 'error' && '❌'}
+                      <span style={{ display: 'flex', color: '#888' }}>
+                        {job.status === 'pending' && <IconClock />}
+                        {job.status === 'running' && <IconRefresh />}
+                        {job.status === 'done' && <IconCheck />}
+                        {job.status === 'error' && <IconX />}
                       </span>
                       <strong style={{ fontSize: '13px' }}>{job.rootFolderName}</strong>
                       <span style={{ fontSize: '11px', color: '#888' }}>[{job.mode}]</span>
