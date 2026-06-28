@@ -322,10 +322,9 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
   }
 
   const tooltipRef = useRef(null)
-  const folderTooltipRef = useRef(null)
   const folderHoverTimer = useRef(null)
-  const folderThumbCache = useRef({})
-  const [folderTooltip, setFolderTooltip] = useState(null)
+  const folderFileCache = useRef({})
+  const [folderTooltip, setFolderTooltip] = useState(null) // { names: [], x, y }
 
   const handleThumbEnter = (e, file) => {
     if (!file.thumbnailLink) return
@@ -336,43 +335,32 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
   }
   const handleThumbLeave = () => setThumbTooltip(null)
 
-  const handleFolderThumbEnter = (e, folder) => {
-    const cx = e.clientX, cy = e.clientY
+  const handleFolderEnter = (e, folder) => {
+    const rect = e.currentTarget.getBoundingClientRect()
     folderHoverTimer.current = setTimeout(async () => {
-      let thumbs = folderThumbCache.current[folder.id]
-      if (!thumbs) {
+      let names = folderFileCache.current[folder.id]
+      if (!names) {
         try {
           const data = await listFiles(auth.accessToken, folder.id)
-          thumbs = data.files.filter(f => f.thumbnailLink).slice(0, 10).map(f => f.thumbnailLink)
-          folderThumbCache.current[folder.id] = thumbs
-        } catch { thumbs = [] }
+          names = data.files.filter(f => f.mimeType !== 'application/vnd.google-apps.folder').slice(0, 10).map(f => f.name)
+          folderFileCache.current[folder.id] = names
+        } catch { names = [] }
       }
-      if (thumbs.length > 0) setFolderTooltip({ thumbs, cx, cy })
-    }, 400)
+      if (names.length > 0) setFolderTooltip({ names, x: rect.right + 8, y: rect.top })
+    }, 350)
   }
-  const handleFolderThumbMove = (e) => {
-    if (folderTooltip) setFolderTooltip(t => ({ ...t, cx: e.clientX, cy: e.clientY }))
-  }
-  const handleFolderThumbLeave = () => {
+  const handleFolderLeave = () => {
     clearTimeout(folderHoverTimer.current)
     setFolderTooltip(null)
   }
 
-  const positionTooltip = (el, cx, cy) => {
-    const { width, height } = el.getBoundingClientRect()
-    const x = cx + 16 + width > window.innerWidth ? cx - width - 8 : cx + 16
-    const y = cy + 16 + height > window.innerHeight ? cy - height - 8 : cy + 16
-    el.style.left = x + 'px'
-    el.style.top = y + 'px'
-  }
-
   useEffect(() => {
     if (!thumbTooltip || !tooltipRef.current) return
-    positionTooltip(tooltipRef.current, thumbTooltip.cx, thumbTooltip.cy)
-  })
-  useEffect(() => {
-    if (!folderTooltip || !folderTooltipRef.current) return
-    positionTooltip(folderTooltipRef.current, folderTooltip.cx, folderTooltip.cy)
+    const el = tooltipRef.current
+    const { width, height } = el.getBoundingClientRect()
+    const { cx, cy } = thumbTooltip
+    el.style.left = (cx + 16 + width > window.innerWidth ? cx - width - 8 : cx + 16) + 'px'
+    el.style.top = (cy + 16 + height > window.innerHeight ? cy - height - 8 : cy + 16) + 'px'
   })
 
   const handleFileClick = (file, e) => {
@@ -553,9 +541,9 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
                         background: isChecked ? 'color-mix(in srgb, var(--primary) 8%, transparent)' : isSelected ? '#eff6ff' : undefined,
                         borderLeft: isChecked ? '3px solid var(--primary)' : isSelected ? '3px solid #3b82f6' : '3px solid transparent',
                       }}
-                      onMouseEnter={isFolder ? (e) => handleFolderThumbEnter(e, file) : (e) => handleThumbEnter(e, file)}
-                      onMouseMove={isFolder ? handleFolderThumbMove : handleThumbMove}
-                      onMouseLeave={isFolder ? handleFolderThumbLeave : handleThumbLeave}
+                      onMouseEnter={isFolder ? (e) => handleFolderEnter(e, file) : (e) => handleThumbEnter(e, file)}
+                      onMouseMove={!isFolder ? handleThumbMove : undefined}
+                      onMouseLeave={isFolder ? handleFolderLeave : handleThumbLeave}
                     >
                       {mode === 'legacy' && isFolder && (
                         <div style={{ paddingLeft: '10px', display: 'flex', alignItems: 'center' }} onClick={e => toggleFolder(file.id, e)}>
@@ -568,7 +556,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
                           />
                         </div>
                       )}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, padding: '6px 10px', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, padding: '8px 10px', minWidth: 0 }}>
                         <span className="file-icon" style={{ color: isFolder ? '#f59e0b' : '#6b7280' }}>{isFolder ? <IconFolder /> : <IconFile />}</span>
                         <span className="file-name">{file.name}</span>
                       </div>
@@ -794,18 +782,21 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
         </div>
       )}
       {folderTooltip && (
-        <div ref={folderTooltipRef} style={{
-          position: 'fixed', left: folderTooltip.cx + 16, top: folderTooltip.cy + 16,
+        <div style={{
+          position: 'fixed', left: folderTooltip.x, top: folderTooltip.y,
           zIndex: 2000, pointerEvents: 'none',
-          background: 'white', borderRadius: '10px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
-          padding: '6px', width: '220px',
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+          padding: '6px 10px', minWidth: '160px', maxWidth: '260px',
         }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px' }}>
-            {folderTooltip.thumbs.map((url, i) => (
-              <img key={i} src={url} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '4px', display: 'block' }} alt="" />
-            ))}
-          </div>
+          {folderTooltip.names.map((name, i) => (
+            <div key={i} style={{
+              fontSize: '11px', color: 'var(--text-secondary)',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              padding: '2px 0',
+              borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+            }}>{name}</div>
+          ))}
         </div>
       )}
 
