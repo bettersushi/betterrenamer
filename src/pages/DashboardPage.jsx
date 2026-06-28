@@ -356,17 +356,20 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
   const handleFolderEnter = (e, folder) => {
     folderCursorRef.current = { x: e.clientX, y: e.clientY }
     folderHoverTimer.current = setTimeout(async () => {
-      let names = folderFileCache.current[folder.id]
-      if (!names) {
+      let items = folderFileCache.current[folder.id]
+      if (!items) {
         try {
           const data = await listFiles(auth.accessToken, folder.id)
-          names = data.files.filter(f => f.mimeType !== 'application/vnd.google-apps.folder').slice(0, 10).map(f => f.name)
-          folderFileCache.current[folder.id] = names
-        } catch { names = [] }
+          items = data.files
+            .filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
+            .slice(0, 10)
+            .map(f => ({ name: f.name, thumb: f.thumbnailLink || null }))
+          folderFileCache.current[folder.id] = items
+        } catch { items = [] }
       }
-      if (names.length > 0) {
+      if (items.length > 0) {
         const { x, y } = folderCursorRef.current
-        setFolderTooltip({ names, x: x + 16, y: y + 16 })
+        setFolderTooltip({ items, x: x + 16, y: y + 16 })
       }
     }, 350)
   }
@@ -887,16 +890,21 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
           position: 'fixed', left: folderTooltip.x, top: folderTooltip.y,
           zIndex: 2000, pointerEvents: 'none',
           background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-          padding: '6px 10px', minWidth: '160px', maxWidth: '260px',
+          borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
+          padding: '6px', minWidth: '220px', maxWidth: '300px',
         }}>
-          {folderTooltip.names.map((name, i) => (
+          {folderTooltip.items.map((item, i) => (
             <div key={i} style={{
-              fontSize: '11px', color: 'var(--text-secondary)',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              padding: '2px 0',
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '4px 6px',
               borderTop: i > 0 ? '1px solid var(--border)' : 'none',
-            }}>{name}</div>
+            }}>
+              {item.thumb
+                ? <img src={`${item.thumb}&access_token=${auth.accessToken}`} style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} alt="" />
+                : <span style={{ width: '32px', height: '32px', borderRadius: '4px', background: 'var(--border)', flexShrink: 0, display: 'block' }} />
+              }
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
+            </div>
           ))}
         </div>
       )}
