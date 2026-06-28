@@ -495,7 +495,9 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
   const runningJobs = queue.filter(j => j.status === 'running')
   const pendingJobs = queue.filter(j => j.status === 'pending')
   const doneJobs = queue.filter(j => j.status === 'done' || j.status === 'error')
-  const activeFolderIds = new Set([...runningJobs, ...pendingJobs].map(j => j.rootFolderId))
+  const activeFolderIds = new Set(
+    [...runningJobs, ...pendingJobs].flatMap(j => [j.rootFolderId, ...j.preview.map(p => p.folderId)])
+  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
