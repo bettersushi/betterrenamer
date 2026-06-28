@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Component } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
 import CallbackPage from './pages/CallbackPage'
@@ -6,6 +6,21 @@ import DashboardPage from './pages/DashboardPage'
 import LogsPage from './pages/LogsPage'
 import { refreshAccessToken } from './auth'
 import './App.css'
+
+class ErrorBoundary extends Component {
+  state = { error: null }
+  static getDerivedStateFromError(error) { return { error } }
+  componentDidCatch(error, info) { console.error('App crash:', error, info) }
+  render() {
+    if (this.state.error) return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '16px', fontFamily: 'Sora, sans-serif' }}>
+        <div style={{ fontSize: '15px', color: '#666' }}>Qualcosa è andato storto.</div>
+        <button onClick={() => { this.setState({ error: null }); window.location.reload() }} style={{ padding: '8px 20px', borderRadius: '8px', border: '1px solid #ddd', cursor: 'pointer', fontSize: '14px' }}>Ricarica</button>
+      </div>
+    )
+    return this.props.children
+  }
+}
 
 function App() {
   const [auth, setAuth] = useState(null)
@@ -58,6 +73,7 @@ function App() {
   }
 
   return (
+    <ErrorBoundary>
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
@@ -67,6 +83,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>
+    </ErrorBoundary>
   )
 }
 

@@ -370,22 +370,24 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     activeFolderRef.current = folder.id
     clearTimeout(folderHoverTimer.current)
     folderHoverTimer.current = setTimeout(async () => {
-      if (activeFolderRef.current !== folder.id) return
-      let items = folderFileCache.current[folder.id]
-      if (!items) {
-        try {
+      try {
+        if (activeFolderRef.current !== folder.id) return
+        let items = folderFileCache.current[folder.id]
+        if (!items) {
           const data = await listFiles(auth.accessToken, folder.id)
-          items = data.files
+          items = (data.files || [])
             .filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
             .slice(0, 10)
             .map(f => ({ name: f.name, thumb: f.thumbnailLink || null }))
           folderFileCache.current[folder.id] = items
-        } catch { items = [] }
-      }
-      if (activeFolderRef.current !== folder.id) return
-      if (items.length > 0) {
-        const { x, y } = folderCursorRef.current
-        setFolderTooltip({ items, x: x + 16, y: y + 16 })
+        }
+        if (activeFolderRef.current !== folder.id) return
+        if (Array.isArray(items) && items.length > 0) {
+          const { x, y } = folderCursorRef.current
+          setFolderTooltip({ items, x: x + 16, y: y + 16 })
+        }
+      } catch {
+        // silently ignore — hover tooltip is non-critical
       }
     }, 400)
   }
