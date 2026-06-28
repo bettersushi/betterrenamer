@@ -297,6 +297,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     setQueue([...queueRef.current])
     setPreview([])
     setPreviewFolder(null)
+    setCheckedFolders(new Set())
     startPending()
   }
 
