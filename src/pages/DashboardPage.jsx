@@ -682,10 +682,10 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme })
                       <tr key={idx} style={{ borderTop: idx > 0 ? '1px solid var(--border)' : 'none' }}>
                         <td style={{ padding: '4px 10px', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontSize: '11px' }}>{item.folderName}</td>
                         <td style={{ padding: '4px 6px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             {item.thumbnailLink
-                              ? <img src={item.thumbnailLink} style={{ width: '28px', height: '28px', objectFit: 'cover', borderRadius: '3px', flexShrink: 0 }} alt="" />
-                              : <span style={{ width: '28px', height: '28px', flexShrink: 0 }} />
+                              ? <img src={item.thumbnailLink} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} alt="" />
+                              : <span style={{ width: '56px', height: '56px', flexShrink: 0, background: 'var(--border)', borderRadius: '4px', display: 'block' }} />
                             }
                             <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{item.oldName}</span>
                           </div>
