@@ -795,8 +795,11 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                     </tr>
                   </thead>
                   <tbody>
-                    {preview.map((item, idx) => (
-                      <tr key={idx} style={{ borderTop: idx > 0 ? '1px solid var(--border)' : 'none', opacity: item.skip ? 0.45 : 1 }}>
+                    {[...preview.filter(p => !p.skip), ...preview.filter(p => p.skip)].map((item, idx, arr) => {
+                      const firstSkipIdx = arr.findIndex(p => p.skip)
+                      const isSeparator = firstSkipIdx > 0 && idx === firstSkipIdx
+                      return (
+                      <tr key={idx} style={{ borderTop: isSeparator ? '2px dotted var(--primary)' : idx > 0 ? '1px solid var(--border)' : 'none', opacity: item.skip ? 0.45 : 1 }}>
                         <td style={{ padding: '4px 10px', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontSize: '11px' }}>{item.folderName}</td>
                         <td style={{ padding: '4px 6px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -807,7 +810,8 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                           {item.skip ? 'già ok ✓' : item.newName}
                         </td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
               )}
