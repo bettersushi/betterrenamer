@@ -721,8 +721,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           ) : (
             <div
               ref={gridRef}
-              className={thumbSize === 'masonry' ? 'search-masonry-scroll' : 'search-grid'}
-              style={thumbSize !== 'masonry' ? { '--thumb-size': `${THUMB_SIZES[thumbSize]}px` } : undefined}
+              className={thumbSize === 'masonry' ? 'search-masonry-scroll' : 'search-grid-scroll'}
             >
               {thumbSize === 'masonry' ? (
                 <div className="search-masonry">
@@ -768,7 +767,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                   ))}
                 </div>
               ) : (
-                results.map((photo, idx) => (
+                <div className="search-grid" style={{ '--thumb-size': `${THUMB_SIZES[thumbSize]}px` }}>
+                {results.map((photo, idx) => (
                   <div key={photo.id} className="thumb-card" onClick={() => setSlideshowIdx(idx)}>
                     {photo.thumbnailLink ? (
                       <LazyPhoto
@@ -808,7 +808,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                       </div>
                     )}
                   </div>
-                ))
+                ))}
+                </div>
               )}
             </div>
           )}
