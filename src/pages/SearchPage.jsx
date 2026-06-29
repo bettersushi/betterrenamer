@@ -152,6 +152,24 @@ const IconFolderJump = () => (
     <line x1="12" y1="11" x2="12" y2="17"/>
   </svg>
 )
+const IconFolder = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+  </svg>
+)
+const IconSortName = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="4" y1="6" x2="14" y2="6"/><line x1="4" y1="12" x2="11" y2="12"/><line x1="4" y1="18" x2="8" y2="18"/>
+    <polyline points="16 16 20 20 20 4"/>
+  </svg>
+)
+const IconSortDate = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/>
+    <line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/>
+    <polyline points="12 14 12 18 15 18"/>
+  </svg>
+)
 const IconChevronLeft = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="15 18 9 12 15 6"/>
@@ -261,27 +279,40 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const [globalSimState, setGlobalSimState] = useState(null)
   const globalSimAbort = useRef(null)
   const pHashCache = useRef({})
+  const [sortOrder, setSortOrder] = useState('modified')
+  const [navHistory, setNavHistory] = useState([])
 
   // Universal view history stack
   const [viewStack, setViewStack] = useState([])
 
   const pushView = () => {
-    setViewStack(s => [...s, {
-      activeFolderId, activeFolderName, allPhotos,
-      globalQuery, globalResults, similarTo, similarResults,
-    }])
+    const snapshot = { activeFolderId, activeFolderName, allPhotos, globalQuery, globalResults, similarTo, similarResults }
+    // derive history entry from current state
+    let entry
+    if (similarTo) {
+      entry = { type: 'similarity', label: similarTo.name, key: 'sim:' + similarTo.id, Icon: IconSimilar, snapshot }
+    } else if (globalResults !== null) {
+      entry = { type: 'search', label: globalQuery || 'Ricerca', key: 'q:' + globalQuery, Icon: IconSearch, snapshot }
+    } else {
+      entry = { type: 'folder', label: activeFolderName, key: 'f:' + activeFolderId, Icon: IconFolder, snapshot }
+    }
+    setNavHistory(h => [entry, ...h.filter(e => e.key !== entry.key)].slice(0, 5))
+    setViewStack(s => [...s, snapshot])
+  }
+  const restoreState = (snapshot) => {
+    setActiveFolderId(snapshot.activeFolderId)
+    setActiveFolderName(snapshot.activeFolderName)
+    setAllPhotos(snapshot.allPhotos)
+    setGlobalQuery(snapshot.globalQuery)
+    setGlobalResults(snapshot.globalResults)
+    setSimilarTo(snapshot.similarTo)
+    setSimilarResults(snapshot.similarResults)
   }
   const popView = () => {
     setViewStack(s => {
       const prev = s[s.length - 1]
       if (!prev) return s
-      setActiveFolderId(prev.activeFolderId)
-      setActiveFolderName(prev.activeFolderName)
-      setAllPhotos(prev.allPhotos)
-      setGlobalQuery(prev.globalQuery)
-      setGlobalResults(prev.globalResults)
-      setSimilarTo(prev.similarTo)
-      setSimilarResults(prev.similarResults)
+      restoreState(prev)
       return s.slice(0, -1)
     })
   }
@@ -491,10 +522,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
 
   // ── Results ─────────────────────────────────────────────────────────────
   const results = useMemo(() => {
-    if (globalResults !== null) return globalResults
-    if (similarTo) return similarResults
-    return allPhotos
-  }, [allPhotos, similarTo, similarResults, globalResults])
+    let list = globalResults !== null ? globalResults : similarTo ? similarResults : allPhotos
+    if (sortOrder === 'name') list = [...list].sort((a, b) => a.name.localeCompare(b.name))
+    else list = [...list].sort((a, b) => new Date(b.modifiedTime || 0) - new Date(a.modifiedTime || 0))
+    return list
+  }, [allPhotos, similarTo, similarResults, globalResults, sortOrder])
 
   // ── Render ───────────────────────────────────────────────────────────────
   const rootFolders = treeChildren['root'] || []
@@ -579,21 +611,38 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                   <Icon />
                 </button>
               ))}
+              <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
+              <button onClick={() => setSortOrder('name')} className={`thumb-size-btn${sortOrder === 'name' ? ' active' : ''}`} title="Ordina per nome">
+                <IconSortName />
+              </button>
+              <button onClick={() => setSortOrder('modified')} className={`thumb-size-btn${sortOrder === 'modified' ? ' active' : ''}`} title="Ordina per data modifica">
+                <IconSortDate />
+              </button>
             </div>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)', flexShrink: 0 }}>
               {loading || globalLoading ? 'Caricamento...' : `${results.length} foto`}
             </span>
           </div>
 
-          {/* Back button + folder label row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          {/* Back button + tag cloud row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             {viewStack.length > 0 && (
-              <button onClick={popView} className="tree-back-btn" style={{ width: 'auto', marginBottom: 0, padding: '6px 14px', fontSize: '13px' }}>
+              <button onClick={popView} className="tree-back-btn" style={{ width: 'auto', marginBottom: 0, padding: '5px 12px', fontSize: '12px', flexShrink: 0 }}>
                 <IconChevronLeft /> Indietro
               </button>
             )}
             {!similarTo && !globalResults && (
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>📁 {activeFolderName}</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)', flexShrink: 0 }}>📁 {activeFolderName}</span>
+            )}
+            {navHistory.length > 0 && (
+              <div style={{ display: 'flex', gap: 5, marginLeft: 'auto', flexWrap: 'wrap', alignItems: 'center' }}>
+                {navHistory.map(entry => (
+                  <button key={entry.key} className="history-tag" onClick={() => restoreState(entry.snapshot)} title={entry.label}>
+                    <entry.Icon />
+                    <span>{entry.label}</span>
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 
