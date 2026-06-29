@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import logoSrc from '../assets/logo-br.svg'
 import { listFiles, searchFilesGlobal, listFilesRecursive } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
@@ -253,6 +253,7 @@ function ConnectedTreeNode({ folder, depth, activeId, onToggle, onSelect, treeEx
 // ── Main Component ───────────────────────────────────────────────────────────
 export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTokenRefresh }) {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   // Tree state
   const [treeExpanded, setTreeExpanded] = useState({ root: true })
@@ -347,6 +348,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     setActiveFolderName(folderName)
     setSimilarTo(null); setSimilarResults([])
     setGlobalResults(null); setGlobalQuery('')
+    // persist in URL
+    if (folderId === 'root') setSearchParams({}, { replace: true })
+    else setSearchParams({ folder: folderId, name: folderName }, { replace: true })
 
     if (treePhotos[folderId]) {
       setAllPhotos(treePhotos[folderId])
@@ -360,7 +364,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
       setAllPhotos(photos)
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
-  }, [fetchFolder, treePhotos, pushView])
+  }, [fetchFolder, treePhotos, pushView, setSearchParams])
 
   const handleTreeToggle = useCallback(async (folder, siblingIds = []) => {
     const id = folder.id
@@ -387,15 +391,28 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     selectFolder(folder.id, folder.name)
   }, [handleTreeToggle, selectFolder])
 
-  // Init: load root
+  // Init: load root + optionally restore folder from URL
   useEffect(() => {
+    const urlFolder = searchParams.get('folder')
+    const urlName = searchParams.get('name') || 'Cartella'
     setLoading(true)
     fetchFolder('root').then(({ subfolders, photos }) => {
       setTreeChildren(t => ({ ...t, root: subfolders }))
       setTreePhotos(t => ({ ...t, root: photos }))
-      setAllPhotos(photos)
+      if (urlFolder) {
+        // restore the folder from URL without pushing to viewStack
+        setActiveFolderId(urlFolder)
+        setActiveFolderName(urlName)
+        return fetchFolder(urlFolder).then(({ subfolders: sf, photos: fp }) => {
+          setTreeChildren(t => ({ ...t, [urlFolder]: sf }))
+          setTreePhotos(t => ({ ...t, [urlFolder]: fp }))
+          setAllPhotos(fp)
+        })
+      } else {
+        setAllPhotos(photos)
+      }
     }).catch(console.error).finally(() => setLoading(false))
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Folder jump from thumb ──────────────────────────────────────────────
   const handleFolderJump = (photo) => {
