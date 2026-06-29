@@ -17,8 +17,8 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 10px 8px;
+  gap: 0;
+  padding: 8px 6px;
 }
 
 /* Tree navigation */
@@ -45,21 +45,40 @@
 }
 
 .tree-root {
-  padding: 9px 12px !important;
-  margin-bottom: 2px;
+  padding: 6px 10px !important;
+  margin-bottom: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+}
+
+.tree-node-wrap {
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+}
+
+.tree-node-wrap:last-child {
+  border-bottom: none;
 }
 
 .tree-node {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 10px;
-  border-radius: 7px;
+  padding: 5px 8px;
+  border-radius: 5px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--text-secondary);
   transition: background 0.12s, color 0.12s;
-  min-height: 36px;
+  min-height: 30px;
+}
+
+.tree-skeleton {
+  height: 11px;
+  border-radius: 4px;
+  background: var(--border);
+  margin: 5px 0;
+  animation: shimmer-slide 1.4s infinite;
+  background: linear-gradient(90deg, var(--border) 25%, color-mix(in srgb, var(--border) 55%, transparent) 50%, var(--border) 75%);
+  background-size: 200% 100%;
 }
 
 .tree-node:hover {
@@ -78,18 +97,12 @@
 }
 
 .tree-chevron {
-  background: none;
-  border: none;
-  padding: 0;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   color: var(--text-muted);
-  cursor: pointer;
   transition: transform 0.18s ease;
+  pointer-events: none;
 }
 
 .tree-label {

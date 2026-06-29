@@ -331,10 +331,15 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     finally { setLoading(false) }
   }, [fetchFolder, treePhotos, pushView])
 
-  const handleTreeToggle = useCallback(async (folder) => {
+  const handleTreeToggle = useCallback(async (folder, siblingIds = []) => {
     const id = folder.id
     const willExpand = !treeExpanded[id]
-    setTreeExpanded(t => ({ ...t, [id]: willExpand }))
+    setTreeExpanded(t => {
+      const next = { ...t, [id]: willExpand }
+      // accordion: collapse siblings when expanding
+      if (willExpand) siblingIds.forEach(sid => { if (sid !== id) next[sid] = false })
+      return next
+    })
     if (willExpand && !treeChildren[id]) {
       setTreeLoading(t => ({ ...t, [id]: true }))
       try {
@@ -346,9 +351,10 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     }
   }, [treeExpanded, treeChildren, fetchFolder])
 
-  const handleTreeSelect = useCallback((folder) => {
+  const handleTreeSelect = useCallback((folder, siblingIds = []) => {
+    handleTreeToggle(folder, siblingIds)
     selectFolder(folder.id, folder.name)
-  }, [selectFolder])
+  }, [handleTreeToggle, selectFolder])
 
   // Init: load root
   useEffect(() => {
@@ -531,6 +537,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
               key={f.id}
               folder={f}
               depth={1}
+              siblingIds={rootFolders.map(s => s.id)}
               treeExpanded={treeExpanded}
               treeChildren={treeChildren}
               treeLoading={treeLoading}
@@ -701,30 +708,32 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
 }
 
 // Recursive tree node with full tree state passed as props
-function TreeNodeFull({ folder, depth, treeExpanded, treeChildren, treeLoading, activeId, onToggle, onSelect }) {
+function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildren, treeLoading, activeId, onToggle, onSelect }) {
   const expanded = treeExpanded[folder.id]
   const loading = treeLoading[folder.id]
   const children = treeChildren[folder.id]
   const hasChildren = children === undefined || children.length > 0
 
+  const childSiblingIds = (children || []).map(c => c.id)
+
   return (
-    <div>
+    <div className="tree-node-wrap">
       <div
         className={`tree-node${activeId === folder.id ? ' active' : ''}`}
-        style={{ paddingLeft: 12 + depth * 14 }}
+        style={{ paddingLeft: 8 + depth * 12 }}
+        onClick={() => onSelect(folder, siblingIds)}
       >
-        <button
+        <span
           className="tree-chevron"
-          onClick={e => { e.stopPropagation(); onToggle(folder) }}
           style={{
             transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
-            opacity: hasChildren ? 1 : 0.25,
-            pointerEvents: hasChildren ? 'auto' : 'none',
+            opacity: hasChildren ? 1 : 0.2,
+            display: 'inline-flex', alignItems: 'center',
           }}
         >
           {loading ? <IconSpinner /> : <IconChevronRight />}
-        </button>
-        <span className="tree-label" onClick={() => onSelect(folder)} title={folder.name}>
+        </span>
+        <span className="tree-label" title={folder.name}>
           {folder.name}
         </span>
       </div>
@@ -733,6 +742,7 @@ function TreeNodeFull({ folder, depth, treeExpanded, treeChildren, treeLoading, 
           key={c.id}
           folder={c}
           depth={depth + 1}
+          siblingIds={childSiblingIds}
           treeExpanded={treeExpanded}
           treeChildren={treeChildren}
           treeLoading={treeLoading}
@@ -741,6 +751,14 @@ function TreeNodeFull({ folder, depth, treeExpanded, treeChildren, treeLoading, 
           onSelect={onSelect}
         />
       ))}
+      {/* skeleton while loading children */}
+      {expanded && loading && !children && (
+        <div style={{ paddingLeft: 8 + (depth + 1) * 12 }}>
+          {[1, 2].map(i => (
+            <div key={i} className="tree-skeleton" style={{ width: `${60 + i * 15}%` }} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
