@@ -145,9 +145,22 @@ const IconMasonry = () => (
   </svg>
 )
 const IconGlobalSimilar = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10"/>
     <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+  </svg>
+)
+const IconVideoFile = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="2" width="20" height="20" rx="2"/>
+    <path d="M9 8l8 4-8 4V8z" fill="currentColor" stroke="none"/>
+  </svg>
+)
+const IconFolderJump = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+    <polyline points="9 14 12 17 15 14"/>
+    <line x1="12" y1="11" x2="12" y2="17"/>
   </svg>
 )
 const IconChevronLeft = () => (
@@ -198,6 +211,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
   const [slideshowIdx, setSlideshowIdx] = useState(null)
   const [thumbSize, setThumbSize] = useState('md')
   const pHashCache = useRef({})
+  const [folderJumpStack, setFolderJumpStack] = useState([]) // stack of previous folderPath states
 
   const currentFolder = folderPath[folderPath.length - 1]
 
@@ -239,6 +253,18 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
       setRecentQueries(updated)
       localStorage.setItem(SEARCH_QUERIES_KEY, JSON.stringify(updated))
     }
+  }
+
+  const handleFolderJump = (photo) => {
+    if (!photo.parents?.[0]) return
+    setFolderJumpStack(s => [...s, folderPath])
+    setFolderPath([{ id: 'root', name: 'My Drive' }, { id: photo.parents[0], name: photo._parentName || 'Cartella' }])
+    setSimilarTo(null); setSimilarResults([]); setGlobalResults(null); setQuery('')
+  }
+  const handleFolderJumpBack = () => {
+    if (!folderJumpStack.length) return
+    setFolderPath(folderJumpStack[folderJumpStack.length - 1])
+    setFolderJumpStack(s => s.slice(0, -1))
   }
 
   const handleGlobalSearch = (q) => {
@@ -395,6 +421,12 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Sidebar */}
         <div className="search-sidebar">
+          {/* Back from folder jump */}
+          {folderJumpStack.length > 0 && (
+            <button onClick={handleFolderJumpBack} className="search-folder-item" style={{ color: 'var(--primary)', fontWeight: 600, marginBottom: 4, background: 'color-mix(in srgb, var(--primary) 8%, transparent)' }}>
+              <IconChevronLeft /> Torna indietro
+            </button>
+          )}
           {/* Breadcrumb */}
           {folderPath.length > 1 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', flexWrap: 'wrap' }}>
@@ -533,7 +565,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
                     <div className="thumb-no-preview">📄</div>
                   )}
                   {isVideoFile(photo) && (
-                    <div style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.55)', borderRadius: 4, padding: '2px 5px', color: 'white', fontSize: 10, pointerEvents: 'none', lineHeight: 1.2 }}>▶</div>
+                    <div style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.55)', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', pointerEvents: 'none' }}>
+                      <IconVideoFile />
+                    </div>
                   )}
                   {similarTo && photo._dist !== undefined && photo._dist === 0 && (
                     <div className="search-similar-badge">identica</div>
@@ -544,6 +578,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
                     </button>
                     <button className="thumb-overlay-btn" title="Cerca simili ovunque in Drive" onClick={() => handleGlobalSimilarity(photo)}>
                       <IconGlobalSimilar />
+                    </button>
+                    <button className="thumb-overlay-btn" title="Vai alla cartella" onClick={() => handleFolderJump(photo)}>
+                      <IconFolderJump />
                     </button>
                     <button className="thumb-overlay-btn" title="QuickLook" onClick={() => setSlideshowIdx(idx)}>
                       <IconEye />

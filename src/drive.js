@@ -8,7 +8,7 @@ export const searchFilesGlobal = async (accessToken, query) => {
     const params = new URLSearchParams({
       q,
       spaces: 'drive',
-      fields: 'files(id,name,mimeType,size,createdTime,modifiedTime,thumbnailLink),nextPageToken',
+      fields: 'files(id,name,mimeType,size,createdTime,modifiedTime,thumbnailLink,parents),nextPageToken',
       pageSize: 100,
     })
     if (pageToken) params.set('pageToken', pageToken)
@@ -34,7 +34,7 @@ export const listFiles = async (accessToken, folderId = 'root') => {
     const params = new URLSearchParams({
       q: `'${folderId}' in parents and trashed = false`,
       spaces: 'drive',
-      fields: 'files(id,name,mimeType,size,createdTime,modifiedTime,thumbnailLink),nextPageToken',
+      fields: 'files(id,name,mimeType,size,createdTime,modifiedTime,thumbnailLink,parents),nextPageToken',
       pageSize: 1000,
       orderBy: 'folder,name',
     })
@@ -57,7 +57,7 @@ const traverseFolder = async (accessToken, folderId, folderName, isRoot, include
   const data = await listFiles(accessToken, folderId)
   const allItems = data.files || []
   const subfolders = allItems.filter(f => f.mimeType === 'application/vnd.google-apps.folder')
-  const files = allItems.filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
+  const files = allItems.filter(f => f.mimeType !== 'application/vnd.google-apps.folder').map(f => ({ ...f, _parentName: folderName }))
 
   if (!isRoot || includeRoot) {
     const sorted = [...files].sort((a, b) => new Date(a.modifiedTime) - new Date(b.modifiedTime))

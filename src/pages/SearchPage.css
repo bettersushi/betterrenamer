@@ -201,10 +201,11 @@
 
 .thumb-overlay {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  gap: 3px;
+  gap: 5px;
   opacity: 0;
   transition: opacity 0.15s;
 }
@@ -214,22 +215,24 @@
 }
 
 .thumb-overlay-btn {
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   border: none;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0,0,0,0.62);
   color: white;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: background 0.12s;
+  transition: background 0.12s, transform 0.1s;
+  backdrop-filter: blur(4px);
 }
 
 .thumb-overlay-btn:hover {
-  background: rgba(0,0,0,0.85);
+  background: rgba(0,0,0,0.88);
+  transform: scale(1.1);
 }
 
 .thumb-no-preview {
