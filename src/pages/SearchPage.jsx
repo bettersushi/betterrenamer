@@ -20,9 +20,9 @@ function isMediaFile(f) {
 }
 
 async function computePHash(imgUrl) {
+  const proxied = `/api/proxy-image?url=${encodeURIComponent(imgUrl)}`
   return new Promise((resolve, reject) => {
     const img = new Image()
-    img.crossOrigin = 'anonymous'
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas')
@@ -37,7 +37,7 @@ async function computePHash(imgUrl) {
       } catch (e) { reject(e) }
     }
     img.onerror = reject
-    img.src = imgUrl
+    img.src = proxied
   })
 }
 function hammingDistance(a, b) {
