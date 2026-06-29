@@ -266,7 +266,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   // Grid state
   const [allPhotos, setAllPhotos] = useState([])
   const [loading, setLoading] = useState(false)
-  const [thumbSize, setThumbSize] = useState('md')
   const [slideshowIdx, setSlideshowIdx] = useState(null)
 
   // Search & similarity
@@ -281,6 +280,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const globalSimAbort = useRef(null)
   const pHashCache = useRef({})
   const gridRef = useRef(null)
+  const [thumbSize, setThumbSizeRaw] = useState(() => localStorage.getItem('br_thumb_size') || 'md')
+  const setThumbSize = (v) => { setThumbSizeRaw(v); localStorage.setItem('br_thumb_size', v) }
   const [sortOrder, setSortOrder] = useState('modified')
   const [navHistory, setNavHistory] = useState([])
 
