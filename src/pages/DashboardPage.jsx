@@ -929,10 +929,50 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
           <button onClick={closeLogs} className="nav-icon-btn" title="Chiudi"><IconX /></button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
-          {logSessions.length === 0 ? (
+          {[...runningJobs, ...pendingJobs].length > 0 && (
+            <div style={{ marginBottom: '16px' }}>
+              {[...runningJobs, ...pendingJobs].map(job => {
+                const pct = job.progress.total > 0 ? Math.round((job.progress.current / job.progress.total) * 100) : 0
+                return (
+                  <div key={job.id} className="session-card" style={{ marginBottom: '10px', position: 'relative', overflow: 'hidden' }}>
+                    <div className="live-shimmer" />
+                    <div style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ color: '#3b82f6', display: 'flex', flexShrink: 0, animation: job.status === 'running' ? 'dancer-bounce 0.6s ease-in-out infinite alternate' : 'none', opacity: job.status === 'pending' ? 0.4 : 1 }}>
+                        <IconDancer />
+                      </span>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <strong style={{ fontSize: '13px' }}>{job.rootFolderName}</strong>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '8px' }}>
+                          {job.status === 'pending' ? 'In attesa...' : job.progress.phase}
+                        </span>
+                        {job.status === 'running' && job.progress.currentFile && (
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', opacity: 0.7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {job.progress.currentFile}{job.progress.currentNewName ? ` → ${job.progress.currentNewName}` : ''}
+                          </div>
+                        )}
+                      </div>
+                      <span style={{ fontSize: '12px', color: '#3b82f6', flexShrink: 0 }}>
+                        {job.status === 'running' ? `${pct}%` : '⏳'}
+                      </span>
+                    </div>
+                    {job.status === 'running' && (
+                      <div style={{ height: '3px', background: 'var(--border)' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: '#3b82f6', transition: 'width 0.3s ease' }} />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {logSessions.length === 0 && [...runningJobs, ...pendingJobs].length === 0 && (
             <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: '13px' }}>Nessuna sessione registrata.</div>
-          ) : (
+          )}
+          {logSessions.length > 0 && (
             <>
+              {[...runningJobs, ...pendingJobs].length > 0 && (
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px', marginTop: '4px' }}>Storico</div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
                 <button onClick={() => { clearSessions(); setLogSessions([]) }} className="btn-secondary" style={{ fontSize: '12px', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <IconTrash /> Elimina tutti
