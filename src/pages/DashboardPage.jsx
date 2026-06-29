@@ -13,6 +13,7 @@ function getExt(name) {
   return name.includes('.') ? name.substring(name.lastIndexOf('.')).toLowerCase() : ''
 }
 function isMediaFile(file) {
+  if (file.mimeType === 'application/vnd.google-apps.shortcut') return false
   const ext = getExt(file.name)
   if (MEDIA_EXTENSIONS.has(ext)) return true
   if (file.mimeType && ['image/', 'video/'].some(m => file.mimeType.startsWith(m))) return true
@@ -465,7 +466,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
           setPreview(built)
         }
       } else {
-        const nonFolderFiles = files.filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
+        const nonFolderFiles = files.filter(f => f.mimeType !== 'application/vnd.google-apps.folder' && f.mimeType !== 'application/vnd.google-apps.shortcut')
         const previewList = nonFolderFiles.map((file, index) => {
           const num = (startNumber + index).toString().padStart(padding, '0')
           const ext = file.name.substring(file.name.lastIndexOf('.')) || ''
