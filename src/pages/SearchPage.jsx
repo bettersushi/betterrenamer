@@ -723,7 +723,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                 <div key={photo.id} className={thumbSize === 'masonry' ? 'masonry-card' : 'thumb-card'} onClick={() => setSlideshowIdx(idx)}>
                   {photo.thumbnailLink ? (
                     <LazyPhoto
-                      src={getLargeThumbUrl(photo.thumbnailLink, thumbSize === 'masonry' ? 1600 : THUMB_SIZES[thumbSize] * 2) + (thumbTimestamps[photo.id] ? `&t=${thumbTimestamps[photo.id]}` : '')}
+                      key={thumbTimestamps[photo.id] || photo.id}
+                      src={getLargeThumbUrl(photo.thumbnailLink, thumbSize === 'masonry' ? 1600 : THUMB_SIZES[thumbSize] * 2)}
                       alt={photo.name}
                       className={thumbSize === 'masonry' ? 'masonry-img' : 'thumb-img'}
                       style={thumbSize === 'masonry' ? undefined : { width: '100%', height: '100%' }}

@@ -73,6 +73,32 @@ function getCornerHitZone(x, y, rect) {
 function applyHandleDrag(handle, rect, dx, dy, ratio) {
   let { x, y, w, h } = rect
   if (handle === 'move') { return { x: x+dx, y: y+dy, w, h } }
+
+  if (ratio) {
+    const targetR = ratio.w / ratio.h
+    if (['tl','tr','bl','br'].includes(handle)) {
+      // Project drag onto the ratio diagonal to get a single scale delta
+      const diagLen = Math.sqrt(ratio.w ** 2 + ratio.h ** 2)
+      const signX = ['tr','br'].includes(handle) ? 1 : -1
+      const signY = ['bl','br'].includes(handle) ? 1 : -1
+      const delta = dx * (ratio.w / diagLen) * signX + dy * (ratio.h / diagLen) * signY
+      const newW = Math.max(10, w + delta)
+      const newH = newW / targetR
+      if (['tl','tr'].includes(handle)) y = (y + h) - newH
+      if (['tl','bl'].includes(handle)) x = (x + w) - newW
+      w = newW; h = newH
+    } else if (['tm','bm'].includes(handle)) {
+      if (handle === 'tm') { y += dy; h -= dy } else { h += dy }
+      const newW = h * targetR
+      x = x + (w - newW) / 2
+      w = newW
+    } else {
+      if (handle === 'ml') { x += dx; w -= dx } else { w += dx }
+      h = w / targetR
+    }
+    return { x, y, w: Math.max(10, w), h: Math.max(10, h) }
+  }
+
   if (handle === 'tl') { x+=dx; y+=dy; w-=dx; h-=dy }
   else if (handle === 'tm') { y+=dy; h-=dy }
   else if (handle === 'tr') { y+=dy; w+=dx; h-=dy }
@@ -81,20 +107,6 @@ function applyHandleDrag(handle, rect, dx, dy, ratio) {
   else if (handle === 'bl') { x+=dx; w-=dx; h+=dy }
   else if (handle === 'bm') { h+=dy }
   else if (handle === 'br') { w+=dx; h+=dy }
-  if (ratio) {
-    const targetRatio = ratio.w / ratio.h
-    if (['tl','tr','bl','br'].includes(handle)) {
-      const newH = w / targetRatio
-      if (['tl','tr'].includes(handle)) y = y + (h - newH)
-      h = newH
-    } else if (['tm','bm'].includes(handle)) {
-      const newW = h * targetRatio
-      x = x + (w - newW) / 2
-      w = newW
-    } else {
-      h = w / targetRatio
-    }
-  }
   return { x, y, w: Math.max(10, w), h: Math.max(10, h) }
 }
 
@@ -212,7 +224,11 @@ export default function CropModal({ photo, accessToken, onClose, onDone }) {
       let rw, rh
       if (cw / ch >= targetR) { rh = ch; rw = rh * targetR }
       else { rw = cw; rh = rw / targetR }
-      const rx = (cw - rw) / 2, ry = (ch - rh) / 2
+      rw = Math.round(rw); rh = Math.round(rh)
+      if (rw >= cw - 1) rw = cw
+      if (rh >= ch - 1) rh = ch
+      const rx = rw === cw ? 0 : Math.round((cw - rw) / 2)
+      const ry = rh === ch ? 0 : Math.round((ch - rh) / 2)
       return clampRect({ x: rx, y: ry, w: rw, h: rh })
     })
   }, [clampRect])
