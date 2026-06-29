@@ -9,12 +9,6 @@ const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.h
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
 const SEARCH_QUERIES_KEY = 'betterrenamer_search_queries'
 const THUMB_SIZES = { sm: 72, md: 120, lg: 200, masonry: 0 }
-const GRID_MODES = [
-  { key: 'sm', icon: IconGridSm, label: 'Piccolo' },
-  { key: 'md', icon: IconGridMd, label: 'Medio' },
-  { key: 'lg', icon: IconGridLg, label: 'Grande' },
-  { key: 'masonry', icon: IconMasonry, label: 'Proporzioni originali' },
-]
 
 function getExt(name) {
   return name.includes('.') ? name.substring(name.lastIndexOf('.')).toLowerCase() : ''
@@ -125,6 +119,13 @@ const IconMoon = () => (
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
   </svg>
 )
+
+const GRID_MODES = [
+  { key: 'sm', icon: IconGridSm, label: 'Piccolo' },
+  { key: 'md', icon: IconGridMd, label: 'Medio' },
+  { key: 'lg', icon: IconGridLg, label: 'Grande' },
+  { key: 'masonry', icon: IconMasonry, label: 'Proporzioni originali' },
+]
 
 export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
   const navigate = useNavigate()
