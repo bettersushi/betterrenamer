@@ -74,16 +74,17 @@
 }
 
 .thumb-size-btn {
-  width: 26px;
-  height: 26px;
-  border-radius: 5px;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
   cursor: pointer;
-  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 
@@ -96,6 +97,50 @@
 .thumb-size-btn:hover:not(.active) {
   border-color: var(--primary);
   color: var(--primary);
+}
+
+.search-masonry {
+  flex: 1;
+  overflow-y: auto;
+  columns: 4;
+  column-gap: 6px;
+}
+
+@media (max-width: 1200px) {
+  .search-masonry { columns: 3; }
+}
+
+@media (max-width: 800px) {
+  .search-masonry { columns: 2; }
+}
+
+.masonry-card {
+  break-inside: avoid;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  display: block;
+}
+
+.masonry-card img {
+  width: 100%;
+  height: auto;
+  display: block;
+  transition: transform 0.2s ease;
+}
+
+.masonry-card:hover img {
+  transform: scale(1.02);
+}
+
+.masonry-card .thumb-overlay {
+  opacity: 0;
+}
+
+.masonry-card:hover .thumb-overlay {
+  opacity: 1;
 }
 
 .thumb-card img {

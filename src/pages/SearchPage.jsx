@@ -8,7 +8,13 @@ import './SearchPage.css'
 const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
 const SEARCH_QUERIES_KEY = 'betterrenamer_search_queries'
-const THUMB_SIZES = { sm: 72, md: 120, lg: 200 }
+const THUMB_SIZES = { sm: 72, md: 120, lg: 200, masonry: 0 }
+const GRID_MODES = [
+  { key: 'sm', icon: IconGridSm, label: 'Piccolo' },
+  { key: 'md', icon: IconGridMd, label: 'Medio' },
+  { key: 'lg', icon: IconGridLg, label: 'Grande' },
+  { key: 'masonry', icon: IconMasonry, label: 'Proporzioni originali' },
+]
 
 function getExt(name) {
   return name.includes('.') ? name.substring(name.lastIndexOf('.')).toLowerCase() : ''
@@ -75,6 +81,30 @@ const IconSimilar = () => (
 const IconX = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+)
+const IconGridSm = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+    <rect x="2" y="2" width="4" height="4" rx="0.5"/><rect x="8" y="2" width="4" height="4" rx="0.5"/><rect x="14" y="2" width="4" height="4" rx="0.5"/><rect x="20" y="2" width="2" height="4" rx="0.5"/>
+    <rect x="2" y="8" width="4" height="4" rx="0.5"/><rect x="8" y="8" width="4" height="4" rx="0.5"/><rect x="14" y="8" width="4" height="4" rx="0.5"/><rect x="20" y="8" width="2" height="4" rx="0.5"/>
+    <rect x="2" y="14" width="4" height="4" rx="0.5"/><rect x="8" y="14" width="4" height="4" rx="0.5"/><rect x="14" y="14" width="4" height="4" rx="0.5"/><rect x="20" y="14" width="2" height="4" rx="0.5"/>
+  </svg>
+)
+const IconGridMd = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+    <rect x="2" y="2" width="9" height="9" rx="1"/><rect x="13" y="2" width="9" height="9" rx="1"/>
+    <rect x="2" y="13" width="9" height="9" rx="1"/><rect x="13" y="13" width="9" height="9" rx="1"/>
+  </svg>
+)
+const IconGridLg = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+    <rect x="2" y="2" width="20" height="20" rx="2"/>
+  </svg>
+)
+const IconMasonry = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+    <rect x="2" y="2" width="9" height="13" rx="1"/><rect x="13" y="2" width="9" height="8" rx="1"/>
+    <rect x="2" y="17" width="9" height="5" rx="1"/><rect x="13" y="12" width="9" height="10" rx="1"/>
   </svg>
 )
 const IconChevronLeft = () => (
@@ -279,8 +309,10 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
               )}
             </div>
             <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
-              {[['sm','S'],['md','M'],['lg','L']].map(([s, label]) => (
-                <button key={s} onClick={() => setThumbSize(s)} className={`thumb-size-btn${thumbSize === s ? ' active' : ''}`}>{label}</button>
+              {GRID_MODES.map(({ key, icon: Icon, label }) => (
+                <button key={key} onClick={() => setThumbSize(key)} className={`thumb-size-btn${thumbSize === key ? ' active' : ''}`} title={label}>
+                  <Icon />
+                </button>
               ))}
             </div>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)', flexShrink: 0 }}>
@@ -308,9 +340,12 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
               <span>{allPhotos.length === 0 ? 'Seleziona una cartella dalla sidebar' : 'Nessun risultato'}</span>
             </div>
           ) : (
-            <div className="search-grid" style={{ '--thumb-size': `${THUMB_SIZES[thumbSize]}px` }}>
+            <div
+              className={thumbSize === 'masonry' ? 'search-masonry' : 'search-grid'}
+              style={thumbSize !== 'masonry' ? { '--thumb-size': `${THUMB_SIZES[thumbSize]}px` } : undefined}
+            >
               {results.map((photo, idx) => (
-                <div key={photo.id} className="thumb-card" onClick={() => setSlideshowIdx(idx)}>
+                <div key={photo.id} className={thumbSize === 'masonry' ? 'masonry-card' : 'thumb-card'} onClick={() => setSlideshowIdx(idx)}>
                   {photo.thumbnailLink ? (
                     <img src={photo.thumbnailLink} alt={photo.name} loading="lazy" title={photo.name} />
                   ) : (
