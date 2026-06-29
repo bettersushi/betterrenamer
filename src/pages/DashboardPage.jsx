@@ -819,7 +819,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <input type="checkbox" id="organizeMedia" checked={organizeMedia} onChange={(e) => setOrganizeMedia(e.target.checked)} style={{ width: 'auto', margin: 0 }} />
-                  <label htmlFor="organizeMedia" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Sposta video/gif in sottocartelle <em>(Air Vid, Air Gif)</em></label>
+                  <label htmlFor="organizeMedia" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Sposta video/gif in sottocartelle</label>
                 </div>
                 <div className="pattern-info">
                   Pattern: <code>cartella-[prefix]counter.ext</code> · Prefissi: <code>vid-</code> <code>gif-</code> · Sort: data modifica · Ricorsivo
