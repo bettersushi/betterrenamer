@@ -254,7 +254,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     for (let i = 0; i < job.preview.length; i++) {
       const item = job.preview[i]
       current++
-      updateJob(job.id, { progress: { current, total, currentFile: item.oldName, phase: 'Rinomino' } })
+      updateJob(job.id, { progress: { current, total, currentFile: item.oldName, currentNewName: item.newName, phase: 'Rinomino' } })
       try {
         await batchRenameFiles(auth.accessToken, [{ id: item.id, oldName: item.oldName, newName: item.newName }])
         entries.push({ type: 'rename', ...item, success: true })
@@ -821,7 +821,16 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                   {job.status === 'running' && (
                     <>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#888', marginBottom: '4px' }}>
-                        <span><strong style={{ color: '#3b82f6' }}>{job.progress.phase}</strong> {job.progress.currentFile}</span>
+                        <span>
+                          <strong style={{ color: '#3b82f6' }}>{job.progress.phase}</strong>{' '}
+                          <span style={{ opacity: 0.7 }}>{job.progress.currentFile}</span>
+                          {job.progress.currentNewName && (
+                            <span style={{ opacity: 0.5 }}> → </span>
+                          )}
+                          {job.progress.currentNewName && (
+                            <span style={{ color: '#3b82f6', opacity: 0.9 }}>{job.progress.currentNewName}</span>
+                          )}
+                        </span>
                         <span>{pct}%</span>
                       </div>
                       <div className="queue-progress-bg">
