@@ -57,7 +57,8 @@ export default function SimilarityBalloon({ state, onViewResults, onCancel, onCl
           <img src={state.refPhoto.thumbnailLink} style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', flexShrink: 0 }} />
         )}
         <span style={{ fontSize: 12, fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {state.status === 'scanning' && 'Ricerca globale...'}
+          {state.status === 'listing' && 'Raccolta file in Drive...'}
+          {state.status === 'scanning' && 'Calcolo similarità...'}
           {state.status === 'done' && `${state.results.length} foto simili trovate`}
           {state.status === 'error' && 'Errore ricerca'}
         </span>
@@ -65,6 +66,18 @@ export default function SimilarityBalloon({ state, onViewResults, onCancel, onCl
           <button onClick={onClose} style={btnStyle} title="Chiudi">✕</button>
         )}
       </div>
+
+      {/* Listing */}
+      {state.status === 'listing' && (
+        <>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
+            Scansione cartelle Drive in corso...
+          </div>
+          <button onClick={onCancel} style={{ ...btnStyle, fontSize: 11, padding: '3px 10px', width: '100%', background: 'color-mix(in srgb, var(--border) 60%, transparent)', borderRadius: 6 }}>
+            Annulla
+          </button>
+        </>
+      )}
 
       {/* Scanning */}
       {state.status === 'scanning' && (

@@ -500,7 +500,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
       setGlobalSimState({ status: 'error', message: 'Errore hash foto: ' + e.message, refPhoto: photo })
       return
     }
-    setGlobalSimState({ status: 'scanning', refPhoto: photo, progress: 0, total: 0, cached: 0 })
+    setGlobalSimState({ status: 'listing', refPhoto: photo })
     let allMedia = []
     try {
       const folders = await listFilesRecursive(auth.accessToken, 'root', 'My Drive', true)
@@ -510,6 +510,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
       return
     }
     if (abortRef.cancelled) return
+    setGlobalSimState({ status: 'scanning', refPhoto: photo, progress: 0, total: allMedia.length > GLOBAL_SIM_CAP ? GLOBAL_SIM_CAP : allMedia.length, cached: 0 })
     const truncated = allMedia.length > GLOBAL_SIM_CAP
     if (truncated) allMedia = allMedia.slice(0, GLOBAL_SIM_CAP)
     const total = allMedia.length
