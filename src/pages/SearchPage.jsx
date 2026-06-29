@@ -593,7 +593,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
       </div>
 
       {/* Body */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
 
         {/* Sidebar — tree */}
         <div className="search-sidebar">
