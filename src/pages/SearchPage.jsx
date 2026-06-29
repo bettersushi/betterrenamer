@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import logoSrc from '../assets/logo-br.svg'
-import { listFiles, searchFilesGlobal } from '../drive'
+import { listFiles, searchFilesGlobal, listFilesRecursive } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
+import SimilarityBalloon from '../components/SimilarityBalloon'
 import './SearchPage.css'
 
 const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
 const SEARCH_QUERIES_KEY = 'betterrenamer_search_queries'
+const PHASH_CACHE_KEY = 'br_phash_cache'
+const GLOBAL_SIM_CAP = 2000
 const THUMB_SIZES = { sm: 72, md: 120, lg: 200, masonry: 0 }
 
 function getExt(name) {
@@ -141,6 +144,12 @@ const IconMasonry = () => (
     <rect x="2" y="17" width="9" height="5" rx="1"/><rect x="13" y="12" width="9" height="10" rx="1"/>
   </svg>
 )
+const IconGlobalSimilar = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+  </svg>
+)
 const IconChevronLeft = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="15 18 9 12 15 6"/>
@@ -177,6 +186,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
   const [recentQueries, setRecentQueries] = useState(() => {
     try { return JSON.parse(localStorage.getItem(SEARCH_QUERIES_KEY)) || [] } catch { return [] }
   })
+  const [globalSimState, setGlobalSimState] = useState(null)
+  const globalSimAbort = useRef(null)
   const [globalQuery, setGlobalQuery] = useState('')
   const [globalResults, setGlobalResults] = useState(null)
   const [globalLoading, setGlobalLoading] = useState(false)
@@ -246,6 +257,83 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
       }
     }, 500)
   }
+
+  const handleGlobalSimilarity = useCallback(async (photo) => {
+    if (!photo.thumbnailLink) return
+    const abortRef = { cancelled: false }
+    globalSimAbort.current = abortRef
+
+    // load persistent hash cache
+    let cache = {}
+    try { cache = JSON.parse(localStorage.getItem(PHASH_CACHE_KEY)) || {} } catch {}
+
+    // hash reference photo
+    let refHash
+    try {
+      refHash = cache[photo.id] || await computePHash(photo.thumbnailLink)
+      cache[photo.id] = refHash
+    } catch (e) {
+      setGlobalSimState({ status: 'error', message: 'Errore hash foto: ' + e.message, refPhoto: photo })
+      return
+    }
+
+    // list all media globally
+    setGlobalSimState({ status: 'scanning', refPhoto: photo, progress: 0, total: 0, cached: 0 })
+    let allMedia = []
+    try {
+      const folders = await listFilesRecursive(auth.accessToken, 'root', 'My Drive', true)
+      for (const f of folders) allMedia.push(...f.files.filter(isMediaFile))
+    } catch (e) {
+      setGlobalSimState({ status: 'error', message: 'Errore listing: ' + e.message, refPhoto: photo })
+      return
+    }
+    if (abortRef.cancelled) return
+
+    const truncated = allMedia.length > GLOBAL_SIM_CAP
+    if (truncated) allMedia = allMedia.slice(0, GLOBAL_SIM_CAP)
+    const total = allMedia.length
+
+    // hash all in batches of 8
+    const BATCH = 8
+    let processed = 0
+    let cachedCount = 0
+    const withDist = []
+
+    for (let i = 0; i < allMedia.length; i += BATCH) {
+      if (abortRef.cancelled) return
+      const batch = allMedia.slice(i, i + BATCH)
+      await Promise.all(batch.map(async (p) => {
+        if (!p.thumbnailLink) return
+        try {
+          let hash = cache[p.id]
+          if (!hash) {
+            hash = await computePHash(p.thumbnailLink)
+            cache[p.id] = hash
+          } else {
+            cachedCount++
+          }
+          const dist = hammingDistance(refHash, hash)
+          withDist.push({ ...p, _dist: dist })
+        } catch { /* skip */ }
+      }))
+      processed += batch.length
+      // save cache incrementally every 20 batches
+      if (Math.floor(i / BATCH) % 20 === 0) {
+        try { localStorage.setItem(PHASH_CACHE_KEY, JSON.stringify(cache)) } catch {}
+      }
+      setGlobalSimState(s => s && s.status === 'scanning'
+        ? { ...s, progress: processed, total, cached: cachedCount }
+        : s)
+      if (i + BATCH < allMedia.length) await new Promise(r => setTimeout(r, 50))
+    }
+
+    if (abortRef.cancelled) return
+    try { localStorage.setItem(PHASH_CACHE_KEY, JSON.stringify(cache)) } catch {}
+
+    withDist.sort((a, b) => a._dist - b._dist)
+    const results = withDist.filter(p => p._dist <= 22)
+    setGlobalSimState({ status: 'done', refPhoto: photo, results, truncated })
+  }, [auth.accessToken])
 
   const handleSimilarity = useCallback(async (photo) => {
     if (!photo.thumbnailLink) return
@@ -451,8 +539,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
                     <div className="search-similar-badge">identica</div>
                   )}
                   <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
-                    <button className="thumb-overlay-btn" title="Cerca simili" onClick={() => handleSimilarity(photo)}>
+                    <button className="thumb-overlay-btn" title="Cerca simili in cartella" onClick={() => handleSimilarity(photo)}>
                       <IconSimilar />
+                    </button>
+                    <button className="thumb-overlay-btn" title="Cerca simili ovunque in Drive" onClick={() => handleGlobalSimilarity(photo)}>
+                      <IconGlobalSimilar />
                     </button>
                     <button className="thumb-overlay-btn" title="QuickLook" onClick={() => setSlideshowIdx(idx)}>
                       <IconEye />
@@ -474,6 +565,22 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
           onPrev={() => setSlideshowIdx(i => Math.max(0, i - 1))}
           onNext={() => setSlideshowIdx(i => Math.min(results.length - 1, i + 1))}
           onClose={() => setSlideshowIdx(null)}
+        />
+      )}
+
+      {globalSimState && (
+        <SimilarityBalloon
+          state={globalSimState}
+          onViewResults={() => {
+            setSimilarTo(globalSimState.refPhoto)
+            setSimilarResults(globalSimState.results)
+            setGlobalSimState(null)
+          }}
+          onCancel={() => {
+            if (globalSimAbort.current) globalSimAbort.current.cancelled = true
+            setGlobalSimState(null)
+          }}
+          onClose={() => setGlobalSimState(null)}
         />
       )}
     </div>
