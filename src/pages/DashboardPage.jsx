@@ -31,6 +31,12 @@ function generateLegacyName(folderName, fileName, mimeType, counter) {
   else if (getExt(fileName) === '.gif') prefix = 'gif-'
   return `${sanitized}-${prefix}${counter}${ext}`
 }
+function matchesLegacyPattern(folderName, fileName, mimeType) {
+  const sanitized = folderName.toLowerCase().replace(/[^a-z0-9]/g, '-')
+  const ext = getExt(fileName).replace('.', '\\.')
+  const prefix = isVideoFile(fileName, mimeType) ? 'vid-' : getExt(fileName) === '.gif' ? 'gif-' : ''
+  return new RegExp(`^${sanitized}-${prefix}\\d+${ext}$`).test(fileName)
+}
 function buildLegacyPreview(groups) {
   const preview = []
   for (const group of groups) {
@@ -38,7 +44,7 @@ function buildLegacyPreview(groups) {
     for (const file of group.files) {
       if (!isMediaFile(file)) continue
       const newName = generateLegacyName(group.folderName, file.name, file.mimeType, counter)
-      preview.push({ id: file.id, oldName: file.name, newName, folderName: group.folderName, folderId: group.folderId, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || null, skip: file.name === newName })
+      preview.push({ id: file.id, oldName: file.name, newName, folderName: group.folderName, folderId: group.folderId, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || null, skip: matchesLegacyPattern(group.folderName, file.name, file.mimeType) })
       counter += Math.floor(Math.random() * 1000) + 100
     }
   }
