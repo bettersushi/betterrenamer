@@ -9,6 +9,28 @@ import './DashboardPage.css'
 const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
 
+const TAB_ID = crypto.randomUUID()
+const LOCK_KEY = 'br_processing_lock'
+const LOCK_TTL = 20000 // ms — lock scade se non refreshato
+
+function readLock() {
+  try { return JSON.parse(localStorage.getItem(LOCK_KEY)) } catch { return null }
+}
+function acquireLock() {
+  const existing = readLock()
+  if (existing && existing.tabId !== TAB_ID && Date.now() - existing.ts < LOCK_TTL) return false
+  localStorage.setItem(LOCK_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }))
+  return true
+}
+function refreshLock() {
+  const existing = readLock()
+  if (existing?.tabId === TAB_ID) localStorage.setItem(LOCK_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }))
+}
+function releaseLock() {
+  const existing = readLock()
+  if (existing?.tabId === TAB_ID) localStorage.removeItem(LOCK_KEY)
+}
+
 function getExt(name) {
   return name.includes('.') ? name.substring(name.lastIndexOf('.')).toLowerCase() : ''
 }
@@ -257,6 +279,22 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     setCheckedFolders(allChecked ? new Set() : new Set(visibleFolders.map(f => f.id)))
   }
 
+  // Cross-tab lock — prevent two windows from running jobs simultaneously
+  const [lockedByOther, setLockedByOther] = useState(() => {
+    const l = readLock(); return !!(l && l.tabId !== TAB_ID && Date.now() - l.ts < LOCK_TTL)
+  })
+  const lockRefreshInterval = useRef(null)
+
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key !== LOCK_KEY) return
+      const l = readLock()
+      setLockedByOther(!!(l && l.tabId !== TAB_ID && Date.now() - l.ts < LOCK_TTL))
+    }
+    window.addEventListener('storage', onStorage)
+    return () => { window.removeEventListener('storage', onStorage); releaseLock() }
+  }, [])
+
   // Queue — restore interrupted jobs from localStorage on mount
   const [queue, setQueue] = useState(() => {
     try {
@@ -306,6 +344,14 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
   }, [])
 
   const processJob = useCallback(async (job) => {
+    if (!acquireLock()) {
+      // Another tab holds the lock — put job back to queued
+      updateJob(job.id, { status: 'queued' })
+      setLockedByOther(true)
+      return
+    }
+    // Refresh lock every 10s while running
+    lockRefreshInterval.current = setInterval(refreshLock, 10000)
     runningCount.current++
     updateJob(job.id, { status: 'running', progress: { current: 0, total: job.preview.length, currentFile: '', phase: 'Avvio...' } })
 
@@ -364,6 +410,10 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     saveSession({ date: new Date().toISOString(), rootFolder: job.rootFolderName, mode: job.mode, entries })
     updateJob(job.id, { status: 'done', entries, progress: { current: total, total, currentFile: '', phase: 'Completato' } })
     runningCount.current--
+    if (runningCount.current === 0) {
+      clearInterval(lockRefreshInterval.current)
+      releaseLock()
+    }
 
     // Avvia prossimi job in coda
     startPending()
@@ -640,6 +690,12 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+      {lockedByOther && (
+        <div style={{ background: '#f59e0b', color: '#000', fontSize: 12, fontWeight: 600, padding: '6px 20px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          ⚠️ Un'altra finestra sta eseguendo un task. I nuovi job verranno messi in attesa fino al termine.
+          <button onClick={() => setLockedByOther(false)} style={{ marginLeft: 'auto', background: 'rgba(0,0,0,0.15)', border: 'none', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>Ignora</button>
+        </div>
+      )}
       {/* Header */}
       <div className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0 }}>
         <div>
