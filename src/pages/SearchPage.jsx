@@ -6,7 +6,9 @@ import QuickLookModal from '../components/QuickLookModal'
 import './SearchPage.css'
 
 const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
+const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
 const SEARCH_QUERIES_KEY = 'betterrenamer_search_queries'
+const THUMB_SIZES = { sm: 72, md: 120, lg: 200 }
 
 function getExt(name) {
   return name.includes('.') ? name.substring(name.lastIndexOf('.')).toLowerCase() : ''
@@ -17,6 +19,10 @@ function isMediaFile(f) {
   if (MEDIA_EXTENSIONS.has(ext)) return true
   if (f.mimeType && ['image/', 'video/'].some(m => f.mimeType.startsWith(m))) return true
   return false
+}
+function isVideoFile(f) {
+  if (f.mimeType && f.mimeType.includes('video')) return true
+  return VIDEO_EXTENSIONS.has(getExt(f.name))
 }
 
 async function computePHash(imgUrl) {
@@ -104,6 +110,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
   const [similarResults, setSimilarResults] = useState([])
   const [similarLoading, setSimilarLoading] = useState(false)
   const [slideshowIdx, setSlideshowIdx] = useState(null)
+  const [thumbSize, setThumbSize] = useState('md')
   const pHashCache = useRef({})
 
   const currentFolder = folderPath[folderPath.length - 1]
@@ -271,6 +278,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
                 </button>
               )}
             </div>
+            <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
+              {[['sm','S'],['md','M'],['lg','L']].map(([s, label]) => (
+                <button key={s} onClick={() => setThumbSize(s)} className={`thumb-size-btn${thumbSize === s ? ' active' : ''}`}>{label}</button>
+              ))}
+            </div>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)', flexShrink: 0 }}>
               {loading ? 'Caricamento...' : `${results.length} foto`}
             </span>
@@ -296,13 +308,16 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
               <span>{allPhotos.length === 0 ? 'Seleziona una cartella dalla sidebar' : 'Nessun risultato'}</span>
             </div>
           ) : (
-            <div className="search-grid">
+            <div className="search-grid" style={{ '--thumb-size': `${THUMB_SIZES[thumbSize]}px` }}>
               {results.map((photo, idx) => (
                 <div key={photo.id} className="thumb-card" onClick={() => setSlideshowIdx(idx)}>
                   {photo.thumbnailLink ? (
                     <img src={photo.thumbnailLink} alt={photo.name} loading="lazy" title={photo.name} />
                   ) : (
                     <div className="thumb-no-preview">📄</div>
+                  )}
+                  {isVideoFile(photo) && (
+                    <div style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.55)', borderRadius: 4, padding: '2px 5px', color: 'white', fontSize: 10, pointerEvents: 'none', lineHeight: 1.2 }}>▶</div>
                   )}
                   {similarTo && photo._dist !== undefined && photo._dist === 0 && (
                     <div className="search-similar-badge">identica</div>

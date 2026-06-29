@@ -57,21 +57,45 @@
 .search-grid {
   flex: 1;
   overflow-y: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--thumb-size, 120px), 1fr));
+  gap: 6px;
   align-content: flex-start;
 }
 
 .thumb-card {
   position: relative;
-  width: 100px;
-  height: 100px;
+  aspect-ratio: 1;
+  width: 100%;
   border-radius: 8px;
   overflow: hidden;
   background: var(--border);
   cursor: pointer;
-  flex-shrink: 0;
+}
+
+.thumb-size-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.thumb-size-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.thumb-size-btn:hover:not(.active) {
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .thumb-card img {
