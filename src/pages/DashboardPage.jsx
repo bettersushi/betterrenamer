@@ -160,6 +160,12 @@ const IconXSmall = () => (
   </svg>
 )
 
+const IconPlay = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+    <polygon points="5 3 19 12 5 21 5 3"/>
+  </svg>
+)
+
 const IconDancer = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="4" r="2"/>
@@ -343,7 +349,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
       organizeMedia,
       preview: preview.filter(p => !p.skip).map(p => ({ ...p })),
       skipCount: preview.filter(p => p.skip).length,
-      status: 'pending',
+      status: 'queued',
       progress: { current: 0, total: preview.filter(p => !p.skip).length, currentFile: '', phase: '' },
       entries: [],
     }
@@ -352,8 +358,24 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     setPreview([])
     setPreviewFolder(null)
     setCheckedFolders(new Set())
-    startPending()
   }
+
+  const handleStartJob = useCallback((jobId) => {
+    queueRef.current = queueRef.current.map(j => j.id === jobId && j.status === 'queued' ? { ...j, status: 'pending' } : j)
+    setQueue([...queueRef.current])
+    startPending()
+  }, [startPending])
+
+  const handleStartAll = useCallback(() => {
+    queueRef.current = queueRef.current.map(j => j.status === 'queued' ? { ...j, status: 'pending' } : j)
+    setQueue([...queueRef.current])
+    startPending()
+  }, [startPending])
+
+  const handleRemoveQueued = useCallback((jobId) => {
+    queueRef.current = queueRef.current.filter(j => !(j.id === jobId && j.status === 'queued'))
+    setQueue([...queueRef.current])
+  }, [])
 
   const loadFolder = async (folderId, token) => {
     setBrowserLoading(true)
@@ -546,11 +568,12 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
   const handleLogout = () => { onLogout(); navigate('/login') }
 
   const queueHasItems = queue.length > 0
+  const queuedJobs = queue.filter(j => j.status === 'queued')
   const runningJobs = queue.filter(j => j.status === 'running')
   const pendingJobs = queue.filter(j => j.status === 'pending')
   const doneJobs = queue.filter(j => j.status === 'done' || j.status === 'error')
   const activeFolderIds = new Set(
-    [...runningJobs, ...pendingJobs].flatMap(j => [j.rootFolderId, ...j.preview.map(p => p.folderId)])
+    [...queuedJobs, ...runningJobs, ...pendingJobs].flatMap(j => [j.rootFolderId, ...j.preview.map(p => p.folderId)])
   )
 
   return (
@@ -833,11 +856,17 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
               <IconList /> Coda
+              {queuedJobs.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>{queuedJobs.length} in coda</span>}
               {runningJobs.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#3b82f6' }}>{runningJobs.length} in esecuzione</span>}
-              {pendingJobs.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#888' }}>{pendingJobs.length} in attesa</span>}
+              {pendingJobs.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#888' }}>{pendingJobs.length} in partenza</span>}
               {doneJobs.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#16a34a' }}>{doneJobs.length} completati</span>}
             </h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {queuedJobs.length > 0 && (
+                <button onClick={handleStartAll} className="btn-primary" style={{ fontSize: '12px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <IconPlay /> Avvia tutto
+                </button>
+              )}
               {runningJobs.length > 0 && (
                 <span style={{ color: '#3b82f6', display: 'flex', animation: 'dancer-bounce 0.6s ease-in-out infinite alternate' }}>
                   <IconDancer />
@@ -869,6 +898,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: job.status === 'running' ? '6px' : 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ display: 'flex', color: '#888' }}>
+                        {job.status === 'queued' && <IconClock />}
                         {job.status === 'pending' && <IconClock />}
                         {job.status === 'running' && <IconRefresh />}
                         {job.status === 'done' && <IconCheck />}
@@ -877,8 +907,19 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                       <strong style={{ fontSize: '13px' }}>{job.rootFolderName}</strong>
                       <span style={{ fontSize: '11px', color: '#888' }}>[{job.mode}]</span>
                     </div>
-                    <div style={{ fontSize: '12px', color: '#888' }}>
-                      {job.status === 'pending' && 'In attesa...'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#888' }}>
+                      {job.status === 'queued' && (
+                        <>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{job.progress.total} file</span>
+                          <button onClick={() => handleStartJob(job.id)} className="btn-primary" style={{ fontSize: '11px', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px' }} title="Avvia">
+                            <IconPlay /> Avvia
+                          </button>
+                          <button onClick={() => handleRemoveQueued(job.id)} className="btn-secondary" style={{ fontSize: '11px', padding: '3px 6px', color: 'var(--danger)' }} title="Rimuovi">
+                            <IconXSmall />
+                          </button>
+                        </>
+                      )}
+                      {job.status === 'pending' && 'In partenza...'}
                       {job.status === 'running' && `${job.progress.current} / ${job.progress.total}`}
                       {job.status === 'done' && (
                         <>
@@ -930,9 +971,39 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
           <button onClick={closeLogs} className="nav-icon-btn" title="Chiudi"><IconX /></button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
-          {[...runningJobs, ...pendingJobs].length > 0 && (
+          {[...queuedJobs, ...pendingJobs, ...runningJobs].length > 0 && (
             <div style={{ marginBottom: '16px' }}>
-              {[...runningJobs, ...pendingJobs].map(job => {
+              {queuedJobs.length > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>In coda ({queuedJobs.length})</span>
+                  <button onClick={handleStartAll} className="btn-primary" style={{ fontSize: '11px', padding: '3px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <IconPlay /> Avvia tutto
+                  </button>
+                </div>
+              )}
+              {queuedJobs.map(job => (
+                <div key={job.id} className="session-card" style={{ marginBottom: '8px' }}>
+                  <div style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ color: 'var(--text-muted)', display: 'flex', flexShrink: 0 }}><IconClock /></span>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <strong style={{ fontSize: '13px' }}>{job.rootFolderName}</strong>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '8px' }}>{job.progress.total} file</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+                      <button onClick={() => handleStartJob(job.id)} className="btn-primary" style={{ fontSize: '11px', padding: '3px 9px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <IconPlay /> Avvia
+                      </button>
+                      <button onClick={() => handleRemoveQueued(job.id)} className="btn-secondary" style={{ fontSize: '11px', padding: '3px 6px', color: 'var(--danger)' }} title="Rimuovi">
+                        <IconXSmall />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {[...pendingJobs, ...runningJobs].length > 0 && queuedJobs.length > 0 && (
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', marginTop: '4px' }}>In esecuzione</div>
+              )}
+              {[...pendingJobs, ...runningJobs].map(job => {
                 const pct = job.progress.total > 0 ? Math.round((job.progress.current / job.progress.total) * 100) : 0
                 return (
                   <div key={job.id} className="session-card" style={{ marginBottom: '10px', position: 'relative', overflow: 'hidden' }}>
@@ -966,12 +1037,12 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
               })}
             </div>
           )}
-          {logSessions.length === 0 && [...runningJobs, ...pendingJobs].length === 0 && (
+          {logSessions.length === 0 && [...queuedJobs, ...pendingJobs, ...runningJobs].length === 0 && (
             <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: '13px' }}>Nessuna sessione registrata.</div>
           )}
           {logSessions.length > 0 && (
             <>
-              {[...runningJobs, ...pendingJobs].length > 0 && (
+              {[...queuedJobs, ...pendingJobs, ...runningJobs].length > 0 && (
                 <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px', marginTop: '4px' }}>Storico</div>
               )}
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
