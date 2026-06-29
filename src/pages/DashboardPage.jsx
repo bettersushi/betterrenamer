@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import logoSrc from '../assets/logo-br.svg'
 import { useNavigate } from 'react-router-dom'
-import { listFiles, listFilesRecursive, batchRenameFiles, getOrCreateFolder, moveFile } from '../drive'
+import { listFiles, listFilesRecursive, batchRenameFiles, getOrCreateFolder, moveFile, renameFile } from '../drive'
 import { saveSession, getSessions, clearSessions, downloadCSV } from '../logs'
 import QuickLookModal from '../components/QuickLookModal'
 import './DashboardPage.css'
@@ -176,9 +176,24 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
   const [logsOpen, setLogsOpen] = useState(false)
   const [logSessions, setLogSessions] = useState([])
   const [logsExpanded, setLogsExpanded] = useState(null)
+  const [undoneEntries, setUndoneEntries] = useState(new Set())
+  const [undoingEntries, setUndoingEntries] = useState(new Set())
 
   const openLogs = () => { setLogSessions(getSessions()); setLogsOpen(true) }
   const closeLogs = () => setLogsOpen(false)
+
+  const handleUndo = useCallback(async (sessionIdx, entryIdx, entry) => {
+    const key = `${sessionIdx}-${entryIdx}`
+    setUndoingEntries(s => new Set(s).add(key))
+    try {
+      await renameFile(auth.accessToken, entry.id, entry.oldName)
+      setUndoneEntries(s => new Set(s).add(key))
+    } catch (e) {
+      alert('Errore undo: ' + e.message)
+    } finally {
+      setUndoingEntries(s => { const n = new Set(s); n.delete(key); return n })
+    }
+  }, [auth])
 
   // Browser state
   const [folderPath, setFolderPath] = useState([{ id: 'root', name: 'My Drive' }])
@@ -947,13 +962,35 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                             </tr>
                           </thead>
                           <tbody>
-                            {session.entries.map((entry, i) => (
-                              <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
-                                <td style={{ padding: '5px 10px' }}>{entry.success ? <IconCheck /> : <IconXSmall />}</td>
-                                <td style={{ padding: '5px 10px', color: 'var(--text-secondary)' }}>{entry.oldName}</td>
-                                <td style={{ padding: '5px 10px', color: entry.success ? 'var(--success)' : 'var(--danger)', fontWeight: 500 }}>{entry.success ? entry.newName : entry.error}</td>
-                              </tr>
-                            ))}
+                            {session.entries.map((entry, i) => {
+                              const key = `${idx}-${i}`
+                              const isUndone = undoneEntries.has(key)
+                              const isUndoing = undoingEntries.has(key)
+                              const canUndo = entry.success && entry.type === 'rename' && entry.id && !isUndone
+                              return (
+                                <tr key={i} style={{ borderTop: '1px solid var(--border)', opacity: isUndone ? 0.4 : 1 }}>
+                                  <td style={{ padding: '5px 10px' }}>{entry.success ? <IconCheck /> : <IconXSmall />}</td>
+                                  <td style={{ padding: '5px 10px', color: 'var(--text-secondary)' }}>{entry.oldName}</td>
+                                  <td style={{ padding: '5px 10px', color: isUndone ? 'var(--text-muted)' : entry.success ? 'var(--success)' : 'var(--danger)', fontWeight: 500 }}>
+                                    {isUndone ? '↩ annullato' : entry.success ? entry.newName : entry.error}
+                                  </td>
+                                  <td style={{ padding: '5px 6px', width: '32px' }}>
+                                    {canUndo && (
+                                      <button
+                                        onClick={() => handleUndo(idx, i, entry)}
+                                        disabled={isUndoing}
+                                        title="Annulla rinomina"
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px', padding: '2px 4px', opacity: isUndoing ? 0.4 : 0.6, transition: 'opacity 0.15s' }}
+                                        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                                        onMouseLeave={e => e.currentTarget.style.opacity = isUndoing ? '0.4' : '0.6'}
+                                      >
+                                        {isUndoing ? '…' : '↩'}
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              )
+                            })}
                           </tbody>
                         </table>
                       </div>
