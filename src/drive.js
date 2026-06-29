@@ -145,6 +145,37 @@ export const renameFile = async (accessToken, fileId, newName) => {
   return response.json();
 };
 
+export const getFolderAncestors = async (accessToken, startFolderId, maxLevels = 5) => {
+  const ancestors = []
+  let currentId = startFolderId
+  for (let i = 0; i < maxLevels; i++) {
+    if (!currentId || currentId === 'root') break
+    const params = new URLSearchParams({ fields: 'id,name,parents' })
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${currentId}?${params}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!res.ok) break
+    const data = await res.json()
+    ancestors.push({ id: data.id, name: data.name })
+    currentId = data.parents?.[0] || null
+  }
+  return ancestors // [immediate parent, grandparent, ...]
+}
+
+export const countFolderFiles = async (accessToken, folderId) => {
+  const params = new URLSearchParams({
+    q: `'${folderId}' in parents and trashed = false and (mimeType contains 'image/' or mimeType contains 'video/')`,
+    fields: 'files(id)',
+    pageSize: 1000,
+  })
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!res.ok) return null
+  const data = await res.json()
+  return data.files?.length ?? null
+}
+
 export const getFileMetadata = async (accessToken, fileId) => {
   const params = new URLSearchParams({ fields: 'id,name,thumbnailLink,mimeType,size,modifiedTime' })
   const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?${params}`, {

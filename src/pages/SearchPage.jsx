@@ -4,6 +4,7 @@ import logoSrc from '../assets/logo-br.svg'
 import { listFiles, searchFilesGlobal, listFilesRecursive } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
 import SimilarityBalloon from '../components/SimilarityBalloon'
+import ScopePickerModal from '../components/ScopePickerModal'
 import CropModal from '../components/CropModal'
 import './SearchPage.css'
 
@@ -307,6 +308,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const [similarResults, setSimilarResults] = useState([])
   const [balloons, setBalloons] = useState([])
   const [cropPhoto, setCropPhoto] = useState(null)
+  const [scopePickerPhoto, setScopePickerPhoto] = useState(null)
   const [croppingIds, setCroppingIds] = useState(new Set())
   const [cropDoneIds, setCropDoneIds] = useState(new Set())
   const [thumbTimestamps, setThumbTimestamps] = useState({}) // forza reload thumbnail dopo crop
@@ -524,7 +526,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   }, [allPhotos, updateBalloon])
 
   // ── Global similarity ───────────────────────────────────────────────────
-  const handleGlobalSimilarity = useCallback(async (photo) => {
+  const handleGlobalSimilarity = useCallback(async (photo, scopeFolder) => {
     if (!photo.thumbnailLink) return
     const id = crypto.randomUUID()
     const abortRef = { cancelled: false }
@@ -538,11 +540,16 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
       setBalloons(bs => [...bs, { id, type: 'global', status: 'error', message: 'Errore hash foto: ' + e.message, refPhoto: photo, abortRef }])
       return
     }
-    setBalloons(bs => [...bs, { id, type: 'global', status: 'listing', refPhoto: photo, abortRef }])
+    setBalloons(bs => [...bs, { id, type: 'global', status: 'listing', refPhoto: photo, abortRef, listingFolder: scopeFolder.name, listingCount: 0 }])
     let allMedia = []
     try {
-      const folders = await listFilesRecursive(auth.accessToken, 'root', 'My Drive', true)
-      for (const f of folders) allMedia.push(...f.files.filter(isMediaFile))
+      const folders = await listFilesRecursive(auth.accessToken, scopeFolder.id, scopeFolder.name, true)
+      for (const f of folders) {
+        if (abortRef.cancelled) return
+        const media = f.files.filter(isMediaFile)
+        allMedia.push(...media)
+        updateBalloon(id, { listingCount: allMedia.length, listingFolder: f.folderName })
+      }
     } catch (e) {
       updateBalloon(id, { status: 'error', message: 'Errore listing: ' + e.message })
       return
@@ -776,7 +783,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                       )}
                       <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
                         <button className="thumb-overlay-btn" title="Cerca simili in cartella" onClick={() => handleSimilarity(photo)}><IconSimilar /></button>
-                        <button className="thumb-overlay-btn" title="Cerca simili ovunque in Drive" onClick={() => handleGlobalSimilarity(photo)}><IconGlobalSimilar /></button>
+                        <button className="thumb-overlay-btn" title="Cerca simili per scope" onClick={() => setScopePickerPhoto(photo)}><IconGlobalSimilar /></button>
                         <button className="thumb-overlay-btn" title="Vai alla cartella" onClick={() => handleFolderJump(photo)}><IconFolderJump /></button>
                         <button className="thumb-overlay-btn" title="QuickLook" onClick={() => setSlideshowIdx(idx)}><IconEye /></button>
                         {photo.thumbnailLink && (
@@ -820,7 +827,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                     )}
                     <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
                       <button className="thumb-overlay-btn" title="Cerca simili in cartella" onClick={() => handleSimilarity(photo)}><IconSimilar /></button>
-                      <button className="thumb-overlay-btn" title="Cerca simili ovunque in Drive" onClick={() => handleGlobalSimilarity(photo)}><IconGlobalSimilar /></button>
+                      <button className="thumb-overlay-btn" title="Cerca simili per scope" onClick={() => setScopePickerPhoto(photo)}><IconGlobalSimilar /></button>
                       <button className="thumb-overlay-btn" title="Vai alla cartella" onClick={() => handleFolderJump(photo)}><IconFolderJump /></button>
                       <button className="thumb-overlay-btn" title="QuickLook" onClick={() => setSlideshowIdx(idx)}><IconEye /></button>
                       {photo.thumbnailLink && (
@@ -874,6 +881,18 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           onClose={() => removeBalloon(b.id)}
         />
       ))}
+      {scopePickerPhoto && (
+        <ScopePickerModal
+          photo={scopePickerPhoto}
+          accessToken={auth.accessToken}
+          onClose={() => setScopePickerPhoto(null)}
+          onConfirm={(scopeFolder) => {
+            setScopePickerPhoto(null)
+            handleGlobalSimilarity(scopePickerPhoto, scopeFolder)
+          }}
+        />
+      )}
+
       {cropPhoto && (
         <CropModal
           photo={cropPhoto}

@@ -71,9 +71,19 @@ export default function SimilarityBalloon({ state, index = 0, onViewResults, onC
       {/* Listing */}
       {state.status === 'listing' && (
         <>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
-            Scansione cartelle Drive in corso...
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>
+            Scansione cartelle...
           </div>
+          {state.listingFolder && (
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.7 }}>
+              📁 {state.listingFolder}
+            </div>
+          )}
+          {state.listingCount > 0 && (
+            <div style={{ fontSize: 11, color: 'var(--primary)', marginBottom: 6 }}>
+              {state.listingCount} file trovati
+            </div>
+          )}
           <button onClick={onCancel} style={{ ...btnStyle, fontSize: 11, padding: '3px 10px', width: '100%', background: 'color-mix(in srgb, var(--border) 60%, transparent)', borderRadius: 6 }}>
             Annulla
           </button>
