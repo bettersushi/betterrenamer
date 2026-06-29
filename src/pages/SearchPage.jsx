@@ -890,7 +890,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                         style={{ width: '100%', height: '100%' }}
                       />
                     ) : (
-                      <div className="thumb-no-preview">📄</div>
+                      <div className="thumb-no-preview">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.3 }}><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="3" x2="21" y2="21"/></svg>
+                      </div>
                     )}
                     {isVideoFile(photo) && (
                       <div style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.55)', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', pointerEvents: 'none' }}>
