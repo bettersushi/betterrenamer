@@ -58,7 +58,7 @@ function getLargeThumbUrl(thumbnailLink, size = 1600) {
   return thumbnailLink.replace(/=s\d+$/, `=s${size}`).replace(/=s\d+-/, `=s${size}-`)
 }
 
-function LazyPhoto({ src, alt, className, style, onLoad: onLoadProp }) {
+function LazyPhoto({ src, alt, className, style }) {
   const ref = useRef(null)
   const [loaded, setLoaded] = useState(false)
   const [src_, setSrc] = useState(null)
@@ -68,10 +68,7 @@ function LazyPhoto({ src, alt, className, style, onLoad: onLoadProp }) {
     const el = ref.current
     if (!el) return
     const obs = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        setSrc(src)
-        obs.disconnect()
-      }
+      if (entry.isIntersecting) { setSrc(src); obs.disconnect() }
     }, { rootMargin: '200px' })
     obs.observe(el)
     return () => obs.disconnect()
@@ -81,23 +78,15 @@ function LazyPhoto({ src, alt, className, style, onLoad: onLoadProp }) {
     <div ref={ref} className={`lazy-photo-wrap${loaded ? ' lazy-loaded' : ''}`} style={style}>
       {!loaded && <div className="lazy-shimmer" />}
       {src_ && (
-        <img
-          src={src_}
-          alt={alt}
-          className={className}
-          onLoad={() => { setLoaded(true); onLoadProp?.() }}
-          style={{ opacity: loaded ? 1 : 0, transition: 'opacity 0.3s' }}
-        />
+        <img src={src_} alt={alt} className={className}
+          onLoad={() => setLoaded(true)}
+          style={{ opacity: loaded ? 1 : 0, transition: 'opacity 0.3s' }} />
       )}
     </div>
   )
 }
 
-const IconFolder = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
-  </svg>
-)
+// ── Icons ────────────────────────────────────────────────────────────────────
 const IconSearch = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -168,6 +157,11 @@ const IconChevronLeft = () => (
     <polyline points="15 18 9 12 15 6"/>
   </svg>
 )
+const IconChevronRight = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>
+)
 const IconSun = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
@@ -181,6 +175,11 @@ const IconMoon = () => (
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
   </svg>
 )
+const IconSpinner = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" style={{ animation: 'spin 1s linear infinite' }}/>
+  </svg>
+)
 
 const GRID_MODES = [
   { key: 'sm', icon: IconGridSm, label: 'Piccolo' },
@@ -189,18 +188,69 @@ const GRID_MODES = [
   { key: 'masonry', icon: IconMasonry, label: 'Proporzioni originali' },
 ]
 
-export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
+// ── Tree Node ────────────────────────────────────────────────────────────────
+function TreeNode({ folder, depth, expanded, loading, children, activeId, onToggle, onSelect }) {
+  const hasChildren = children === undefined || children.length > 0
+  return (
+    <div>
+      <div
+        className={`tree-node${activeId === folder.id ? ' active' : ''}`}
+        style={{ paddingLeft: 12 + depth * 14 }}
+      >
+        <button
+          className="tree-chevron"
+          onClick={e => { e.stopPropagation(); onToggle(folder) }}
+          style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', opacity: hasChildren ? 1 : 0.2 }}
+          disabled={!hasChildren && !loading}
+        >
+          {loading ? <IconSpinner /> : <IconChevronRight />}
+        </button>
+        <span className="tree-label" onClick={() => onSelect(folder)} title={folder.name}>
+          {folder.name}
+        </span>
+      </div>
+      {expanded && children && children.map(c => (
+        <ConnectedTreeNode key={c.id} folder={c} depth={depth + 1} activeId={activeId} onToggle={onToggle} onSelect={onSelect} />
+      ))}
+    </div>
+  )
+}
+
+// Connected version reads its own state from props passed down
+function ConnectedTreeNode({ folder, depth, activeId, onToggle, onSelect, treeExpanded, treeChildren, treeLoading }) {
+  return (
+    <TreeNode
+      folder={folder}
+      depth={depth}
+      expanded={treeExpanded?.[folder.id]}
+      loading={treeLoading?.[folder.id]}
+      children={treeChildren?.[folder.id]}
+      activeId={activeId}
+      onToggle={onToggle}
+      onSelect={onSelect}
+    />
+  )
+}
+
+// ── Main Component ───────────────────────────────────────────────────────────
+export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTokenRefresh }) {
   const navigate = useNavigate()
-  const [folderPath, setFolderPath] = useState([{ id: 'root', name: 'My Drive' }])
-  const [folders, setFolders] = useState([])
+
+  // Tree state
+  const [treeExpanded, setTreeExpanded] = useState({ root: true })
+  const [treeChildren, setTreeChildren] = useState({})
+  const [treeLoading, setTreeLoading] = useState({})
+  const [treePhotos, setTreePhotos] = useState({})
+  const [activeFolderId, setActiveFolderId] = useState('root')
+  const [activeFolderName, setActiveFolderName] = useState('My Drive')
+
+  // Grid state
   const [allPhotos, setAllPhotos] = useState([])
   const [loading, setLoading] = useState(false)
-  const [query, setQuery] = useState('')
-  const [recentQueries, setRecentQueries] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(SEARCH_QUERIES_KEY)) || [] } catch { return [] }
-  })
-  const [globalSimState, setGlobalSimState] = useState(null)
-  const globalSimAbort = useRef(null)
+  const [thumbSize, setThumbSize] = useState('md')
+  const [slideshowIdx, setSlideshowIdx] = useState(null)
+
+  // Search & similarity
   const [globalQuery, setGlobalQuery] = useState('')
   const [globalResults, setGlobalResults] = useState(null)
   const [globalLoading, setGlobalLoading] = useState(false)
@@ -208,92 +258,182 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
   const [similarTo, setSimilarTo] = useState(null)
   const [similarResults, setSimilarResults] = useState([])
   const [similarLoading, setSimilarLoading] = useState(false)
-  const [slideshowIdx, setSlideshowIdx] = useState(null)
-  const [thumbSize, setThumbSize] = useState('md')
+  const [globalSimState, setGlobalSimState] = useState(null)
+  const globalSimAbort = useRef(null)
   const pHashCache = useRef({})
-  const [folderJumpStack, setFolderJumpStack] = useState([]) // stack of previous folderPath states
 
-  const currentFolder = folderPath[folderPath.length - 1]
+  // Universal view history stack
+  const [viewStack, setViewStack] = useState([])
 
-  const loadFolder = useCallback(async (folderId) => {
-    setLoading(true)
-    setSimilarTo(null)
-    setSimilarResults([])
+  const pushView = () => {
+    setViewStack(s => [...s, {
+      activeFolderId, activeFolderName, allPhotos,
+      globalQuery, globalResults, similarTo, similarResults,
+    }])
+  }
+  const popView = () => {
+    setViewStack(s => {
+      const prev = s[s.length - 1]
+      if (!prev) return s
+      setActiveFolderId(prev.activeFolderId)
+      setActiveFolderName(prev.activeFolderName)
+      setAllPhotos(prev.allPhotos)
+      setGlobalQuery(prev.globalQuery)
+      setGlobalResults(prev.globalResults)
+      setSimilarTo(prev.similarTo)
+      setSimilarResults(prev.similarResults)
+      return s.slice(0, -1)
+    })
+  }
+
+  // ── Folder loading ──────────────────────────────────────────────────────
+  const fetchFolder = useCallback(async (folderId) => {
     try {
       const data = await listFiles(auth.accessToken, folderId)
       const files = data.files || []
-      setFolders(files.filter(f => f.mimeType === 'application/vnd.google-apps.folder'))
-      setAllPhotos(files.filter(isMediaFile))
+      const subfolders = files.filter(f => f.mimeType === 'application/vnd.google-apps.folder')
+      const photos = files.filter(isMediaFile)
+      return { subfolders, photos }
     } catch (e) {
-      console.error(e)
-    } finally {
-      setLoading(false)
+      if (e.status === 401 && onTokenRefresh) {
+        const newToken = await onTokenRefresh()
+        if (newToken) {
+          const data = await listFiles(newToken, folderId)
+          const files = data.files || []
+          return {
+            subfolders: files.filter(f => f.mimeType === 'application/vnd.google-apps.folder'),
+            photos: files.filter(isMediaFile),
+          }
+        }
+      }
+      throw e
     }
-  }, [auth.accessToken])
+  }, [auth.accessToken, onTokenRefresh])
 
+  const selectFolder = useCallback(async (folderId, folderName, pushHistory = true) => {
+    if (pushHistory) pushView()
+    setActiveFolderId(folderId)
+    setActiveFolderName(folderName)
+    setSimilarTo(null); setSimilarResults([])
+    setGlobalResults(null); setGlobalQuery('')
+
+    if (treePhotos[folderId]) {
+      setAllPhotos(treePhotos[folderId])
+      return
+    }
+    setLoading(true)
+    try {
+      const { subfolders, photos } = await fetchFolder(folderId)
+      setTreeChildren(t => ({ ...t, [folderId]: subfolders }))
+      setTreePhotos(t => ({ ...t, [folderId]: photos }))
+      setAllPhotos(photos)
+    } catch (e) { console.error(e) }
+    finally { setLoading(false) }
+  }, [fetchFolder, treePhotos, pushView])
+
+  const handleTreeToggle = useCallback(async (folder) => {
+    const id = folder.id
+    const willExpand = !treeExpanded[id]
+    setTreeExpanded(t => ({ ...t, [id]: willExpand }))
+    if (willExpand && !treeChildren[id]) {
+      setTreeLoading(t => ({ ...t, [id]: true }))
+      try {
+        const { subfolders, photos } = await fetchFolder(id)
+        setTreeChildren(t => ({ ...t, [id]: subfolders }))
+        setTreePhotos(t => ({ ...t, [id]: photos }))
+      } catch (e) { console.error(e) }
+      finally { setTreeLoading(t => ({ ...t, [id]: false })) }
+    }
+  }, [treeExpanded, treeChildren, fetchFolder])
+
+  const handleTreeSelect = useCallback((folder) => {
+    selectFolder(folder.id, folder.name)
+  }, [selectFolder])
+
+  // Init: load root
   useEffect(() => {
-    loadFolder(currentFolder.id)
-  }, [currentFolder.id])
+    setLoading(true)
+    fetchFolder('root').then(({ subfolders, photos }) => {
+      setTreeChildren(t => ({ ...t, root: subfolders }))
+      setTreePhotos(t => ({ ...t, root: photos }))
+      setAllPhotos(photos)
+    }).catch(console.error).finally(() => setLoading(false))
+  }, [])
 
-  const handleFolderClick = (folder) => {
-    setFolderPath(p => [...p, folder])
-  }
-  const handleBack = () => {
-    if (folderPath.length > 1) setFolderPath(p => p.slice(0, -1))
-  }
-  const handleBreadcrumb = (idx) => {
-    setFolderPath(p => p.slice(0, idx + 1))
-  }
-
-  const handleSearch = (q) => {
-    setQuery(q)
-    setSimilarTo(null)
-    if (q.trim() && !recentQueries.includes(q.trim())) {
-      const updated = [q.trim(), ...recentQueries].slice(0, 8)
-      setRecentQueries(updated)
-      localStorage.setItem(SEARCH_QUERIES_KEY, JSON.stringify(updated))
-    }
-  }
-
+  // ── Folder jump from thumb ──────────────────────────────────────────────
   const handleFolderJump = (photo) => {
     if (!photo.parents?.[0]) return
-    setFolderJumpStack(s => [...s, folderPath])
-    setFolderPath([{ id: 'root', name: 'My Drive' }, { id: photo.parents[0], name: photo._parentName || 'Cartella' }])
-    setSimilarTo(null); setSimilarResults([]); setGlobalResults(null); setQuery('')
-  }
-  const handleFolderJumpBack = () => {
-    if (!folderJumpStack.length) return
-    setFolderPath(folderJumpStack[folderJumpStack.length - 1])
-    setFolderJumpStack(s => s.slice(0, -1))
+    pushView()
+    const folderId = photo.parents[0]
+    const folderName = photo._parentName || 'Cartella'
+    setActiveFolderId(folderId)
+    setActiveFolderName(folderName)
+    setSimilarTo(null); setSimilarResults([])
+    setGlobalResults(null); setGlobalQuery('')
+
+    if (treePhotos[folderId]) {
+      setAllPhotos(treePhotos[folderId])
+      return
+    }
+    setLoading(true)
+    fetchFolder(folderId).then(({ subfolders, photos }) => {
+      setTreeChildren(t => ({ ...t, [folderId]: subfolders }))
+      setTreePhotos(t => ({ ...t, [folderId]: photos }))
+      setAllPhotos(photos)
+    }).catch(console.error).finally(() => setLoading(false))
   }
 
+  // ── Global name search ──────────────────────────────────────────────────
   const handleGlobalSearch = (q) => {
     setGlobalQuery(q)
     clearTimeout(globalTimerRef.current)
     if (!q.trim()) { setGlobalResults(null); return }
+    if (globalResults === null) pushView()
     globalTimerRef.current = setTimeout(async () => {
       setGlobalLoading(true)
       try {
         const data = await searchFilesGlobal(auth.accessToken, q.trim())
         setGlobalResults(data.files || [])
-      } catch (e) {
-        console.error(e)
-      } finally {
-        setGlobalLoading(false)
-      }
+      } catch (e) { console.error(e) }
+      finally { setGlobalLoading(false) }
     }, 500)
   }
 
+  // ── Per-folder similarity ───────────────────────────────────────────────
+  const handleSimilarity = useCallback(async (photo) => {
+    if (!photo.thumbnailLink) return
+    pushView()
+    setSimilarLoading(true)
+    setSimilarTo(photo)
+    setGlobalResults(null); setGlobalQuery('')
+    try {
+      if (!pHashCache.current[photo.id]) {
+        pHashCache.current[photo.id] = await computePHash(photo.thumbnailLink)
+      }
+      const refHash = pHashCache.current[photo.id]
+      const withDist = []
+      for (const p of allPhotos) {
+        if (!p.thumbnailLink) continue
+        try {
+          if (!pHashCache.current[p.id]) pHashCache.current[p.id] = await computePHash(p.thumbnailLink)
+          withDist.push({ ...p, _dist: hammingDistance(refHash, pHashCache.current[p.id]) })
+        } catch { /* skip */ }
+      }
+      withDist.sort((a, b) => a._dist - b._dist)
+      setSimilarResults(withDist.filter(p => p._dist <= 22))
+    } catch (e) {
+      alert('Similarità non disponibile: ' + e.message)
+      setSimilarTo(null)
+    } finally { setSimilarLoading(false) }
+  }, [allPhotos])
+
+  // ── Global similarity ───────────────────────────────────────────────────
   const handleGlobalSimilarity = useCallback(async (photo) => {
     if (!photo.thumbnailLink) return
     const abortRef = { cancelled: false }
     globalSimAbort.current = abortRef
-
-    // load persistent hash cache
     let cache = {}
     try { cache = JSON.parse(localStorage.getItem(PHASH_CACHE_KEY)) || {} } catch {}
-
-    // hash reference photo
     let refHash
     try {
       refHash = cache[photo.id] || await computePHash(photo.thumbnailLink)
@@ -302,8 +442,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
       setGlobalSimState({ status: 'error', message: 'Errore hash foto: ' + e.message, refPhoto: photo })
       return
     }
-
-    // list all media globally
     setGlobalSimState({ status: 'scanning', refPhoto: photo, progress: 0, total: 0, cached: 0 })
     let allMedia = []
     try {
@@ -314,17 +452,12 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
       return
     }
     if (abortRef.cancelled) return
-
     const truncated = allMedia.length > GLOBAL_SIM_CAP
     if (truncated) allMedia = allMedia.slice(0, GLOBAL_SIM_CAP)
     const total = allMedia.length
-
-    // hash all in batches of 8
     const BATCH = 8
-    let processed = 0
-    let cachedCount = 0
+    let processed = 0, cachedCount = 0
     const withDist = []
-
     for (let i = 0; i < allMedia.length; i += BATCH) {
       if (abortRef.cancelled) return
       const batch = allMedia.slice(i, i + BATCH)
@@ -332,71 +465,33 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
         if (!p.thumbnailLink) return
         try {
           let hash = cache[p.id]
-          if (!hash) {
-            hash = await computePHash(p.thumbnailLink)
-            cache[p.id] = hash
-          } else {
-            cachedCount++
-          }
-          const dist = hammingDistance(refHash, hash)
-          withDist.push({ ...p, _dist: dist })
+          if (!hash) { hash = await computePHash(p.thumbnailLink); cache[p.id] = hash }
+          else cachedCount++
+          withDist.push({ ...p, _dist: hammingDistance(refHash, hash) })
         } catch { /* skip */ }
       }))
       processed += batch.length
-      // save cache incrementally every 20 batches
       if (Math.floor(i / BATCH) % 20 === 0) {
         try { localStorage.setItem(PHASH_CACHE_KEY, JSON.stringify(cache)) } catch {}
       }
-      setGlobalSimState(s => s && s.status === 'scanning'
-        ? { ...s, progress: processed, total, cached: cachedCount }
-        : s)
+      setGlobalSimState(s => s?.status === 'scanning' ? { ...s, progress: processed, total, cached: cachedCount } : s)
       if (i + BATCH < allMedia.length) await new Promise(r => setTimeout(r, 50))
     }
-
     if (abortRef.cancelled) return
     try { localStorage.setItem(PHASH_CACHE_KEY, JSON.stringify(cache)) } catch {}
-
     withDist.sort((a, b) => a._dist - b._dist)
-    const results = withDist.filter(p => p._dist <= 22)
-    setGlobalSimState({ status: 'done', refPhoto: photo, results, truncated })
+    setGlobalSimState({ status: 'done', refPhoto: photo, results: withDist.filter(p => p._dist <= 22), truncated })
   }, [auth.accessToken])
 
-  const handleSimilarity = useCallback(async (photo) => {
-    if (!photo.thumbnailLink) return
-    setSimilarLoading(true)
-    setSimilarTo(photo)
-    setQuery('')
-    try {
-      if (!pHashCache.current[photo.id]) {
-        pHashCache.current[photo.id] = await computePHash(photo.thumbnailLink)
-      }
-      const refHash = pHashCache.current[photo.id]
-      const withDist = []
-      for (const p of allPhotos) {
-        if (!p.thumbnailLink) continue
-        try {
-          if (!pHashCache.current[p.id]) {
-            pHashCache.current[p.id] = await computePHash(p.thumbnailLink)
-          }
-          withDist.push({ ...p, _dist: hammingDistance(refHash, pHashCache.current[p.id]) })
-        } catch { /* skip if crossOrigin fails */ }
-      }
-      withDist.sort((a, b) => a._dist - b._dist)
-      setSimilarResults(withDist.filter(p => p._dist <= 22))
-    } catch (e) {
-      alert('Similarità non disponibile: ' + e.message)
-      setSimilarTo(null)
-    } finally {
-      setSimilarLoading(false)
-    }
-  }, [allPhotos])
-
+  // ── Results ─────────────────────────────────────────────────────────────
   const results = useMemo(() => {
     if (globalResults !== null) return globalResults
-    let list = similarTo ? similarResults : allPhotos
-    if (query) list = list.filter(f => f.name.toLowerCase().includes(query.toLowerCase()))
-    return list
-  }, [allPhotos, query, similarTo, similarResults, globalResults])
+    if (similarTo) return similarResults
+    return allPhotos
+  }, [allPhotos, similarTo, similarResults, globalResults])
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  const rootFolders = treeChildren['root'] || []
 
   return (
     <div className="search-page-bg">
@@ -419,99 +514,54 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
 
       {/* Body */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {/* Sidebar */}
-        <div className="search-sidebar">
-          {/* Back from folder jump */}
-          {folderJumpStack.length > 0 && (
-            <button onClick={handleFolderJumpBack} className="search-folder-item" style={{ color: 'var(--primary)', fontWeight: 600, marginBottom: 4, background: 'color-mix(in srgb, var(--primary) 8%, transparent)' }}>
-              <IconChevronLeft /> Torna indietro
-            </button>
-          )}
-          {/* Breadcrumb */}
-          {folderPath.length > 1 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', flexWrap: 'wrap' }}>
-              <button onClick={handleBack} className="nav-icon-btn" style={{ width: 20, height: 20 }}>
-                <IconChevronLeft />
-              </button>
-              {folderPath.map((f, i) => (
-                <span key={f.id} style={{ fontSize: '10px', color: 'var(--text-muted)', cursor: i < folderPath.length - 1 ? 'pointer' : 'default', fontWeight: i === folderPath.length - 1 ? 600 : 400 }}
-                  onClick={() => i < folderPath.length - 1 && handleBreadcrumb(i)}>
-                  {i > 0 && <span style={{ marginRight: '2px' }}>/</span>}{f.name}
-                </span>
-              ))}
-            </div>
-          )}
 
-          {/* Folder list */}
-          {folders.map(f => (
-            <div key={f.id} className="search-folder-item" onClick={() => handleFolderClick(f)}>
-              <IconFolder /><span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</span>
-            </div>
+        {/* Sidebar — tree */}
+        <div className="search-sidebar">
+          {/* Tree root label */}
+          <div
+            className={`tree-node tree-root${activeFolderId === 'root' ? ' active' : ''}`}
+            onClick={() => selectFolder('root', 'My Drive')}
+          >
+            <span className="tree-label" style={{ fontWeight: 600 }}>My Drive</span>
+          </div>
+
+          {/* Tree children of root */}
+          {rootFolders.map(f => (
+            <TreeNodeFull
+              key={f.id}
+              folder={f}
+              depth={1}
+              treeExpanded={treeExpanded}
+              treeChildren={treeChildren}
+              treeLoading={treeLoading}
+              activeId={activeFolderId}
+              onToggle={handleTreeToggle}
+              onSelect={handleTreeSelect}
+            />
           ))}
 
-          {folders.length === 0 && !loading && (
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '8px', textAlign: 'center' }}>Nessuna sottocartella</div>
-          )}
-
-          {/* Recent queries */}
-          {recentQueries.length > 0 && (
-            <div style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
-              <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Ricerche recenti</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                {recentQueries.map((q, i) => (
-                  <button key={i} onClick={() => setQuery(q)} style={{ background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '11px', color: 'var(--text-secondary)', padding: '3px 4px', borderRadius: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'color-mix(in srgb, var(--border) 50%, transparent)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-                    {q}
-                  </button>
-                ))}
-              </div>
-            </div>
+          {treeLoading['root'] && (
+            <div style={{ padding: '10px 16px', fontSize: '12px', color: 'var(--text-muted)' }}>Caricamento...</div>
           )}
         </div>
 
         {/* Main */}
         <div className="search-main">
           {/* Search bar */}
-          <div className="search-bar-row">
-            {/* Global search */}
-            <div style={{ position: 'relative', flex: 1 }}>
-              <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }}>
+          <div className="search-bar-row" style={{ justifyContent: 'center' }}>
+            <div style={{ position: 'relative', width: '69%' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }}>
                 <IconSearch />
               </span>
               <input
                 className="search-input"
-                style={{ paddingLeft: '32px' }}
+                style={{ paddingLeft: '36px', paddingRight: globalQuery ? '36px' : '14px', width: '100%', boxSizing: 'border-box', fontSize: '15px', padding: '10px 14px 10px 36px' }}
                 placeholder="Cerca ovunque in Drive..."
                 value={globalQuery}
                 onChange={e => handleGlobalSearch(e.target.value)}
               />
               {globalQuery && (
-                <button onClick={() => { setGlobalQuery(''); setGlobalResults(null) }} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px' }}>
-                  <IconX />
-                </button>
-              )}
-              {globalResults !== null && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', whiteSpace: 'nowrap' }}>
-                  {globalLoading ? 'Ricerca...' : `${globalResults.length} risultati globali`}
-                </div>
-              )}
-            </div>
-            <div style={{ width: 1, height: 28, background: 'var(--border)', flexShrink: 0 }} />
-            {/* Folder search */}
-            <div style={{ position: 'relative', flex: 1 }}>
-              <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }}>
-                <IconSearch />
-              </span>
-              <input
-                className="search-input"
-                style={{ paddingLeft: '32px' }}
-                placeholder={`Cerca in ${currentFolder.name}...`}
-                value={query}
-                onChange={e => handleSearch(e.target.value)}
-              />
-              {query && (
-                <button onClick={() => setQuery('')} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px' }}>
+                <button onClick={() => { setGlobalQuery(''); setGlobalResults(null) }} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px' }}>
                   <IconX />
                 </button>
               )}
@@ -528,6 +578,18 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
             </span>
           </div>
 
+          {/* Back button + folder label row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+            {viewStack.length > 0 && (
+              <button onClick={popView} className="tree-back-btn" style={{ width: 'auto', marginBottom: 0, padding: '6px 14px', fontSize: '13px' }}>
+                <IconChevronLeft /> Indietro
+              </button>
+            )}
+            {!similarTo && !globalResults && (
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>📁 {activeFolderName}</span>
+            )}
+          </div>
+
           {/* Similarity banner */}
           {similarTo && (
             <div className="similarity-active-banner">
@@ -539,13 +601,24 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
             </div>
           )}
 
+          {/* Global search banner */}
+          {globalResults !== null && !globalLoading && (
+            <div className="similarity-active-banner" style={{ background: 'color-mix(in srgb, var(--primary) 8%, transparent)', borderColor: 'color-mix(in srgb, var(--primary) 25%, transparent)', color: 'var(--primary)' }}>
+              <IconSearch />
+              <span>{globalResults.length} risultati per "{globalQuery}"</span>
+              <button onClick={() => { setGlobalQuery(''); setGlobalResults(null) }} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)' }}>
+                <IconX />
+              </button>
+            </div>
+          )}
+
           {/* Grid */}
           {loading ? (
             <div className="search-empty"><span>Caricamento...</span></div>
           ) : results.length === 0 ? (
             <div className="search-empty">
               <IconSearch />
-              <span>{allPhotos.length === 0 ? 'Seleziona una cartella dalla sidebar' : 'Nessun risultato'}</span>
+              <span>{allPhotos.length === 0 ? 'Nessuna foto in questa cartella' : 'Nessun risultato'}</span>
             </div>
           ) : (
             <div
@@ -609,8 +682,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
         <SimilarityBalloon
           state={globalSimState}
           onViewResults={() => {
+            pushView()
             setSimilarTo(globalSimState.refPhoto)
             setSimilarResults(globalSimState.results)
+            setGlobalResults(null)
+            setGlobalQuery('')
             setGlobalSimState(null)
           }}
           onCancel={() => {
@@ -620,6 +696,51 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
           onClose={() => setGlobalSimState(null)}
         />
       )}
+    </div>
+  )
+}
+
+// Recursive tree node with full tree state passed as props
+function TreeNodeFull({ folder, depth, treeExpanded, treeChildren, treeLoading, activeId, onToggle, onSelect }) {
+  const expanded = treeExpanded[folder.id]
+  const loading = treeLoading[folder.id]
+  const children = treeChildren[folder.id]
+  const hasChildren = children === undefined || children.length > 0
+
+  return (
+    <div>
+      <div
+        className={`tree-node${activeId === folder.id ? ' active' : ''}`}
+        style={{ paddingLeft: 12 + depth * 14 }}
+      >
+        <button
+          className="tree-chevron"
+          onClick={e => { e.stopPropagation(); onToggle(folder) }}
+          style={{
+            transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+            opacity: hasChildren ? 1 : 0.25,
+            pointerEvents: hasChildren ? 'auto' : 'none',
+          }}
+        >
+          {loading ? <IconSpinner /> : <IconChevronRight />}
+        </button>
+        <span className="tree-label" onClick={() => onSelect(folder)} title={folder.name}>
+          {folder.name}
+        </span>
+      </div>
+      {expanded && children && children.map(c => (
+        <TreeNodeFull
+          key={c.id}
+          folder={c}
+          depth={depth + 1}
+          treeExpanded={treeExpanded}
+          treeChildren={treeChildren}
+          treeLoading={treeLoading}
+          activeId={activeId}
+          onToggle={onToggle}
+          onSelect={onSelect}
+        />
+      ))}
     </div>
   )
 }
