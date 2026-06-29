@@ -68,6 +68,11 @@ function LazyPhoto({ src, alt, className, style }) {
     if (!src) return
     const el = ref.current
     if (!el) return
+    const rect = el.getBoundingClientRect()
+    if (rect.top < window.innerHeight + 200 && rect.bottom > -200) {
+      setSrc(src)
+      return
+    }
     const obs = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) { setSrc(src); obs.disconnect() }
     }, { rootMargin: '200px' })
