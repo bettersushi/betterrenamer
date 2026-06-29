@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage'
 import CallbackPage from './pages/CallbackPage'
 import DashboardPage from './pages/DashboardPage'
 import LogsPage from './pages/LogsPage'
+import SearchPage from './pages/SearchPage'
 import { refreshAccessToken } from './auth'
 import './App.css'
 
@@ -80,6 +81,7 @@ function App() {
         <Route path="/callback" element={<CallbackPage onLogin={handleLogin} />} />
         <Route path="/" element={auth ? <DashboardPage auth={auth} onLogout={handleLogout} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} onTokenRefresh={handleTokenRefresh} /> : <Navigate to="/login" />} />
         <Route path="/logs" element={auth ? <LogsPage onLogout={handleLogout} /> : <Navigate to="/login" />} />
+        <Route path="/search" element={auth ? <SearchPage auth={auth} onLogout={handleLogout} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} onTokenRefresh={handleTokenRefresh} /> : <Navigate to="/login" />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>

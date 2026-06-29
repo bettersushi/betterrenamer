@@ -572,6 +572,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
           <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px' }}>
             {isDark ? <IconSun /> : <IconMoon />}
           </button>
+          <button onClick={() => navigate('/search')} className="nav-icon-btn" title="Ricerca foto" style={{ width: 28, height: 28 }}><IconSearch /></button>
           <button onClick={openLogs} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><IconList /> Logs</button>
           <button onClick={handleLogout} className="btn-secondary">Logout</button>
         </div>
