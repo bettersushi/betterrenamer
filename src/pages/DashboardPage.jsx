@@ -270,12 +270,20 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
   // Persist active jobs on unload
   useEffect(() => {
     const handler = () => {
+      // Save only config needed to re-run — no preview/entries to avoid quota issues
       const toSave = queueRef.current
         .filter(j => j.status === 'queued' || j.status === 'pending' || j.status === 'running' || j.status === 'interrupted')
         .map(j => ({
-          ...j,
+          id: j.id,
+          rootFolderId: j.rootFolderId,
+          rootFolderName: j.rootFolderName,
+          mode: j.mode,
+          organizeMedia: j.organizeMedia,
+          skipCount: j.skipCount,
+          preview: [], // re-generated on restart
           entries: [],
-          preview: j.preview.map(({ thumbnailLink, ...p }) => p), // strip thumbs to save space
+          status: 'interrupted',
+          progress: { current: 0, total: 0, currentFile: '', phase: '' },
         }))
       try {
         if (toSave.length > 0) localStorage.setItem('br_queue_interrupted', JSON.stringify(toSave))
@@ -390,15 +398,28 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     setCheckedFolders(new Set())
   }
 
+  const reanalizeAndQueue = useCallback(async (jobId) => {
+    const job = queueRef.current.find(j => j.id === jobId)
+    if (!job) return
+    updateJob(jobId, { status: 'pending', progress: { current: 0, total: 0, currentFile: '', phase: 'Ri-analisi...' } })
+    try {
+      const groups = await listFilesRecursive(auth.accessToken, job.rootFolderId, job.rootFolderName, true)
+      const preview = buildLegacyPreview(groups).filter(p => !p.skip)
+      updateJob(jobId, { status: 'pending', preview, progress: { current: 0, total: preview.length, currentFile: '', phase: '' }, entries: [] })
+      startPending()
+    } catch (e) {
+      updateJob(jobId, { status: 'interrupted', progress: { current: 0, total: 0, currentFile: '', phase: '' } })
+    }
+  }, [auth.accessToken, updateJob, startPending])
+
   const handleRestartJob = useCallback((jobId) => {
-    queueRef.current = queueRef.current.map(j => j.id === jobId && j.status === 'interrupted' ? { ...j, status: 'queued', progress: { current: 0, total: j.preview.length, currentFile: '', phase: '' }, entries: [] } : j)
-    setQueue([...queueRef.current])
-  }, [])
+    reanalizeAndQueue(jobId)
+  }, [reanalizeAndQueue])
 
   const handleRestartAll = useCallback(() => {
-    queueRef.current = queueRef.current.map(j => j.status === 'interrupted' ? { ...j, status: 'queued', progress: { current: 0, total: j.preview.length, currentFile: '', phase: '' }, entries: [] } : j)
-    setQueue([...queueRef.current])
-  }, [])
+    const interrupted = queueRef.current.filter(j => j.status === 'interrupted')
+    interrupted.forEach(j => reanalizeAndQueue(j.id))
+  }, [reanalizeAndQueue])
 
   const handleStartJob = useCallback((jobId) => {
     queueRef.current = queueRef.current.map(j => j.id === jobId && j.status === 'queued' ? { ...j, status: 'pending' } : j)
