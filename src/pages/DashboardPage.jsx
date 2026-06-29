@@ -239,6 +239,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
 
   // Config
   const [mode, setMode] = useState('legacy')
+  const [moveOnly, setMoveOnly] = useState(false)
   const [includeRoot, setIncludeRoot] = useState(true)
   const [organizeMedia, setOrganizeMedia] = useState(true)
   const [pattern, setPattern] = useState('folder-ext-seq')
@@ -366,11 +367,12 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
       return folderCache[key]
     }
 
-    const moveItems = job.organizeMedia
+    const moveItems = (job.moveOnly || job.organizeMedia)
       ? job.preview.filter(item => isVideoFile(item.oldName, item.mimeType) || getExt(item.oldName) === '.gif')
       : []
 
-    const total = moveItems.length + job.preview.length
+    const renameItems = job.moveOnly ? [] : job.preview
+    const total = moveItems.length + renameItems.length
     let current = 0
 
     // Fase 1: sposta
@@ -389,9 +391,9 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
       }
     }
 
-    // Fase 2: rinomina
-    for (let i = 0; i < job.preview.length; i++) {
-      const item = job.preview[i]
+    // Fase 2: rinomina (skip in moveOnly)
+    for (let i = 0; i < renameItems.length; i++) {
+      const item = renameItems[i]
       current++
       if (item.skip) {
         entries.push({ type: 'rename', ...item, success: true, skipped: true })
@@ -434,7 +436,8 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
       rootFolderName: previewFolder.name,
       rootFolderId: previewFolder.id,
       mode,
-      organizeMedia,
+      moveOnly,
+      organizeMedia: moveOnly ? true : organizeMedia,
       preview: preview.filter(p => !p.skip).map(p => ({ ...p })),
       skipCount: preview.filter(p => p.skip).length,
       status: 'queued',
@@ -645,11 +648,22 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
         } else {
           groups = await listFilesRecursive(auth.accessToken, currentFolder.id, currentFolder.name, includeRoot)
         }
-        const built = buildLegacyPreview(groups)
-        if (built.length === 0) {
-          setPreviewError('Nessun file media trovato' + (includeRoot ? '' : ' nelle sottocartelle') + '.')
+        if (moveOnly) {
+          // Solo sposta: mostra video/gif con newName = oldName
+          const allFiles = groups.flatMap(g => g.files.map(f => ({ ...f, folderName: g.folderName, folderId: g.folderId })))
+          const mediaFiles = allFiles.filter(f => isVideoFile(f.name, f.mimeType) || getExt(f.name) === '.gif')
+          if (mediaFiles.length === 0) {
+            setPreviewError('Nessun video/gif trovato nelle cartelle selezionate.')
+          } else {
+            setPreview(mediaFiles.map(f => ({ id: f.id, oldName: f.name, newName: f.name, folderName: f.folderName, folderId: f.folderId, mimeType: f.mimeType, thumbnailLink: f.thumbnailLink || null, skip: false })))
+          }
         } else {
-          setPreview(built)
+          const built = buildLegacyPreview(groups)
+          if (built.length === 0) {
+            setPreviewError('Nessun file media trovato' + (includeRoot ? '' : ' nelle sottocartelle') + '.')
+          } else {
+            setPreview(built)
+          }
         }
       } else {
         const nonFolderFiles = files.filter(f => f.mimeType !== 'application/vnd.google-apps.folder' && f.mimeType !== 'application/vnd.google-apps.shortcut')
@@ -870,15 +884,25 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
             {mode === 'legacy' && (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input type="checkbox" id="includeRoot" checked={includeRoot} onChange={(e) => { setIncludeRoot(e.target.checked); setPreview([]) }} style={{ width: 'auto', margin: 0 }} />
-                  <label htmlFor="includeRoot" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Includi file nella cartella selezionata</label>
+                  <input type="checkbox" id="moveOnly" checked={moveOnly} onChange={(e) => { setMoveOnly(e.target.checked); setPreview([]) }} style={{ width: 'auto', margin: 0 }} />
+                  <label htmlFor="moveOnly" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Solo sposta video/gif (senza rinominare)</label>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input type="checkbox" id="organizeMedia" checked={organizeMedia} onChange={(e) => setOrganizeMedia(e.target.checked)} style={{ width: 'auto', margin: 0 }} />
-                  <label htmlFor="organizeMedia" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Sposta video/gif in sottocartelle</label>
-                </div>
+                {!moveOnly && (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input type="checkbox" id="includeRoot" checked={includeRoot} onChange={(e) => { setIncludeRoot(e.target.checked); setPreview([]) }} style={{ width: 'auto', margin: 0 }} />
+                      <label htmlFor="includeRoot" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Includi file nella cartella selezionata</label>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input type="checkbox" id="organizeMedia" checked={organizeMedia} onChange={(e) => setOrganizeMedia(e.target.checked)} style={{ width: 'auto', margin: 0 }} />
+                      <label htmlFor="organizeMedia" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Sposta video/gif in sottocartelle</label>
+                    </div>
+                  </>
+                )}
                 <div className="pattern-info">
-                  Pattern: <code>cartella-[prefix]counter.ext</code> · Prefissi: <code>vid-</code> <code>gif-</code> · Sort: data modifica · Ricorsivo
+                  {moveOnly
+                    ? 'Sposta video/gif nelle sottocartelle · Prefissi: vid- gif- · Ricorsivo'
+                    : 'Pattern: cartella-[prefix]counter.ext · Prefissi: vid- gif- · Sort: data modifica · Ricorsivo'}
                 </div>
               </>
             )}
@@ -949,7 +973,9 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                           </div>
                         </td>
                         <td style={{ padding: '4px 10px', fontWeight: 500, fontSize: '13px', color: item.skip ? 'var(--text-muted)' : 'var(--success, #16a34a)' }}>
-                          {item.skip ? 'già ok ✓' : item.newName}
+                          {moveOnly
+                            ? <span style={{ color: 'var(--primary)' }}>→ {item.folderName} {isVideoFile(item.oldName, item.mimeType) ? 'Vid' : 'Gif'}</span>
+                            : item.skip ? 'già ok ✓' : item.newName}
                         </td>
                       </tr>
                       )
