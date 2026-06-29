@@ -20,9 +20,9 @@ const RATIOS = [
   { label: '5:4',  w: 5, h: 4  },
 ]
 
-const HANDLE_SIZE = 8
-const HANDLE_HIT = 14
-const MOVE_HANDLE_R = 18
+const HANDLE_SIZE = 14
+const HANDLE_HIT = 24
+const MOVE_HANDLE_R = 30
 
 function RatioIcon({ w, h }) {
   const maxW = 16, maxH = 16
@@ -56,6 +56,20 @@ function getHitZone(x, y, rect) {
   return null
 }
 
+function getCornerHitZone(x, y, rect) {
+  const { x: rx, y: ry, w: rw, h: rh } = rect
+  const corners = [
+    { id: 'tl', cx: rx,    cy: ry    },
+    { id: 'tr', cx: rx+rw, cy: ry    },
+    { id: 'bl', cx: rx,    cy: ry+rh },
+    { id: 'br', cx: rx+rw, cy: ry+rh },
+  ]
+  for (const c of corners) {
+    if (Math.abs(x - c.cx) <= HANDLE_HIT && Math.abs(y - c.cy) <= HANDLE_HIT) return c.id
+  }
+  return null
+}
+
 function applyHandleDrag(handle, rect, dx, dy, ratio) {
   let { x, y, w, h } = rect
   if (handle === 'move') { return { x: x+dx, y: y+dy, w, h } }
@@ -68,7 +82,6 @@ function applyHandleDrag(handle, rect, dx, dy, ratio) {
   else if (handle === 'bm') { h+=dy }
   else if (handle === 'br') { w+=dx; h+=dy }
   if (ratio) {
-    // Adjust to maintain ratio
     const targetRatio = ratio.w / ratio.h
     if (['tl','tr','bl','br'].includes(handle)) {
       const newH = w / targetRatio
@@ -97,7 +110,6 @@ export default function CropModal({ photo, accessToken, onClose, onDone }) {
   const dragState = useRef(null)
   const canvasDims = useRef({ w: 0, h: 0 })
 
-  // Load image
   useEffect(() => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
@@ -106,13 +118,12 @@ export default function CropModal({ photo, accessToken, onClose, onDone }) {
     img.src = `/api/proxy-image?url=${encodeURIComponent(getLargeThumbUrl(photo.thumbnailLink, 1600))}`
   }, [photo.thumbnailLink])
 
-  // Init rect when image loads
   useEffect(() => {
     if (!imgLoaded || !canvasRef.current) return
     const canvas = canvasRef.current
     const img = imgRef.current
-    const maxW = Math.min(window.innerWidth * 0.7, 860)
-    const maxH = Math.min(window.innerHeight * 0.65, 620)
+    const maxW = Math.min(window.innerWidth * 0.82, 1100)
+    const maxH = Math.min(window.innerHeight * 0.72, 800)
     const scale = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight, 1)
     const cw = Math.round(img.naturalWidth * scale)
     const ch = Math.round(img.naturalHeight * scale)
@@ -122,7 +133,6 @@ export default function CropModal({ photo, accessToken, onClose, onDone }) {
     setRect({ x: margin, y: margin, w: cw - margin*2, h: ch - margin*2 })
   }, [imgLoaded])
 
-  // Draw canvas
   useEffect(() => {
     if (!imgLoaded || !rect || !canvasRef.current) return
     const canvas = canvasRef.current
@@ -134,14 +144,12 @@ export default function CropModal({ photo, accessToken, onClose, onDone }) {
     ctx.clearRect(0, 0, cw, ch)
     ctx.drawImage(img, 0, 0, cw, ch)
 
-    // Darken outside
     ctx.fillStyle = 'rgba(0,0,0,0.52)'
-    ctx.fillRect(0, 0, cw, y)               // top
-    ctx.fillRect(0, y+h, cw, ch-y-h)        // bottom
-    ctx.fillRect(0, y, x, h)                // left
-    ctx.fillRect(x+w, y, cw-x-w, h)         // right
+    ctx.fillRect(0, 0, cw, y)
+    ctx.fillRect(0, y+h, cw, ch-y-h)
+    ctx.fillRect(0, y, x, h)
+    ctx.fillRect(x+w, y, cw-x-w, h)
 
-    // Grid lines inside (rule of thirds)
     ctx.strokeStyle = 'rgba(255,255,255,0.35)'
     ctx.lineWidth = 0.5
     for (let i = 1; i < 3; i++) {
@@ -149,23 +157,28 @@ export default function CropModal({ photo, accessToken, onClose, onDone }) {
       ctx.beginPath(); ctx.moveTo(x, y + h*i/3); ctx.lineTo(x+w, y + h*i/3); ctx.stroke()
     }
 
-    // Border
     ctx.strokeStyle = 'white'
     ctx.lineWidth = 1.5
     ctx.strokeRect(x, y, w, h)
 
     if (activeRatio) {
-      // Move handle circle at center
-      const cx = x + w/2, cy = y + h/2
-      ctx.beginPath(); ctx.arc(cx, cy, MOVE_HANDLE_R, 0, Math.PI*2)
-      ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fill()
+      // 4 corner handles
+      [[x,y],[x+w,y],[x,y+h],[x+w,y+h]].forEach(([hx,hy]) => {
+        ctx.fillStyle = 'white'
+        ctx.fillRect(hx - HANDLE_SIZE/2, hy - HANDLE_SIZE/2, HANDLE_SIZE, HANDLE_SIZE)
+        ctx.strokeStyle = '#444'; ctx.lineWidth = 0.5
+        ctx.strokeRect(hx - HANDLE_SIZE/2, hy - HANDLE_SIZE/2, HANDLE_SIZE, HANDLE_SIZE)
+      })
+      // Move handle circle
+      const hcx = x + w/2, hcy = y + h/2
+      ctx.beginPath(); ctx.arc(hcx, hcy, MOVE_HANDLE_R, 0, Math.PI*2)
+      ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fill()
       ctx.strokeStyle = 'white'; ctx.lineWidth = 1.5; ctx.stroke()
-      // Draw move arrows
       ctx.fillStyle = 'white'
-      ctx.font = '14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-      ctx.fillText('⠿', cx, cy)
+      ctx.font = `${Math.round(MOVE_HANDLE_R * 0.9)}px sans-serif`
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.fillText('⠿', hcx, hcy)
     } else {
-      // Draw 8 resize handles
       const handles = [
         [x,   y],   [x+w/2, y],   [x+w, y],
         [x,   y+h/2],             [x+w, y+h/2],
@@ -192,12 +205,13 @@ export default function CropModal({ photo, accessToken, onClose, onDone }) {
 
   const handleRatioClick = useCallback((ratio) => {
     setActiveRatio(r => r?.label === ratio.label ? null : ratio)
-    setRect(prev => {
-      if (!prev) return prev
+    setRect(() => {
       const { w: cw, h: ch } = canvasDims.current
+      if (!cw) return null
       const targetR = ratio.w / ratio.h
-      let rw = prev.w, rh = rw / targetR
-      if (rh > ch) { rh = ch; rw = rh * targetR }
+      let rw, rh
+      if (cw / ch >= targetR) { rh = ch; rw = rh * targetR }
+      else { rw = cw; rh = rw / targetR }
       const rx = (cw - rw) / 2, ry = (ch - rh) / 2
       return clampRect({ x: rx, y: ry, w: rw, h: rh })
     })
@@ -219,9 +233,17 @@ export default function CropModal({ photo, accessToken, onClose, onDone }) {
     const { x, y } = getCanvasXY(e)
 
     if (activeRatio) {
-      // Only allow move via center handle
       const cx = rect.x + rect.w/2, cy = rect.y + rect.h/2
-      if (Math.hypot(x - cx, y - cy) <= MOVE_HANDLE_R + 4) {
+      if (Math.hypot(x - cx, y - cy) <= MOVE_HANDLE_R + 6) {
+        dragState.current = { type: 'move', startX: x, startY: y, origRect: { ...rect } }
+        return
+      }
+      const cornerZone = getCornerHitZone(x, y, rect)
+      if (cornerZone) {
+        dragState.current = { type: 'handle', handle: cornerZone, startX: x, startY: y, origRect: { ...rect } }
+        return
+      }
+      if (x >= rect.x && x <= rect.x+rect.w && y >= rect.y && y <= rect.y+rect.h) {
         dragState.current = { type: 'move', startX: x, startY: y, origRect: { ...rect } }
       }
       return
@@ -288,7 +310,7 @@ export default function CropModal({ photo, accessToken, onClose, onDone }) {
       style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={{ background: 'var(--surface)', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', maxWidth: '90vw', maxHeight: '95vh', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--surface)', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', maxWidth: '90vw', maxHeight: '96vh', overflow: 'hidden' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg>
@@ -327,7 +349,7 @@ export default function CropModal({ photo, accessToken, onClose, onDone }) {
           ) : (
             <canvas
               ref={canvasRef}
-              style={{ display: 'block', maxWidth: '100%', maxHeight: '62vh', cursor: activeRatio ? 'default' : 'crosshair', userSelect: 'none' }}
+              style={{ display: 'block', maxWidth: '100%', maxHeight: '72vh', cursor: activeRatio ? 'default' : 'crosshair', userSelect: 'none' }}
               onMouseDown={onMouseDown}
               onMouseMove={onMouseMove}
               onMouseUp={onMouseUp}
