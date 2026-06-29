@@ -138,6 +138,17 @@ const IconXSmall = () => (
   </svg>
 )
 
+const IconDancer = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="4" r="2"/>
+    <line x1="12" y1="6" x2="12" y2="14"/>
+    <line x1="12" y1="8" x2="6" y2="5"/>
+    <line x1="12" y1="8" x2="18" y2="11"/>
+    <line x1="12" y1="14" x2="7" y2="20"/>
+    <line x1="12" y1="14" x2="17" y2="20"/>
+  </svg>
+)
+
 export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, onTokenRefresh }) {
   const navigate = useNavigate()
   const [logsOpen, setLogsOpen] = useState(false)
@@ -777,15 +788,22 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
               {pendingJobs.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#888' }}>{pendingJobs.length} in attesa</span>}
               {doneJobs.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#16a34a' }}>{doneJobs.length} completati</span>}
             </h3>
-            {doneJobs.length === queue.length && (
-              <button
-                onClick={() => { queueRef.current = []; setQueue([]) }}
-                className="btn-secondary"
-                style={{ fontSize: '12px', padding: '4px 10px' }}
-              >
-                Svuota
-              </button>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {runningJobs.length > 0 && (
+                <span style={{ color: '#3b82f6', display: 'flex', animation: 'dancer-bounce 0.6s ease-in-out infinite alternate' }}>
+                  <IconDancer />
+                </span>
+              )}
+              {doneJobs.length === queue.length && (
+                <button
+                  onClick={() => { queueRef.current = []; setQueue([]) }}
+                  className="btn-secondary"
+                  style={{ fontSize: '12px', padding: '4px 10px' }}
+                >
+                  Svuota
+                </button>
+              )}
+            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

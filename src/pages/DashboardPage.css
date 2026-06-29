@@ -235,6 +235,11 @@
   color: var(--primary);
 }
 
+@keyframes dancer-bounce {
+  0%   { transform: rotate(-10deg) translateY(0px); }
+  100% { transform: rotate(10deg) translateY(-2px); }
+}
+
 @keyframes shimmer-slide {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(200%); }
