@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
 
-export default function SimilarityBalloon({ state, onViewResults, onCancel, onClose }) {
+export default function SimilarityBalloon({ state, index = 0, onViewResults, onCancel, onClose }) {
   const [pos, setPos] = useState(null) // null = usa bottom-right default
   const dragging = useRef(false)
   const dragOffset = useRef({ x: 0, y: 0 })
@@ -37,9 +37,10 @@ export default function SimilarityBalloon({ state, onViewResults, onCancel, onCl
     if (!pos) setPos({ x: rect.left, y: rect.top })
   }
 
+  const defaultBottom = 24 + index * 188
   const style = pos
     ? { position: 'fixed', left: pos.x, top: pos.y, bottom: 'auto', right: 'auto' }
-    : { position: 'fixed', bottom: 24, right: 24 }
+    : { position: 'fixed', bottom: defaultBottom, right: 24 }
 
   const pct = state.total > 0 ? Math.round((state.progress / state.total) * 100) : 0
 
@@ -58,8 +59,8 @@ export default function SimilarityBalloon({ state, onViewResults, onCancel, onCl
         )}
         <span style={{ fontSize: 12, fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {state.status === 'listing' && 'Raccolta file in Drive...'}
-          {state.status === 'scanning' && 'Calcolo similarità...'}
-          {state.status === 'done' && `${state.results.length} foto simili trovate`}
+          {state.status === 'scanning' && (state.type === 'folder' ? 'Similarità in cartella...' : 'Calcolo similarità...')}
+          {state.status === 'done' && `${state.results.length} simili trovate`}
           {state.status === 'error' && 'Errore ricerca'}
         </span>
         {(state.status === 'done' || state.status === 'error') && (

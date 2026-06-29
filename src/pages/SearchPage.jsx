@@ -275,9 +275,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const globalTimerRef = useRef(null)
   const [similarTo, setSimilarTo] = useState(null)
   const [similarResults, setSimilarResults] = useState([])
-  const [similarLoading, setSimilarLoading] = useState(false)
-  const [globalSimState, setGlobalSimState] = useState(null)
-  const globalSimAbort = useRef(null)
+  const [balloons, setBalloons] = useState([])
   const pHashCache = useRef({})
   const gridRef = useRef(null)
   const [thumbSize, setThumbSizeRaw] = useState(() => localStorage.getItem('br_thumb_size') || 'md')
@@ -287,6 +285,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
 
   // Universal view history stack
   const [viewStack, setViewStack] = useState([])
+
+  const updateBalloon = useCallback((id, patch) =>
+    setBalloons(bs => bs.map(b => b.id === id ? { ...b, ...patch } : b)), [])
+  const removeBalloon = useCallback((id) =>
+    setBalloons(bs => bs.filter(b => b.id !== id)), [])
 
   const pushView = () => {
     const snapshot = { activeFolderId, activeFolderName, allPhotos, globalQuery, globalResults, similarTo, similarResults }
@@ -460,36 +463,37 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   // ── Per-folder similarity ───────────────────────────────────────────────
   const handleSimilarity = useCallback(async (photo) => {
     if (!photo.thumbnailLink) return
-    pushView()
-    setSimilarLoading(true)
-    setSimilarTo(photo)
-    setGlobalResults(null); setGlobalQuery('')
+    const id = crypto.randomUUID()
+    const abortRef = { cancelled: false }
+    const total = allPhotos.filter(p => p.thumbnailLink).length
+    setBalloons(bs => [...bs, { id, type: 'folder', status: 'scanning', refPhoto: photo, progress: 0, total, cached: 0, abortRef }])
     try {
-      if (!pHashCache.current[photo.id]) {
-        pHashCache.current[photo.id] = await computePHash(photo.thumbnailLink)
-      }
+      if (!pHashCache.current[photo.id]) pHashCache.current[photo.id] = await computePHash(photo.thumbnailLink)
       const refHash = pHashCache.current[photo.id]
       const withDist = []
+      let processed = 0
       for (const p of allPhotos) {
+        if (abortRef.cancelled) return
         if (!p.thumbnailLink) continue
         try {
           if (!pHashCache.current[p.id]) pHashCache.current[p.id] = await computePHash(p.thumbnailLink)
           withDist.push({ ...p, _dist: hammingDistance(refHash, pHashCache.current[p.id]) })
         } catch { /* skip */ }
+        processed++
+        updateBalloon(id, { progress: processed })
       }
       withDist.sort((a, b) => a._dist - b._dist)
-      setSimilarResults(withDist.filter(p => p._dist <= 22))
+      updateBalloon(id, { status: 'done', results: withDist.filter(p => p._dist <= 22) })
     } catch (e) {
-      alert('Similarità non disponibile: ' + e.message)
-      setSimilarTo(null)
-    } finally { setSimilarLoading(false) }
-  }, [allPhotos])
+      updateBalloon(id, { status: 'error', message: e.message })
+    }
+  }, [allPhotos, updateBalloon])
 
   // ── Global similarity ───────────────────────────────────────────────────
   const handleGlobalSimilarity = useCallback(async (photo) => {
     if (!photo.thumbnailLink) return
+    const id = crypto.randomUUID()
     const abortRef = { cancelled: false }
-    globalSimAbort.current = abortRef
     let cache = {}
     try { cache = JSON.parse(localStorage.getItem(PHASH_CACHE_KEY)) || {} } catch {}
     let refHash
@@ -497,23 +501,23 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
       refHash = cache[photo.id] || await computePHash(photo.thumbnailLink)
       cache[photo.id] = refHash
     } catch (e) {
-      setGlobalSimState({ status: 'error', message: 'Errore hash foto: ' + e.message, refPhoto: photo })
+      setBalloons(bs => [...bs, { id, type: 'global', status: 'error', message: 'Errore hash foto: ' + e.message, refPhoto: photo, abortRef }])
       return
     }
-    setGlobalSimState({ status: 'listing', refPhoto: photo })
+    setBalloons(bs => [...bs, { id, type: 'global', status: 'listing', refPhoto: photo, abortRef }])
     let allMedia = []
     try {
       const folders = await listFilesRecursive(auth.accessToken, 'root', 'My Drive', true)
       for (const f of folders) allMedia.push(...f.files.filter(isMediaFile))
     } catch (e) {
-      setGlobalSimState({ status: 'error', message: 'Errore listing: ' + e.message, refPhoto: photo })
+      updateBalloon(id, { status: 'error', message: 'Errore listing: ' + e.message })
       return
     }
     if (abortRef.cancelled) return
-    setGlobalSimState({ status: 'scanning', refPhoto: photo, progress: 0, total: allMedia.length > GLOBAL_SIM_CAP ? GLOBAL_SIM_CAP : allMedia.length, cached: 0 })
     const truncated = allMedia.length > GLOBAL_SIM_CAP
     if (truncated) allMedia = allMedia.slice(0, GLOBAL_SIM_CAP)
     const total = allMedia.length
+    updateBalloon(id, { status: 'scanning', progress: 0, total, cached: 0 })
     const BATCH = 8
     let processed = 0, cachedCount = 0
     const withDist = []
@@ -533,14 +537,14 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
       if (Math.floor(i / BATCH) % 20 === 0) {
         try { localStorage.setItem(PHASH_CACHE_KEY, JSON.stringify(cache)) } catch {}
       }
-      setGlobalSimState(s => s?.status === 'scanning' ? { ...s, progress: processed, total, cached: cachedCount } : s)
+      updateBalloon(id, { progress: processed, total, cached: cachedCount })
       if (i + BATCH < allMedia.length) await new Promise(r => setTimeout(r, 50))
     }
     if (abortRef.cancelled) return
     try { localStorage.setItem(PHASH_CACHE_KEY, JSON.stringify(cache)) } catch {}
     withDist.sort((a, b) => a._dist - b._dist)
-    setGlobalSimState({ status: 'done', refPhoto: photo, results: withDist.filter(p => p._dist <= 22), truncated })
-  }, [auth.accessToken])
+    updateBalloon(id, { status: 'done', results: withDist.filter(p => p._dist <= 22), truncated })
+  }, [auth.accessToken, updateBalloon])
 
   // ── Results ─────────────────────────────────────────────────────────────
   const results = useMemo(() => {
@@ -757,24 +761,23 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
         />
       )}
 
-      {globalSimState && (
+      {balloons.map((b, i) => (
         <SimilarityBalloon
-          state={globalSimState}
+          key={b.id}
+          state={b}
+          index={i}
           onViewResults={() => {
             pushView()
-            setSimilarTo(globalSimState.refPhoto)
-            setSimilarResults(globalSimState.results)
+            setSimilarTo(b.refPhoto)
+            setSimilarResults(b.results)
             setGlobalResults(null)
             setGlobalQuery('')
-            setGlobalSimState(null)
+            removeBalloon(b.id)
           }}
-          onCancel={() => {
-            if (globalSimAbort.current) globalSimAbort.current.cancelled = true
-            setGlobalSimState(null)
-          }}
-          onClose={() => setGlobalSimState(null)}
+          onCancel={() => { b.abortRef.cancelled = true; removeBalloon(b.id) }}
+          onClose={() => removeBalloon(b.id)}
         />
-      )}
+      ))}
     </div>
   )
 }
