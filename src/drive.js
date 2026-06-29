@@ -8,7 +8,7 @@ export const searchFilesGlobal = async (accessToken, query) => {
     const params = new URLSearchParams({
       q,
       spaces: 'drive',
-      fields: 'files(id,name,mimeType,size,createdTime,modifiedTime,thumbnailLink,parents),nextPageToken',
+      fields: 'files(id,name,mimeType,size,createdTime,modifiedTime,thumbnailLink,parents,videoMediaMetadata),nextPageToken',
       pageSize: 100,
     })
     if (pageToken) params.set('pageToken', pageToken)
@@ -34,7 +34,7 @@ export const listFiles = async (accessToken, folderId = 'root') => {
     const params = new URLSearchParams({
       q: `'${folderId}' in parents and trashed = false`,
       spaces: 'drive',
-      fields: 'files(id,name,mimeType,size,createdTime,modifiedTime,thumbnailLink,parents),nextPageToken',
+      fields: 'files(id,name,mimeType,size,createdTime,modifiedTime,thumbnailLink,parents,videoMediaMetadata),nextPageToken',
       pageSize: 1000,
       orderBy: 'folder,name',
     })

@@ -29,6 +29,24 @@ function isVideoFile(f) {
   return VIDEO_EXTENSIONS.has(getExt(f.name))
 }
 
+function formatDuration(ms) {
+  if (!ms) return null
+  const s = Math.round(ms / 1000)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = s % 60
+  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
+  return `${m}:${String(sec).padStart(2,'0')}`
+}
+
+function formatSize(bytes) {
+  if (!bytes) return null
+  const b = Number(bytes)
+  if (b >= 1073741824) return `${(b/1073741824).toFixed(1)} GB`
+  if (b >= 1048576) return `${(b/1048576).toFixed(1)} MB`
+  return `${(b/1024).toFixed(0)} KB`
+}
+
 async function computePHash(imgUrl) {
   const proxied = `/api/proxy-image?url=${encodeURIComponent(imgUrl)}`
   return new Promise((resolve, reject) => {
@@ -738,9 +756,18 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                         <div className="thumb-no-preview">📄</div>
                       )}
                       {isVideoFile(photo) && (
-                        <div className="video-icon-badge" style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', pointerEvents: 'none' }}>
-                          <IconVideoFile />
-                        </div>
+                        <>
+                          <div className="video-icon-badge" style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', pointerEvents: 'none' }}>
+                            <IconVideoFile />
+                          </div>
+                          <div className="masonry-video-hover">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
+                            <span className="masonry-video-label">Play video</span>
+                            <span className="masonry-video-meta">
+                              {[formatDuration(photo.videoMediaMetadata?.durationMillis), formatSize(photo.size)].filter(Boolean).join(' · ')}
+                            </span>
+                          </div>
+                        </>
                       )}
                       {similarTo && photo._dist !== undefined && photo._dist === 0 && (
                         <div className="search-similar-badge">identica</div>
