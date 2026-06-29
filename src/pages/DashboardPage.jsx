@@ -863,7 +863,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
             </h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {queuedJobs.length > 0 && (
-                <button onClick={handleStartAll} className="btn-primary" style={{ fontSize: '12px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <button onClick={handleStartAll} className="btn-avvia-tutto">
                   <IconPlay /> Avvia tutto
                 </button>
               )}
@@ -976,7 +976,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
               {queuedJobs.length > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>In coda ({queuedJobs.length})</span>
-                  <button onClick={handleStartAll} className="btn-primary" style={{ fontSize: '11px', padding: '3px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <button onClick={handleStartAll} className="btn-avvia-tutto">
                     <IconPlay /> Avvia tutto
                   </button>
                 </div>
