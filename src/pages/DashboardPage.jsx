@@ -38,7 +38,7 @@ function buildLegacyPreview(groups) {
     for (const file of group.files) {
       if (!isMediaFile(file)) continue
       const newName = generateLegacyName(group.folderName, file.name, file.mimeType, counter)
-      preview.push({ id: file.id, oldName: file.name, newName, folderName: group.folderName, folderId: group.folderId, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || null })
+      preview.push({ id: file.id, oldName: file.name, newName, folderName: group.folderName, folderId: group.folderId, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || null, skip: file.name === newName })
       counter += Math.floor(Math.random() * 1000) + 100
     }
   }
@@ -266,6 +266,10 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     for (let i = 0; i < job.preview.length; i++) {
       const item = job.preview[i]
       current++
+      if (item.skip) {
+        entries.push({ type: 'rename', ...item, success: true, skipped: true })
+        continue
+      }
       updateJob(job.id, { progress: { current, total, currentFile: item.oldName, currentNewName: item.newName, phase: 'Rinomino' } })
       try {
         await batchRenameFiles(auth.accessToken, [{ id: item.id, oldName: item.oldName, newName: item.newName }])
@@ -486,7 +490,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
           if (pattern === 'folder-ext-seq') newName = `${currentFolder.name}${separator}${extName}${separator}${num}${ext}`
           else if (pattern === 'seq-ext') newName = `${num}${separator}${extName}${ext}`
           else if (pattern === 'folder-seq') newName = `${currentFolder.name}${separator}${num}${ext}`
-          return { id: file.id, oldName: file.name, newName, folderName: currentFolder.name, folderId: currentFolder.id, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || null }
+          return { id: file.id, oldName: file.name, newName, folderName: currentFolder.name, folderId: currentFolder.id, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || null, skip: file.name === newName }
         })
         setPreview(previewList)
       }
@@ -754,14 +758,16 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                   </thead>
                   <tbody>
                     {preview.map((item, idx) => (
-                      <tr key={idx} style={{ borderTop: idx > 0 ? '1px solid var(--border)' : 'none' }}>
+                      <tr key={idx} style={{ borderTop: idx > 0 ? '1px solid var(--border)' : 'none', opacity: item.skip ? 0.45 : 1 }}>
                         <td style={{ padding: '4px 10px', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontSize: '11px' }}>{item.folderName}</td>
                         <td style={{ padding: '4px 6px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{item.oldName}</span>
                           </div>
                         </td>
-                        <td style={{ padding: '4px 10px', color: 'var(--success, #16a34a)', fontWeight: 500, fontSize: '13px' }}>{item.newName}</td>
+                        <td style={{ padding: '4px 10px', fontWeight: 500, fontSize: '13px', color: item.skip ? 'var(--text-muted)' : 'var(--success, #16a34a)' }}>
+                          {item.skip ? 'già ok ✓' : item.newName}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
