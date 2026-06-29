@@ -37,15 +37,31 @@ function matchesLegacyPattern(folderName, fileName, mimeType) {
   const prefix = isVideoFile(fileName, mimeType) ? 'vid-' : getExt(fileName) === '.gif' ? 'gif-' : ''
   return new RegExp(`^${sanitized}-${prefix}\\d+${ext}$`).test(fileName)
 }
+function extractLegacyCounter(folderName, fileName) {
+  const sanitized = folderName.toLowerCase().replace(/[^a-z0-9]/g, '-')
+  const ext = getExt(fileName).replace('.', '\\.')
+  const m = fileName.match(new RegExp(`^${sanitized}-(?:vid-|gif-)?(\\d+)${ext}$`))
+  return m ? parseInt(m[1], 10) : null
+}
 function buildLegacyPreview(groups) {
   const preview = []
   for (const group of groups) {
+    // Passata 1: trovare il counter max tra file già rinominati
     let counter = 100000
     for (const file of group.files) {
       if (!isMediaFile(file)) continue
-      const newName = generateLegacyName(group.folderName, file.name, file.mimeType, counter)
-      preview.push({ id: file.id, oldName: file.name, newName, folderName: group.folderName, folderId: group.folderId, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || null, skip: matchesLegacyPattern(group.folderName, file.name, file.mimeType) })
-      counter += Math.floor(Math.random() * 1000) + 100
+      if (matchesLegacyPattern(group.folderName, file.name, file.mimeType)) {
+        const n = extractLegacyCounter(group.folderName, file.name)
+        if (n !== null && n >= counter) counter = n + 1000
+      }
+    }
+    // Passata 2: costruire preview, assegnando counter solo ai file nuovi
+    for (const file of group.files) {
+      if (!isMediaFile(file)) continue
+      const skip = matchesLegacyPattern(group.folderName, file.name, file.mimeType)
+      const newName = skip ? file.name : generateLegacyName(group.folderName, file.name, file.mimeType, counter)
+      preview.push({ id: file.id, oldName: file.name, newName, folderName: group.folderName, folderId: group.folderId, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || null, skip })
+      if (!skip) counter += Math.floor(Math.random() * 1000) + 100
     }
   }
   return preview
