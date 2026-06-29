@@ -1,5 +1,14 @@
 import { useEffect, useRef } from 'react'
 
+const IEye = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+const ISimilar = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
+const IGlobe = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+const IPencil = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+const ICopy = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+const IDownload = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+const IFolder = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+const ITrash = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+
 export default function PhotoContextMenu({ photo, idx, x, y, onClose, actions }) {
   const menuRef = useRef(null)
 
@@ -14,13 +23,12 @@ export default function PhotoContextMenu({ photo, idx, x, y, onClose, actions })
     }
   }, [onClose])
 
-  // Smart positioning: avoid going off-screen
-  const menuW = 200
-  const menuH = 320
+  const menuW = 210
+  const menuH = 330
   const adjustedX = x + menuW > window.innerWidth ? x - menuW : x
   const adjustedY = y + menuH > window.innerHeight ? y - menuH : y
 
-  const item = (icon, label, onClick, danger = false) => (
+  const item = (Icon, label, onClick, danger = false) => (
     <button
       key={label}
       onClick={() => { onClose(); onClick() }}
@@ -34,7 +42,7 @@ export default function PhotoContextMenu({ photo, idx, x, y, onClose, actions })
       onMouseEnter={e => e.currentTarget.style.background = danger ? 'rgba(239,68,68,0.08)' : 'color-mix(in srgb, var(--border) 60%, transparent)'}
       onMouseLeave={e => e.currentTarget.style.background = 'none'}
     >
-      <span style={{ fontSize: 15, width: 18, textAlign: 'center', flexShrink: 0 }}>{icon}</span>
+      <span style={{ width: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, opacity: danger ? 1 : 0.65 }}><Icon /></span>
       {label}
     </button>
   )
@@ -52,16 +60,16 @@ export default function PhotoContextMenu({ photo, idx, x, y, onClose, actions })
         animation: 'contextMenuIn 0.1s ease',
       }}
     >
-      {item('👁', 'QuickLook', () => actions.onQuickLook(idx))}
-      {item('◎', 'Cerca simili in cartella', () => actions.onSimilarity(photo))}
-      {item('🌐', 'Cerca simili per scope', () => actions.onScopeSearch(photo))}
+      {item(IEye, 'QuickLook', () => actions.onQuickLook(idx))}
+      {item(ISimilar, 'Cerca simili in cartella', () => actions.onSimilarity(photo))}
+      {item(IGlobe, 'Cerca simili per scope', () => actions.onScopeSearch(photo))}
       {sep}
-      {item('✏️', 'Rinomina', () => actions.onRename(photo))}
-      {item('⧉', 'Duplica', () => actions.onDuplicate(photo))}
-      {item('⬇', 'Download', () => actions.onDownload(photo))}
-      {item('📂', 'Sposta in...', () => actions.onMove(photo))}
+      {item(IPencil, 'Rinomina', () => actions.onRename(photo))}
+      {item(ICopy, 'Duplica', () => actions.onDuplicate(photo))}
+      {item(IDownload, 'Download', () => actions.onDownload(photo))}
+      {item(IFolder, 'Sposta in...', () => actions.onMove(photo))}
       {sep}
-      {item('🗑', 'Elimina', () => actions.onDelete(photo), true)}
+      {item(ITrash, 'Elimina', () => actions.onDelete(photo), true)}
     </div>
   )
 }

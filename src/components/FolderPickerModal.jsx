@@ -52,7 +52,7 @@ export default function FolderPickerModal({ accessToken, title = 'Sposta in...',
               onMouseEnter={e => e.currentTarget.style.background = 'color-mix(in srgb, var(--border) 50%, transparent)'}
               onMouseLeave={e => e.currentTarget.style.background = 'none'}
             >
-              <span style={{ fontSize: 14 }}>📁</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
               <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                 onClick={() => onConfirm(f)}
               >{f.name}</span>
