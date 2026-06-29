@@ -465,11 +465,22 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Folder jump from thumb ──────────────────────────────────────────────
-  const handleFolderJump = (photo) => {
+  const handleFolderJump = async (photo) => {
     if (!photo.parents?.[0]) return
     pushView()
     const folderId = photo.parents[0]
-    const folderName = photo._parentName || 'Cartella'
+    // Use cached name if available, otherwise fetch from API
+    let folderName = photo._parentName || null
+    if (!folderName) {
+      try {
+        const params = new URLSearchParams({ fields: 'id,name' })
+        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}?${params}`, {
+          headers: { Authorization: `Bearer ${auth.accessToken}` },
+        })
+        if (res.ok) { const d = await res.json(); folderName = d.name }
+      } catch {}
+    }
+    folderName = folderName || 'Cartella'
     setActiveFolderId(folderId)
     setActiveFolderName(folderName)
     setSimilarTo(null); setSimilarResults([])
