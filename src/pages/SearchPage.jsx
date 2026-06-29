@@ -667,17 +667,17 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           </div>
 
           {/* Back button + tag cloud row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <div className="search-sub-toolbar">
             {viewStack.length > 0 && (
-              <button onClick={popView} className="tree-back-btn" style={{ width: 'auto', marginBottom: 0, padding: '5px 12px', fontSize: '12px', flexShrink: 0 }}>
+              <button onClick={popView} className="sub-toolbar-back">
                 <IconChevronLeft /> Indietro
               </button>
             )}
             {!similarTo && !globalResults && (
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)', flexShrink: 0 }}>📁 {activeFolderName}</span>
+              <span className="sub-toolbar-folder">📁 {activeFolderName}</span>
             )}
             {navHistory.length > 0 && (
-              <div style={{ display: 'flex', gap: 5, marginLeft: 'auto', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div className="sub-toolbar-tags">
                 {navHistory.map(entry => (
                   <button key={entry.key} className="history-tag" onClick={() => restoreState(entry.snapshot)} title={entry.label}>
                     <entry.Icon />
