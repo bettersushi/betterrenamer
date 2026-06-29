@@ -74,6 +74,22 @@ function formatSize(bytes) {
   return `${(b/1024).toFixed(0)} KB`
 }
 
+function SubfolderSidebar({ folders, onSelect }) {
+  return (
+    <div className="subfolder-sidebar">
+      <div className="subfolder-sidebar-header">
+        Sottocartelle <span>{folders.length}</span>
+      </div>
+      {folders.map(f => (
+        <button key={f.id} className="subfolder-sidebar-item" onClick={() => onSelect(f.id, f.name)}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+          <span>{f.name}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 async function computePHash(imgUrl) {
   const proxied = `/api/proxy-image?url=${encodeURIComponent(imgUrl)}`
   return new Promise((resolve, reject) => {
@@ -355,6 +371,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const [cropDoneIds, setCropDoneIds] = useState(new Set())
   const [rotatingIds, setRotatingIds] = useState(new Set())
   const [rotateDoneIds, setRotateDoneIds] = useState(new Set())
+  const [currentSubfolders, setCurrentSubfolders] = useState([])
   const [thumbTimestamps, setThumbTimestamps] = useState({}) // forza reload thumbnail dopo crop
   const pHashCache = useRef({})
   const gridRef = useRef(null)
@@ -440,6 +457,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     if (gridRef.current) gridRef.current.scrollTop = 0
     if (treePhotos[folderId]) {
       setAllPhotos(treePhotos[folderId])
+      setCurrentSubfolders(treeChildren[folderId] || [])
       return
     }
     setLoading(true)
@@ -448,9 +466,10 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
       setTreeChildren(t => ({ ...t, [folderId]: subfolders }))
       setTreePhotos(t => ({ ...t, [folderId]: photos }))
       setAllPhotos(photos)
+      setCurrentSubfolders(subfolders)
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
-  }, [fetchFolder, treePhotos, pushView, setSearchParams])
+  }, [fetchFolder, treePhotos, treeChildren, pushView, setSearchParams])
 
   const handleTreeToggle = useCallback(async (folder, siblingIds = []) => {
     const id = folder.id
@@ -493,9 +512,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           setTreeChildren(t => ({ ...t, [urlFolder]: sf }))
           setTreePhotos(t => ({ ...t, [urlFolder]: fp }))
           setAllPhotos(fp)
+          setCurrentSubfolders(sf)
         })
       } else {
         setAllPhotos(photos)
+        setCurrentSubfolders(subfolders)
       }
     }).catch(console.error).finally(() => setLoading(false))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -531,6 +552,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
       setTreeChildren(t => ({ ...t, [folderId]: subfolders }))
       setTreePhotos(t => ({ ...t, [folderId]: photos }))
       setAllPhotos(photos)
+      setCurrentSubfolders(subfolders)
     }).catch(console.error).finally(() => setLoading(false))
   }
 
@@ -539,6 +561,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     setGlobalQuery(q)
     clearTimeout(globalTimerRef.current)
     if (!q.trim()) { setGlobalResults(null); return }
+    setCurrentSubfolders([])
     globalTimerRef.current = setTimeout(async () => {
       setGlobalLoading(true)
       if (gridRef.current) gridRef.current.scrollTop = 0
@@ -770,6 +793,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
 
   // ── Render ───────────────────────────────────────────────────────────────
   const rootFolders = treeChildren['root'] || []
+  const showSubfolderSidebar = currentSubfolders.length > 0 && globalResults === null && similarTo === null
 
   return (
     <div className="search-page-bg">
@@ -914,10 +938,14 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           )}
 
           {/* Grid */}
+          <div className="content-area">
+            {showSubfolderSidebar && (
+              <SubfolderSidebar folders={currentSubfolders} onSelect={(id, name) => selectFolder(id, name)} />
+            )}
           {loading ? (
-            <div className="search-empty"><span>Caricamento...</span></div>
+            <div className="search-empty" style={{ flex: 1 }}><span>Caricamento...</span></div>
           ) : results.length === 0 ? (
-            <div className="search-empty">
+            <div className="search-empty" style={{ flex: 1 }}>
               <IconSearch />
               <span>{allPhotos.length === 0 ? 'Nessuna foto in questa cartella' : 'Nessun risultato'}</span>
             </div>
@@ -1031,6 +1059,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
               )}
             </div>
           )}
+          </div>
         </div>
       </div>
 
