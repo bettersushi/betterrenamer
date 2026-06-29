@@ -185,6 +185,19 @@ export const getFileMetadata = async (accessToken, fileId) => {
   return response.json()
 }
 
+export const patchFileMetadata = async (accessToken, fileId, fields) => {
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,modifiedTime`,
+    {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(fields),
+    }
+  )
+  if (!response.ok) throw new Error('Failed to patch file metadata')
+  return response.json()
+}
+
 export const updateFileContent = async (accessToken, fileId, blob, mimeType) => {
   const response = await fetch(
     `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import logoSrc from '../assets/logo-br.svg'
-import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata } from '../drive'
+import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata, patchFileMetadata } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
 import SimilarityBalloon from '../components/SimilarityBalloon'
 import ScopePickerModal from '../components/ScopePickerModal'
@@ -539,6 +539,14 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
 
       // Upload
       await updateFileContent(auth.accessToken, photo.id, outBlob, mimeType)
+
+      // Restore original modifiedTime
+      if (photo.modifiedTime) {
+        await patchFileMetadata(auth.accessToken, photo.id, { modifiedTime: photo.modifiedTime })
+      }
+
+      // Wait for Drive to regenerate thumbnail
+      await new Promise(r => setTimeout(r, 3000))
 
       // Refresh thumbnail
       const updatedMeta = await getFileMetadata(auth.accessToken, photo.id)
