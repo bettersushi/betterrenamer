@@ -721,61 +721,95 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           ) : (
             <div
               ref={gridRef}
-              className={thumbSize === 'masonry' ? 'search-masonry' : 'search-grid'}
+              className={thumbSize === 'masonry' ? 'search-masonry-scroll' : 'search-grid'}
               style={thumbSize !== 'masonry' ? { '--thumb-size': `${THUMB_SIZES[thumbSize]}px` } : undefined}
             >
-              {results.map((photo, idx) => (
-                <div key={photo.id} className={thumbSize === 'masonry' ? 'masonry-card' : 'thumb-card'} onClick={() => setSlideshowIdx(idx)}>
-                  {photo.thumbnailLink ? (
-                    <LazyPhoto
-                      key={thumbTimestamps[photo.id] || photo.id}
-                      src={getLargeThumbUrl(photo.thumbnailLink, thumbSize === 'masonry' ? 1600 : THUMB_SIZES[thumbSize] * 2)}
-                      alt={photo.name}
-                      className={thumbSize === 'masonry' ? 'masonry-img' : 'thumb-img'}
-                      style={thumbSize === 'masonry' ? undefined : { width: '100%', height: '100%' }}
-                    />
-                  ) : (
-                    <div className="thumb-no-preview">📄</div>
-                  )}
-                  {isVideoFile(photo) && (
-                    <div style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.55)', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', pointerEvents: 'none' }}>
-                      <IconVideoFile />
-                    </div>
-                  )}
-                  {similarTo && photo._dist !== undefined && photo._dist === 0 && (
-                    <div className="search-similar-badge">identica</div>
-                  )}
-                  <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
-                    <button className="thumb-overlay-btn" title="Cerca simili in cartella" onClick={() => handleSimilarity(photo)}>
-                      <IconSimilar />
-                    </button>
-                    <button className="thumb-overlay-btn" title="Cerca simili ovunque in Drive" onClick={() => handleGlobalSimilarity(photo)}>
-                      <IconGlobalSimilar />
-                    </button>
-                    <button className="thumb-overlay-btn" title="Vai alla cartella" onClick={() => handleFolderJump(photo)}>
-                      <IconFolderJump />
-                    </button>
-                    <button className="thumb-overlay-btn" title="QuickLook" onClick={() => setSlideshowIdx(idx)}>
-                      <IconEye />
-                    </button>
-                    {photo.thumbnailLink && (
-                      <button className="thumb-overlay-btn" title="Crop" onClick={() => setCropPhoto(photo)}>
-                        <IconCrop />
-                      </button>
-                    )}
-                  </div>
-                  {/* Crop feedback overlay */}
-                  {(croppingIds.has(photo.id) || cropDoneIds.has(photo.id)) && (
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: croppingIds.has(photo.id) ? 'rgba(0,0,0,0.55)' : 'rgba(16,185,129,0.7)', borderRadius: 8, pointerEvents: 'none', transition: 'background 0.3s' }}>
-                      {croppingIds.has(photo.id) ? (
-                        <svg style={{ animation: 'spin 0.9s linear infinite' }} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              {thumbSize === 'masonry' ? (
+                <div className="search-masonry">
+                  {results.map((photo, idx) => (
+                    <div key={photo.id} className="masonry-card" onClick={() => setSlideshowIdx(idx)}>
+                      {photo.thumbnailLink ? (
+                        <LazyPhoto
+                          key={thumbTimestamps[photo.id] || photo.id}
+                          src={getLargeThumbUrl(photo.thumbnailLink, 1600)}
+                          alt={photo.name}
+                          className="masonry-img"
+                        />
                       ) : (
-                        <span style={{ color: 'white', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 }}>✓ Salvato</span>
+                        <div className="thumb-no-preview">📄</div>
+                      )}
+                      {isVideoFile(photo) && (
+                        <div style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.55)', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', pointerEvents: 'none' }}>
+                          <IconVideoFile />
+                        </div>
+                      )}
+                      {similarTo && photo._dist !== undefined && photo._dist === 0 && (
+                        <div className="search-similar-badge">identica</div>
+                      )}
+                      <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
+                        <button className="thumb-overlay-btn" title="Cerca simili in cartella" onClick={() => handleSimilarity(photo)}><IconSimilar /></button>
+                        <button className="thumb-overlay-btn" title="Cerca simili ovunque in Drive" onClick={() => handleGlobalSimilarity(photo)}><IconGlobalSimilar /></button>
+                        <button className="thumb-overlay-btn" title="Vai alla cartella" onClick={() => handleFolderJump(photo)}><IconFolderJump /></button>
+                        <button className="thumb-overlay-btn" title="QuickLook" onClick={() => setSlideshowIdx(idx)}><IconEye /></button>
+                        {photo.thumbnailLink && (
+                          <button className="thumb-overlay-btn" title="Crop" onClick={() => setCropPhoto(photo)}><IconCrop /></button>
+                        )}
+                      </div>
+                      {(croppingIds.has(photo.id) || cropDoneIds.has(photo.id)) && (
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: croppingIds.has(photo.id) ? 'rgba(0,0,0,0.55)' : 'rgba(16,185,129,0.7)', borderRadius: 8, pointerEvents: 'none', transition: 'background 0.3s' }}>
+                          {croppingIds.has(photo.id) ? (
+                            <svg style={{ animation: 'spin 0.9s linear infinite' }} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                          ) : (
+                            <span style={{ color: 'white', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 }}>✓ Salvato</span>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
+                  ))}
                 </div>
-              ))}
+              ) : (
+                results.map((photo, idx) => (
+                  <div key={photo.id} className="thumb-card" onClick={() => setSlideshowIdx(idx)}>
+                    {photo.thumbnailLink ? (
+                      <LazyPhoto
+                        key={thumbTimestamps[photo.id] || photo.id}
+                        src={getLargeThumbUrl(photo.thumbnailLink, THUMB_SIZES[thumbSize] * 2)}
+                        alt={photo.name}
+                        className="thumb-img"
+                        style={{ width: '100%', height: '100%' }}
+                      />
+                    ) : (
+                      <div className="thumb-no-preview">📄</div>
+                    )}
+                    {isVideoFile(photo) && (
+                      <div style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.55)', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', pointerEvents: 'none' }}>
+                        <IconVideoFile />
+                      </div>
+                    )}
+                    {similarTo && photo._dist !== undefined && photo._dist === 0 && (
+                      <div className="search-similar-badge">identica</div>
+                    )}
+                    <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
+                      <button className="thumb-overlay-btn" title="Cerca simili in cartella" onClick={() => handleSimilarity(photo)}><IconSimilar /></button>
+                      <button className="thumb-overlay-btn" title="Cerca simili ovunque in Drive" onClick={() => handleGlobalSimilarity(photo)}><IconGlobalSimilar /></button>
+                      <button className="thumb-overlay-btn" title="Vai alla cartella" onClick={() => handleFolderJump(photo)}><IconFolderJump /></button>
+                      <button className="thumb-overlay-btn" title="QuickLook" onClick={() => setSlideshowIdx(idx)}><IconEye /></button>
+                      {photo.thumbnailLink && (
+                        <button className="thumb-overlay-btn" title="Crop" onClick={() => setCropPhoto(photo)}><IconCrop /></button>
+                      )}
+                    </div>
+                    {(croppingIds.has(photo.id) || cropDoneIds.has(photo.id)) && (
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: croppingIds.has(photo.id) ? 'rgba(0,0,0,0.55)' : 'rgba(16,185,129,0.7)', borderRadius: 8, pointerEvents: 'none', transition: 'background 0.3s' }}>
+                        {croppingIds.has(photo.id) ? (
+                          <svg style={{ animation: 'spin 0.9s linear infinite' }} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                        ) : (
+                          <span style={{ color: 'white', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 }}>✓ Salvato</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>

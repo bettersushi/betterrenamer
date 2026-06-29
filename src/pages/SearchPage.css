@@ -131,6 +131,7 @@
   gap: 10px;
   flex-shrink: 0;
   padding: 12px 20px 8px;
+  border-bottom: 1px solid var(--border);
 }
 
 .search-input {
@@ -199,15 +200,18 @@
   color: var(--primary);
 }
 
-.search-masonry {
+.search-masonry-scroll {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
-  columns: 4;
-  column-gap: 6px;
   padding: 0 20px 16px;
   box-sizing: border-box;
+}
+
+.search-masonry {
+  columns: 4;
+  column-gap: 6px;
 }
 
 @media (max-width: 1200px) {
