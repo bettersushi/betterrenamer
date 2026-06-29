@@ -50,6 +50,46 @@ function hammingDistance(a, b) {
   return a.reduce((d, v, i) => d + (v !== b[i] ? 1 : 0), 0)
 }
 
+function getLargeThumbUrl(thumbnailLink, size = 1600) {
+  if (!thumbnailLink) return null
+  return thumbnailLink.replace(/=s\d+$/, `=s${size}`).replace(/=s\d+-/, `=s${size}-`)
+}
+
+function LazyPhoto({ src, alt, className, style, onLoad: onLoadProp }) {
+  const ref = useRef(null)
+  const [loaded, setLoaded] = useState(false)
+  const [src_, setSrc] = useState(null)
+
+  useEffect(() => {
+    if (!src) return
+    const el = ref.current
+    if (!el) return
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setSrc(src)
+        obs.disconnect()
+      }
+    }, { rootMargin: '200px' })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [src])
+
+  return (
+    <div ref={ref} className={`lazy-photo-wrap${loaded ? ' lazy-loaded' : ''}`} style={style}>
+      {!loaded && <div className="lazy-shimmer" />}
+      {src_ && (
+        <img
+          src={src_}
+          alt={alt}
+          className={className}
+          onLoad={() => { setLoaded(true); onLoadProp?.() }}
+          style={{ opacity: loaded ? 1 : 0, transition: 'opacity 0.3s' }}
+        />
+      )}
+    </div>
+  )
+}
+
 const IconFolder = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
@@ -348,7 +388,12 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
               {results.map((photo, idx) => (
                 <div key={photo.id} className={thumbSize === 'masonry' ? 'masonry-card' : 'thumb-card'} onClick={() => setSlideshowIdx(idx)}>
                   {photo.thumbnailLink ? (
-                    <img src={photo.thumbnailLink} alt={photo.name} loading="lazy" title={photo.name} />
+                    <LazyPhoto
+                      src={getLargeThumbUrl(photo.thumbnailLink, thumbSize === 'masonry' ? 1600 : THUMB_SIZES[thumbSize] * 2)}
+                      alt={photo.name}
+                      className={thumbSize === 'masonry' ? 'masonry-img' : 'thumb-img'}
+                      style={thumbSize === 'masonry' ? undefined : { width: '100%', height: '100%' }}
+                    />
                   ) : (
                     <div className="thumb-no-preview">📄</div>
                   )}
