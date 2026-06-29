@@ -377,7 +377,7 @@
 }
 
 .masonry-no-thumb {
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 3 / 2;
   width: 100%;
   display: flex;
   align-items: center;
