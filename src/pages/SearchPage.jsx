@@ -206,7 +206,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
         } catch { /* skip if crossOrigin fails */ }
       }
       withDist.sort((a, b) => a._dist - b._dist)
-      setSimilarResults(withDist.filter(p => p._dist <= 12))
+      setSimilarResults(withDist.filter(p => p._dist <= 22))
     } catch (e) {
       alert('Similarità non disponibile: ' + e.message)
       setSimilarTo(null)
