@@ -272,7 +272,11 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     const handler = () => {
       const toSave = queueRef.current
         .filter(j => j.status === 'queued' || j.status === 'pending' || j.status === 'running' || j.status === 'interrupted')
-        .map(j => ({ ...j, entries: [] })) // strip log entries to save space
+        .map(j => ({
+          ...j,
+          entries: [],
+          preview: j.preview.map(({ thumbnailLink, ...p }) => p), // strip thumbs to save space
+        }))
       try {
         if (toSave.length > 0) localStorage.setItem('br_queue_interrupted', JSON.stringify(toSave))
         else localStorage.removeItem('br_queue_interrupted')
