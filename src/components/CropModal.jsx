@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
-import { updateFileContent, getFileMetadata } from '../drive'
+import { updateFileContent, getFileMetadata, patchFileMetadata } from '../drive'
 
 function getLargeThumbUrl(thumbnailLink, size = 1600) {
   if (!thumbnailLink) return null
@@ -297,6 +297,9 @@ export default function CropModal({ photo, accessToken, onClose, onDone }) {
       ctx2.drawImage(img, rect.x * scaleX, rect.y * scaleY, rect.w * scaleX, rect.h * scaleY, 0, 0, offscreen.width, offscreen.height)
       const blob = await offscreen.convertToBlob({ type: 'image/jpeg', quality: 0.92 })
       await updateFileContent(accessToken, photo.id, blob, photo.mimeType || 'image/jpeg')
+      if (photo.modifiedTime) {
+        try { await patchFileMetadata(accessToken, photo.id, { modifiedTime: photo.modifiedTime }) } catch {}
+      }
       // Fetch updated metadata to get fresh thumbnailLink from Drive
       let updatedMeta = null
       try { updatedMeta = await getFileMetadata(accessToken, photo.id) } catch {}
