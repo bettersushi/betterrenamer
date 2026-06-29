@@ -5,6 +5,7 @@ import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, ge
 import QuickLookModal from '../components/QuickLookModal'
 import SimilarityBalloon from '../components/SimilarityBalloon'
 import ScopePickerModal from '../components/ScopePickerModal'
+import DriveStatsModal from '../components/DriveStatsModal'
 import CropModal from '../components/CropModal'
 import './SearchPage.css'
 
@@ -315,6 +316,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const [balloons, setBalloons] = useState([])
   const [cropPhoto, setCropPhoto] = useState(null)
   const [scopePickerPhoto, setScopePickerPhoto] = useState(null)
+  const [showStats, setShowStats] = useState(false)
   const [croppingIds, setCroppingIds] = useState(new Set())
   const [cropDoneIds, setCropDoneIds] = useState(new Set())
   const [rotatingIds, setRotatingIds] = useState(new Set())
@@ -760,6 +762,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
               <button onClick={() => setSortOrder('modified')} className={`thumb-size-btn${sortOrder === 'modified' ? ' active' : ''}`} title="Ordina per data modifica">
                 <IconSortDate />
               </button>
+              <button onClick={() => setShowStats(true)} className="thumb-size-btn" title="Statistiche cartella">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -961,6 +968,16 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           onClose={() => removeBalloon(b.id)}
         />
       ))}
+      {showStats && (
+        <DriveStatsModal
+          folderName={activeFolderName || 'My Drive'}
+          folderId={activeFolderId || 'root'}
+          currentFiles={allPhotos}
+          accessToken={auth.accessToken}
+          onClose={() => setShowStats(false)}
+        />
+      )}
+
       {scopePickerPhoto && (
         <ScopePickerModal
           photo={scopePickerPhoto}

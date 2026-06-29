@@ -53,7 +53,7 @@ export const listFiles = async (accessToken, folderId = 'root') => {
   return { files: allFiles }
 };
 
-const traverseFolder = async (accessToken, folderId, folderName, isRoot, includeRoot, results) => {
+const traverseFolder = async (accessToken, folderId, folderName, isRoot, includeRoot, results, onProgress) => {
   const data = await listFiles(accessToken, folderId)
   const allItems = data.files || []
   const subfolders = allItems.filter(f => f.mimeType === 'application/vnd.google-apps.folder')
@@ -64,14 +64,16 @@ const traverseFolder = async (accessToken, folderId, folderName, isRoot, include
     if (sorted.length > 0) results.push({ folderName, folderId, files: sorted })
   }
 
+  if (onProgress) onProgress(folderName, results.reduce((n, f) => n + f.files.length, 0), subfolders.length)
+
   for (const subfolder of subfolders) {
-    await traverseFolder(accessToken, subfolder.id, subfolder.name, false, includeRoot, results)
+    await traverseFolder(accessToken, subfolder.id, subfolder.name, false, includeRoot, results, onProgress)
   }
 }
 
-export const listFilesRecursive = async (accessToken, rootFolderId, rootFolderName, includeRoot) => {
+export const listFilesRecursive = async (accessToken, rootFolderId, rootFolderName, includeRoot, onProgress) => {
   const results = []
-  await traverseFolder(accessToken, rootFolderId, rootFolderName, true, includeRoot, results)
+  await traverseFolder(accessToken, rootFolderId, rootFolderName, true, includeRoot, results, onProgress)
   return results
 }
 
