@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import logoSrc from '../assets/logo-br.svg'
-import { listFiles, searchFilesGlobal, listFilesRecursive } from '../drive'
+import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
 import SimilarityBalloon from '../components/SimilarityBalloon'
 import ScopePickerModal from '../components/ScopePickerModal'
@@ -183,6 +183,12 @@ const IconCrop = () => (
     <path d="M18 22V8a2 2 0 0 0-2-2H2"/>
   </svg>
 )
+const IconRotateCCW = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+    <path d="M3 3v5h5"/>
+  </svg>
+)
 const IconFolder = () => (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
@@ -311,6 +317,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const [scopePickerPhoto, setScopePickerPhoto] = useState(null)
   const [croppingIds, setCroppingIds] = useState(new Set())
   const [cropDoneIds, setCropDoneIds] = useState(new Set())
+  const [rotatingIds, setRotatingIds] = useState(new Set())
+  const [rotateDoneIds, setRotateDoneIds] = useState(new Set())
   const [thumbTimestamps, setThumbTimestamps] = useState({}) // forza reload thumbnail dopo crop
   const pHashCache = useRef({})
   const gridRef = useRef(null)
@@ -497,6 +505,45 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   }
 
   // ── Per-folder similarity ───────────────────────────────────────────────
+  const handleRotate = useCallback(async (photo) => {
+    if (!photo.thumbnailLink) return
+    setRotatingIds(ids => new Set([...ids, photo.id]))
+    try {
+      // Fetch original file
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${photo.id}?alt=media`, {
+        headers: { Authorization: `Bearer ${auth.accessToken}` },
+      })
+      if (!res.ok) throw new Error('Download fallito')
+      const blob = await res.blob()
+      const mimeType = blob.type || photo.mimeType || 'image/jpeg'
+
+      // Draw rotated on canvas
+      const img = await createImageBitmap(blob)
+      const canvas = new OffscreenCanvas(img.height, img.width)
+      const ctx = canvas.getContext('2d')
+      ctx.translate(img.height / 2, img.width / 2)
+      ctx.rotate(-Math.PI / 2)
+      ctx.drawImage(img, -img.width / 2, -img.height / 2)
+      const outBlob = await canvas.convertToBlob({ type: mimeType, quality: 0.92 })
+
+      // Upload
+      await updateFileContent(auth.accessToken, photo.id, outBlob, mimeType)
+
+      // Refresh thumbnail
+      const updatedMeta = await getFileMetadata(auth.accessToken, photo.id)
+      if (updatedMeta?.thumbnailLink) {
+        setAllPhotos(photos => photos.map(p => p.id === photo.id ? { ...p, thumbnailLink: updatedMeta.thumbnailLink } : p))
+      }
+      setThumbTimestamps(ts => ({ ...ts, [photo.id]: Date.now() }))
+      setRotateDoneIds(ids => new Set([...ids, photo.id]))
+      setTimeout(() => setRotateDoneIds(ids => { const n = new Set(ids); n.delete(photo.id); return n }), 2000)
+    } catch (e) {
+      console.error('Rotate failed:', e)
+    } finally {
+      setRotatingIds(ids => { const n = new Set(ids); n.delete(photo.id); return n })
+    }
+  }, [auth.accessToken])
+
   const handleSimilarity = useCallback(async (photo) => {
     if (!photo.thumbnailLink) return
     const id = crypto.randomUUID()
@@ -789,10 +836,13 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                         {photo.thumbnailLink && (
                           <button className="thumb-overlay-btn" title="Crop" onClick={() => setCropPhoto(photo)}><IconCrop /></button>
                         )}
+                        {photo.thumbnailLink && (
+                          <button className="thumb-overlay-btn" title="Ruota 90° sx" onClick={() => handleRotate(photo)}><IconRotateCCW /></button>
+                        )}
                       </div>
-                      {(croppingIds.has(photo.id) || cropDoneIds.has(photo.id)) && (
-                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: croppingIds.has(photo.id) ? 'rgba(0,0,0,0.55)' : 'rgba(16,185,129,0.7)', borderRadius: 8, pointerEvents: 'none', transition: 'background 0.3s' }}>
-                          {croppingIds.has(photo.id) ? (
+                      {(croppingIds.has(photo.id) || cropDoneIds.has(photo.id) || rotatingIds.has(photo.id) || rotateDoneIds.has(photo.id)) && (
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: (croppingIds.has(photo.id) || rotatingIds.has(photo.id)) ? 'rgba(0,0,0,0.55)' : 'rgba(16,185,129,0.7)', borderRadius: 8, pointerEvents: 'none', transition: 'background 0.3s' }}>
+                          {(croppingIds.has(photo.id) || rotatingIds.has(photo.id)) ? (
                             <svg style={{ animation: 'spin 0.9s linear infinite' }} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
                           ) : (
                             <span style={{ color: 'white', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 }}>✓ Salvato</span>
@@ -833,10 +883,13 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                       {photo.thumbnailLink && (
                         <button className="thumb-overlay-btn" title="Crop" onClick={() => setCropPhoto(photo)}><IconCrop /></button>
                       )}
+                      {photo.thumbnailLink && (
+                        <button className="thumb-overlay-btn" title="Ruota 90° sx" onClick={() => handleRotate(photo)}><IconRotateCCW /></button>
+                      )}
                     </div>
-                    {(croppingIds.has(photo.id) || cropDoneIds.has(photo.id)) && (
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: croppingIds.has(photo.id) ? 'rgba(0,0,0,0.55)' : 'rgba(16,185,129,0.7)', borderRadius: 8, pointerEvents: 'none', transition: 'background 0.3s' }}>
-                        {croppingIds.has(photo.id) ? (
+                    {(croppingIds.has(photo.id) || cropDoneIds.has(photo.id) || rotatingIds.has(photo.id) || rotateDoneIds.has(photo.id)) && (
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: (croppingIds.has(photo.id) || rotatingIds.has(photo.id)) ? 'rgba(0,0,0,0.55)' : 'rgba(16,185,129,0.7)', borderRadius: 8, pointerEvents: 'none', transition: 'background 0.3s' }}>
+                        {(croppingIds.has(photo.id) || rotatingIds.has(photo.id)) ? (
                           <svg style={{ animation: 'spin 0.9s linear infinite' }} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
                         ) : (
                           <span style={{ color: 'white', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 }}>✓ Salvato</span>
