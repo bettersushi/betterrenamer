@@ -4,6 +4,7 @@ import logoSrc from '../assets/logo-br.svg'
 import { listFiles, searchFilesGlobal, listFilesRecursive } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
 import SimilarityBalloon from '../components/SimilarityBalloon'
+import CropModal from '../components/CropModal'
 import './SearchPage.css'
 
 const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
@@ -152,6 +153,12 @@ const IconFolderJump = () => (
     <line x1="12" y1="11" x2="12" y2="17"/>
   </svg>
 )
+const IconCrop = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <path d="M6 2v14a2 2 0 0 0 2 2h14"/>
+    <path d="M18 22V8a2 2 0 0 0-2-2H2"/>
+  </svg>
+)
 const IconFolder = () => (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
@@ -276,6 +283,10 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const [similarTo, setSimilarTo] = useState(null)
   const [similarResults, setSimilarResults] = useState([])
   const [balloons, setBalloons] = useState([])
+  const [cropPhoto, setCropPhoto] = useState(null)
+  const [croppingIds, setCroppingIds] = useState(new Set())
+  const [cropDoneIds, setCropDoneIds] = useState(new Set())
+  const [thumbTimestamps, setThumbTimestamps] = useState({}) // forza reload thumbnail dopo crop
   const pHashCache = useRef({})
   const gridRef = useRef(null)
   const [thumbSize, setThumbSizeRaw] = useState(() => localStorage.getItem('br_thumb_size') || 'md')
@@ -712,7 +723,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                 <div key={photo.id} className={thumbSize === 'masonry' ? 'masonry-card' : 'thumb-card'} onClick={() => setSlideshowIdx(idx)}>
                   {photo.thumbnailLink ? (
                     <LazyPhoto
-                      src={getLargeThumbUrl(photo.thumbnailLink, thumbSize === 'masonry' ? 1600 : THUMB_SIZES[thumbSize] * 2)}
+                      src={getLargeThumbUrl(photo.thumbnailLink, thumbSize === 'masonry' ? 1600 : THUMB_SIZES[thumbSize] * 2) + (thumbTimestamps[photo.id] ? `&t=${thumbTimestamps[photo.id]}` : '')}
                       alt={photo.name}
                       className={thumbSize === 'masonry' ? 'masonry-img' : 'thumb-img'}
                       style={thumbSize === 'masonry' ? undefined : { width: '100%', height: '100%' }}
@@ -741,7 +752,22 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                     <button className="thumb-overlay-btn" title="QuickLook" onClick={() => setSlideshowIdx(idx)}>
                       <IconEye />
                     </button>
+                    {photo.thumbnailLink && (
+                      <button className="thumb-overlay-btn" title="Crop" onClick={() => setCropPhoto(photo)}>
+                        <IconCrop />
+                      </button>
+                    )}
                   </div>
+                  {/* Crop feedback overlay */}
+                  {(croppingIds.has(photo.id) || cropDoneIds.has(photo.id)) && (
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: croppingIds.has(photo.id) ? 'rgba(0,0,0,0.55)' : 'rgba(16,185,129,0.7)', borderRadius: 8, pointerEvents: 'none', transition: 'background 0.3s' }}>
+                      {croppingIds.has(photo.id) ? (
+                        <svg style={{ animation: 'spin 0.9s linear infinite' }} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                      ) : (
+                        <span style={{ color: 'white', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 }}>✓ Salvato</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -778,6 +804,25 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           onClose={() => removeBalloon(b.id)}
         />
       ))}
+      {cropPhoto && (
+        <CropModal
+          photo={cropPhoto}
+          accessToken={auth.accessToken}
+          onClose={() => setCropPhoto(null)}
+          onDone={(photoId) => {
+            setCropPhoto(null)
+            setCroppingIds(ids => new Set([...ids, photoId]))
+            setThumbTimestamps(ts => ({ ...ts, [photoId]: Date.now() }))
+            setTimeout(() => {
+              setCroppingIds(ids => { const n = new Set(ids); n.delete(photoId); return n })
+              setCropDoneIds(ids => new Set([...ids, photoId]))
+              setTimeout(() => {
+                setCropDoneIds(ids => { const n = new Set(ids); n.delete(photoId); return n })
+              }, 1500)
+            }, 2500)
+          }}
+        />
+      )}
     </div>
   )
 }

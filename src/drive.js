@@ -145,6 +145,19 @@ export const renameFile = async (accessToken, fileId, newName) => {
   return response.json();
 };
 
+export const updateFileContent = async (accessToken, fileId, blob, mimeType) => {
+  const response = await fetch(
+    `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+    {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': mimeType || 'image/jpeg' },
+      body: blob,
+    }
+  )
+  if (!response.ok) throw new Error('Failed to update file')
+  return response.json()
+}
+
 export const batchRenameFiles = async (accessToken, files) => {
   const results = [];
 
