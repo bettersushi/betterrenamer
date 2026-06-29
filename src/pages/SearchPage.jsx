@@ -336,7 +336,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     } else {
       entry = { type: 'folder', label: activeFolderName, key: 'f:' + activeFolderId, Icon: IconFolder, snapshot }
     }
-    setNavHistory(h => [entry, ...h.filter(e => e.key !== entry.key)].slice(0, 5))
+    setNavHistory(h => [entry, ...h.filter(e => e.key !== entry.key)].slice(0, 10))
     setViewStack(s => [...s, snapshot])
   }
   const restoreState = (snapshot) => {
@@ -710,7 +710,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           {similarTo && (
             <div className="similarity-active-banner">
               <img src={similarTo.thumbnailLink} style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }} />
-              <span>Simili a <strong>{similarTo.name}</strong> {similarLoading ? '— calcolo...' : `— ${similarResults.length} trovate`}</span>
+              <span>Simili a <strong>{similarTo.name}</strong> — {similarResults.length} trovate</span>
               <button onClick={() => { setSimilarTo(null); setSimilarResults([]) }} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#8b5cf6' }}>
                 <IconX />
               </button>
