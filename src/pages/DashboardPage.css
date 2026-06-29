@@ -240,9 +240,9 @@
   100% { transform: translateX(200%); }
 }
 
-@keyframes folder-pulse {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 1; }
+@keyframes folder-parent-pulse {
+  0%, 100% { opacity: 0.04; }
+  50% { opacity: 0.12; }
 }
 
 .folder-active {
@@ -269,16 +269,14 @@
   position: relative;
 }
 
-.folder-has-active-job::before {
+.folder-has-active-job::after {
   content: '';
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 2px;
+  inset: 0;
   background: var(--primary);
-  opacity: 0.3;
-  animation: folder-pulse 2s ease-in-out infinite;
+  opacity: 0.06;
+  animation: folder-parent-pulse 2s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .stat-card {
