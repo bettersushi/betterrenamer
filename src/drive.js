@@ -145,6 +145,15 @@ export const renameFile = async (accessToken, fileId, newName) => {
   return response.json();
 };
 
+export const getFileMetadata = async (accessToken, fileId) => {
+  const params = new URLSearchParams({ fields: 'id,name,thumbnailLink,mimeType,size,modifiedTime' })
+  const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!response.ok) throw new Error('Failed to get file metadata')
+  return response.json()
+}
+
 export const updateFileContent = async (accessToken, fileId, blob, mimeType) => {
   const response = await fetch(
     `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,

@@ -815,8 +815,12 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           photo={cropPhoto}
           accessToken={auth.accessToken}
           onClose={() => setCropPhoto(null)}
-          onDone={(photoId) => {
+          onDone={(photoId, updatedMeta) => {
             setCropPhoto(null)
+            // Update thumbnailLink in allPhotos so the grid shows the new image
+            if (updatedMeta?.thumbnailLink) {
+              setAllPhotos(photos => photos.map(p => p.id === photoId ? { ...p, thumbnailLink: updatedMeta.thumbnailLink } : p))
+            }
             setCroppingIds(ids => new Set([...ids, photoId]))
             setThumbTimestamps(ts => ({ ...ts, [photoId]: Date.now() }))
             setTimeout(() => {
