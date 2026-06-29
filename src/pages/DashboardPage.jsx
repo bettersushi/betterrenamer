@@ -257,10 +257,32 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     setCheckedFolders(allChecked ? new Set() : new Set(visibleFolders.map(f => f.id)))
   }
 
-  // Queue
-  const [queue, setQueue] = useState([])
-  const queueRef = useRef([])
+  // Queue — restore interrupted jobs from localStorage on mount
+  const [queue, setQueue] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('br_queue_interrupted') || '[]')
+      return saved.map(j => ({ ...j, status: 'interrupted' }))
+    } catch { return [] }
+  })
+  const queueRef = useRef(queue)
   const runningCount = useRef(0)
+
+  // Persist active jobs on unload
+  useEffect(() => {
+    const handler = () => {
+      const toSave = queueRef.current.filter(j => j.status === 'queued' || j.status === 'pending' || j.status === 'running' || j.status === 'interrupted')
+      if (toSave.length > 0) localStorage.setItem('br_queue_interrupted', JSON.stringify(toSave))
+      else localStorage.removeItem('br_queue_interrupted')
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [])
+
+  // Clear localStorage when no more interrupted/active jobs remain
+  useEffect(() => {
+    const active = queue.filter(j => j.status === 'queued' || j.status === 'pending' || j.status === 'running' || j.status === 'interrupted')
+    if (active.length === 0) localStorage.removeItem('br_queue_interrupted')
+  }, [queue])
 
   const updateJob = useCallback((id, updates) => {
     queueRef.current = queueRef.current.map(j => j.id === id ? { ...j, ...updates } : j)
@@ -359,6 +381,16 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     setPreviewFolder(null)
     setCheckedFolders(new Set())
   }
+
+  const handleRestartJob = useCallback((jobId) => {
+    queueRef.current = queueRef.current.map(j => j.id === jobId && j.status === 'interrupted' ? { ...j, status: 'queued', progress: { current: 0, total: j.preview.length, currentFile: '', phase: '' }, entries: [] } : j)
+    setQueue([...queueRef.current])
+  }, [])
+
+  const handleRestartAll = useCallback(() => {
+    queueRef.current = queueRef.current.map(j => j.status === 'interrupted' ? { ...j, status: 'queued', progress: { current: 0, total: j.preview.length, currentFile: '', phase: '' }, entries: [] } : j)
+    setQueue([...queueRef.current])
+  }, [])
 
   const handleStartJob = useCallback((jobId) => {
     queueRef.current = queueRef.current.map(j => j.id === jobId && j.status === 'queued' ? { ...j, status: 'pending' } : j)
@@ -568,6 +600,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
   const handleLogout = () => { onLogout(); navigate('/login') }
 
   const queueHasItems = queue.length > 0
+  const interruptedJobs = queue.filter(j => j.status === 'interrupted')
   const queuedJobs = queue.filter(j => j.status === 'queued')
   const runningJobs = queue.filter(j => j.status === 'running')
   const pendingJobs = queue.filter(j => j.status === 'pending')
@@ -862,6 +895,11 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
               {doneJobs.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#16a34a' }}>{doneJobs.length} completati</span>}
             </h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {interruptedJobs.length > 0 && (
+                <button onClick={handleRestartAll} className="btn-avvia-tutto" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)', boxShadow: '0 2px 8px rgba(239,68,68,0.3)' }}>
+                  <IconPlay /> Riavvia tutto
+                </button>
+              )}
               {queuedJobs.length > 0 && (
                 <button onClick={handleStartAll} className="btn-avvia-tutto">
                   <IconPlay /> Avvia tutto
@@ -897,7 +935,8 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                 <div key={job.id} className="queue-job">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: job.status === 'running' ? '6px' : 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ display: 'flex', color: '#888' }}>
+                      <span style={{ display: 'flex', color: job.status === 'interrupted' ? '#f59e0b' : '#888' }}>
+                        {job.status === 'interrupted' && <IconX />}
                         {job.status === 'queued' && <IconClock />}
                         {job.status === 'pending' && <IconClock />}
                         {job.status === 'running' && <IconRefresh />}
@@ -915,6 +954,18 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                             <IconPlay /> Avvia
                           </button>
                           <button onClick={() => handleRemoveQueued(job.id)} className="btn-secondary" style={{ fontSize: '11px', padding: '3px 6px', color: 'var(--danger)' }} title="Rimuovi">
+                            <IconXSmall />
+                          </button>
+                        </>
+                      )}
+                      {job.status === 'interrupted' && (
+                        <>
+                          <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 600 }}>Interrotto</span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{job.preview.length} file</span>
+                          <button onClick={() => handleRestartJob(job.id)} className="btn-primary" style={{ fontSize: '11px', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <IconPlay /> Riavvia
+                          </button>
+                          <button onClick={() => { queueRef.current = queueRef.current.filter(j => j.id !== job.id); setQueue([...queueRef.current]) }} className="btn-secondary" style={{ fontSize: '11px', padding: '3px 6px', color: 'var(--danger)' }}>
                             <IconXSmall />
                           </button>
                         </>
@@ -971,8 +1022,32 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
           <button onClick={closeLogs} className="nav-icon-btn" title="Chiudi"><IconX /></button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
-          {[...queuedJobs, ...pendingJobs, ...runningJobs].length > 0 && (
+          {[...interruptedJobs, ...queuedJobs, ...pendingJobs, ...runningJobs].length > 0 && (
             <div style={{ marginBottom: '16px' }}>
+              {interruptedJobs.length > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Interrotti ({interruptedJobs.length})</span>
+                  <button onClick={handleRestartAll} className="btn-avvia-tutto" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)', boxShadow: '0 2px 8px rgba(239,68,68,0.3)' }}>
+                    <IconPlay /> Riavvia tutto
+                  </button>
+                </div>
+              )}
+              {interruptedJobs.map(job => (
+                <div key={job.id} className="session-card" style={{ marginBottom: '8px', borderLeft: '3px solid #f59e0b' }}>
+                  <div style={{ padding: '8px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <strong style={{ fontSize: '13px' }}>{job.rootFolderName}</strong>
+                      <span style={{ fontSize: '11px', color: '#f59e0b', marginLeft: '8px' }}>Interrotto — {job.preview.length} file</span>
+                    </div>
+                    <button onClick={() => handleRestartJob(job.id)} className="btn-primary" style={{ fontSize: '11px', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <IconPlay /> Riavvia
+                    </button>
+                    <button onClick={() => { queueRef.current = queueRef.current.filter(j => j.id !== job.id); setQueue([...queueRef.current]) }} className="btn-secondary" style={{ fontSize: '11px', padding: '3px 6px', color: 'var(--danger)' }}>
+                      <IconXSmall />
+                    </button>
+                  </div>
+                </div>
+              ))}
               {queuedJobs.length > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>In coda ({queuedJobs.length})</span>
