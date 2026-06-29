@@ -326,9 +326,10 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
       rootFolderId: previewFolder.id,
       mode,
       organizeMedia,
-      preview: preview.map(p => ({ ...p })),
+      preview: preview.filter(p => !p.skip).map(p => ({ ...p })),
+      skipCount: preview.filter(p => p.skip).length,
       status: 'pending',
-      progress: { current: 0, total: preview.length, currentFile: '', phase: '' },
+      progress: { current: 0, total: preview.filter(p => !p.skip).length, currentFile: '', phase: '' },
       entries: [],
     }
     queueRef.current = [...queueRef.current, job]
@@ -822,9 +823,12 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                   <IconDancer />
                 </span>
               )}
-              {doneJobs.length === queue.length && (
+              {doneJobs.length > 0 && (
                 <button
-                  onClick={() => { queueRef.current = []; setQueue([]) }}
+                  onClick={() => {
+                    queueRef.current = queueRef.current.filter(j => j.status !== 'done' && j.status !== 'error')
+                    setQueue([...queueRef.current])
+                  }}
                   className="btn-secondary"
                   style={{ fontSize: '12px', padding: '4px 10px' }}
                 >
@@ -859,6 +863,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                       {job.status === 'done' && (
                         <>
                           <span style={{ color: '#16a34a' }}>{successCount} ok</span>
+                          {job.skipCount > 0 && <span style={{ color: 'var(--text-muted)', marginLeft: '6px', opacity: 0.6 }}>{job.skipCount} già ok</span>}
                           {failCount > 0 && <span style={{ color: '#dc2626', marginLeft: '6px' }}>{failCount} errori</span>}
                         </>
                       )}
