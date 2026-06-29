@@ -280,6 +280,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const [globalSimState, setGlobalSimState] = useState(null)
   const globalSimAbort = useRef(null)
   const pHashCache = useRef({})
+  const gridRef = useRef(null)
   const [sortOrder, setSortOrder] = useState('modified')
   const [navHistory, setNavHistory] = useState([])
 
@@ -352,6 +353,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     if (folderId === 'root') setSearchParams({}, { replace: true })
     else setSearchParams({ folder: folderId, name: folderName }, { replace: true })
 
+    if (gridRef.current) gridRef.current.scrollTop = 0
     if (treePhotos[folderId]) {
       setAllPhotos(treePhotos[folderId])
       return
@@ -445,6 +447,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     if (globalResults === null) pushView()
     globalTimerRef.current = setTimeout(async () => {
       setGlobalLoading(true)
+      if (gridRef.current) gridRef.current.scrollTop = 0
       try {
         const data = await searchFilesGlobal(auth.accessToken, q.trim())
         setGlobalResults(data.files || [])
@@ -603,26 +606,29 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
 
         {/* Main */}
         <div className="search-main">
-          {/* Search bar */}
-          <div className="search-bar-row" style={{ justifyContent: 'center' }}>
-            <div style={{ position: 'relative', width: '69%' }}>
-              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }}>
+          {/* Search bar + toolbar */}
+          <div className="search-bar-row">
+            <div style={{ position: 'relative', width: '38%', flexShrink: 0 }}>
+              <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }}>
                 <IconSearch />
               </span>
               <input
                 className="search-input"
-                style={{ paddingLeft: '36px', paddingRight: globalQuery ? '36px' : '14px', width: '100%', boxSizing: 'border-box', fontSize: '15px', padding: '10px 14px 10px 36px' }}
+                style={{ paddingLeft: '32px', paddingRight: globalQuery ? '32px' : '10px', width: '100%', boxSizing: 'border-box', fontSize: '13px', padding: '7px 10px 7px 32px' }}
                 placeholder="Cerca ovunque in Drive..."
                 value={globalQuery}
                 onChange={e => handleGlobalSearch(e.target.value)}
               />
               {globalQuery && (
-                <button onClick={() => { setGlobalQuery(''); setGlobalResults(null) }} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px' }}>
+                <button onClick={() => { setGlobalQuery(''); setGlobalResults(null) }} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px' }}>
                   <IconX />
                 </button>
               )}
             </div>
-            <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginRight: 6, whiteSpace: 'nowrap' }}>
+                {loading || globalLoading ? 'Caricamento...' : `${results.length} foto`}
+              </span>
               {GRID_MODES.map(({ key, icon: Icon, label }) => (
                 <button key={key} onClick={() => setThumbSize(key)} className={`thumb-size-btn${thumbSize === key ? ' active' : ''}`} title={label}>
                   <Icon />
@@ -636,9 +642,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                 <IconSortDate />
               </button>
             </div>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)', flexShrink: 0 }}>
-              {loading || globalLoading ? 'Caricamento...' : `${results.length} foto`}
-            </span>
           </div>
 
           {/* Back button + tag cloud row */}
@@ -695,6 +698,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
             </div>
           ) : (
             <div
+              ref={gridRef}
               className={thumbSize === 'masonry' ? 'search-masonry' : 'search-grid'}
               style={thumbSize !== 'masonry' ? { '--thumb-size': `${THUMB_SIZES[thumbSize]}px` } : undefined}
             >
