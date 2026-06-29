@@ -1,3 +1,31 @@
+export const searchFilesGlobal = async (accessToken, query) => {
+  const allFiles = []
+  let pageToken = null
+  const escaped = query.replace(/'/g, "\\'")
+  const q = `name contains '${escaped}' and trashed = false and (mimeType contains 'image/' or mimeType contains 'video/')`
+
+  do {
+    const params = new URLSearchParams({
+      q,
+      spaces: 'drive',
+      fields: 'files(id,name,mimeType,size,createdTime,modifiedTime,thumbnailLink),nextPageToken',
+      pageSize: 100,
+    })
+    if (pageToken) params.set('pageToken', pageToken)
+
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (response.status === 401) throw Object.assign(new Error('Failed to search files'), { status: 401 })
+    if (!response.ok) throw new Error('Failed to search files')
+    const data = await response.json()
+    allFiles.push(...(data.files || []))
+    pageToken = data.nextPageToken || null
+  } while (pageToken)
+
+  return { files: allFiles }
+}
+
 export const listFiles = async (accessToken, folderId = 'root') => {
   const allFiles = []
   let pageToken = null

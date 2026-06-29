@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import logoSrc from '../assets/logo-br.svg'
-import { listFiles } from '../drive'
+import { listFiles, searchFilesGlobal } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
 import './SearchPage.css'
 
@@ -177,6 +177,10 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
   const [recentQueries, setRecentQueries] = useState(() => {
     try { return JSON.parse(localStorage.getItem(SEARCH_QUERIES_KEY)) || [] } catch { return [] }
   })
+  const [globalQuery, setGlobalQuery] = useState('')
+  const [globalResults, setGlobalResults] = useState(null)
+  const [globalLoading, setGlobalLoading] = useState(false)
+  const globalTimerRef = useRef(null)
   const [similarTo, setSimilarTo] = useState(null)
   const [similarResults, setSimilarResults] = useState([])
   const [similarLoading, setSimilarLoading] = useState(false)
@@ -226,6 +230,23 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
     }
   }
 
+  const handleGlobalSearch = (q) => {
+    setGlobalQuery(q)
+    clearTimeout(globalTimerRef.current)
+    if (!q.trim()) { setGlobalResults(null); return }
+    globalTimerRef.current = setTimeout(async () => {
+      setGlobalLoading(true)
+      try {
+        const data = await searchFilesGlobal(auth.accessToken, q.trim())
+        setGlobalResults(data.files || [])
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setGlobalLoading(false)
+      }
+    }, 500)
+  }
+
   const handleSimilarity = useCallback(async (photo) => {
     if (!photo.thumbnailLink) return
     setSimilarLoading(true)
@@ -257,10 +278,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
   }, [allPhotos])
 
   const results = useMemo(() => {
+    if (globalResults !== null) return globalResults
     let list = similarTo ? similarResults : allPhotos
     if (query) list = list.filter(f => f.name.toLowerCase().includes(query.toLowerCase()))
     return list
-  }, [allPhotos, query, similarTo, similarResults])
+  }, [allPhotos, query, similarTo, similarResults, globalResults])
 
   return (
     <div className="search-page-bg">
@@ -332,6 +354,31 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
         <div className="search-main">
           {/* Search bar */}
           <div className="search-bar-row">
+            {/* Global search */}
+            <div style={{ position: 'relative', flex: 1 }}>
+              <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }}>
+                <IconSearch />
+              </span>
+              <input
+                className="search-input"
+                style={{ paddingLeft: '32px' }}
+                placeholder="Cerca ovunque in Drive..."
+                value={globalQuery}
+                onChange={e => handleGlobalSearch(e.target.value)}
+              />
+              {globalQuery && (
+                <button onClick={() => { setGlobalQuery(''); setGlobalResults(null) }} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px' }}>
+                  <IconX />
+                </button>
+              )}
+              {globalResults !== null && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', whiteSpace: 'nowrap' }}>
+                  {globalLoading ? 'Ricerca...' : `${globalResults.length} risultati globali`}
+                </div>
+              )}
+            </div>
+            <div style={{ width: 1, height: 28, background: 'var(--border)', flexShrink: 0 }} />
+            {/* Folder search */}
             <div style={{ position: 'relative', flex: 1 }}>
               <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }}>
                 <IconSearch />
@@ -357,7 +404,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme }) {
               ))}
             </div>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)', flexShrink: 0 }}>
-              {loading ? 'Caricamento...' : `${results.length} foto`}
+              {loading || globalLoading ? 'Caricamento...' : `${results.length} foto`}
             </span>
           </div>
 
