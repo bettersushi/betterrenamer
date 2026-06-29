@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import logoSrc from '../assets/logo-br.svg'
-import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata, patchFileMetadata } from '../drive'
+import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata, patchFileMetadata, trashFile, restoreFile, copyFile, moveFile, renameFile } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
 import SimilarityBalloon from '../components/SimilarityBalloon'
 import ScopePickerModal from '../components/ScopePickerModal'
 import DriveStatsModal from '../components/DriveStatsModal'
+import PhotoContextMenu from '../components/PhotoContextMenu'
+import FolderPickerModal from '../components/FolderPickerModal'
 import CropModal from '../components/CropModal'
 import './SearchPage.css'
 
@@ -29,6 +31,29 @@ function isMediaFile(f) {
 function isVideoFile(f) {
   if (f.mimeType && f.mimeType.includes('video')) return true
   return VIDEO_EXTENSIONS.has(getExt(f.name))
+}
+
+function RenameModal({ photo, onClose, onConfirm }) {
+  const [name, setName] = useState(photo.name)
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{ background: 'var(--surface)', borderRadius: 14, padding: '20px 22px', width: 360, maxWidth: '92vw', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', border: '1px solid var(--border)' }}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: 'var(--text-primary)' }}>Rinomina file</div>
+        <input
+          autoFocus
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') onConfirm(name); if (e.key === 'Escape') onClose() }}
+          style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', marginBottom: 14 }}
+        />
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Annulla</button>
+          <button onClick={() => onConfirm(name)} style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Rinomina</button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function formatDuration(ms) {
@@ -208,6 +233,11 @@ const IconSortDate = () => (
     <polyline points="12 14 12 18 15 18"/>
   </svg>
 )
+const IconDots = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+    <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+  </svg>
+)
 const IconChevronLeft = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="15 18 9 12 15 6"/>
@@ -317,6 +347,10 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const [cropPhoto, setCropPhoto] = useState(null)
   const [scopePickerPhoto, setScopePickerPhoto] = useState(null)
   const [showStats, setShowStats] = useState(false)
+  const [contextMenu, setContextMenu] = useState(null) // { photo, idx, x, y }
+  const [movePhoto, setMovePhoto] = useState(null)
+  const [renamePhoto, setRenamePhoto] = useState(null)
+  const [undoToast, setUndoToast] = useState(null) // { photo, insertIdx, timer }
   const [croppingIds, setCroppingIds] = useState(new Set())
   const [cropDoneIds, setCropDoneIds] = useState(new Set())
   const [rotatingIds, setRotatingIds] = useState(new Set())
@@ -569,6 +603,71 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     } finally {
       setRotatingIds(ids => { const n = new Set(ids); n.delete(photo.id); return n })
     }
+  }, [auth.accessToken])
+
+  const handleDelete = useCallback(async (photo) => {
+    const insertIdx = allPhotos.findIndex(p => p.id === photo.id)
+    setAllPhotos(photos => photos.filter(p => p.id !== photo.id))
+    try { await trashFile(auth.accessToken, photo.id) } catch (e) { console.error(e) }
+    if (undoToast?.timer) clearTimeout(undoToast.timer)
+    const timer = setTimeout(() => setUndoToast(null), 5000)
+    setUndoToast({ photo, insertIdx, timer })
+  }, [auth.accessToken, allPhotos, undoToast])
+
+  const handleUndoDelete = useCallback(async () => {
+    if (!undoToast) return
+    clearTimeout(undoToast.timer)
+    try { await restoreFile(auth.accessToken, undoToast.photo.id) } catch (e) { console.error(e) }
+    setAllPhotos(photos => {
+      const next = [...photos]
+      const idx = Math.min(undoToast.insertIdx, next.length)
+      next.splice(idx, 0, undoToast.photo)
+      return next
+    })
+    setUndoToast(null)
+  }, [auth.accessToken, undoToast])
+
+  const handleDownload = useCallback(async (photo) => {
+    try {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${photo.id}?alt=media`, {
+        headers: { Authorization: `Bearer ${auth.accessToken}` },
+      })
+      if (!res.ok) throw new Error('Download failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = photo.name; a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (e) { console.error(e) }
+  }, [auth.accessToken])
+
+  const handleDuplicate = useCallback(async (photo) => {
+    try {
+      const copy = await copyFile(auth.accessToken, photo.id)
+      setAllPhotos(photos => {
+        const idx = photos.findIndex(p => p.id === photo.id)
+        const next = [...photos]
+        next.splice(idx + 1, 0, { ...photo, ...copy })
+        return next
+      })
+    } catch (e) { console.error(e) }
+  }, [auth.accessToken])
+
+  const handleMove = useCallback(async (photo, targetFolder) => {
+    const oldParentId = photo.parents?.[0]
+    if (!oldParentId || oldParentId === targetFolder.id) return
+    try {
+      await moveFile(auth.accessToken, photo.id, targetFolder.id, oldParentId)
+      setAllPhotos(photos => photos.filter(p => p.id !== photo.id))
+    } catch (e) { console.error(e) }
+  }, [auth.accessToken])
+
+  const handleRename = useCallback(async (photo, newName) => {
+    if (!newName.trim() || newName === photo.name) return
+    try {
+      await renameFile(auth.accessToken, photo.id, newName.trim())
+      setAllPhotos(photos => photos.map(p => p.id === photo.id ? { ...p, name: newName.trim() } : p))
+    } catch (e) { console.error(e) }
   }, [auth.accessToken])
 
   const handleSimilarity = useCallback(async (photo) => {
@@ -830,7 +929,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
               {thumbSize === 'masonry' ? (
                 <div className="search-masonry">
                   {results.map((photo, idx) => (
-                    <div key={photo.id} className="masonry-card" onClick={() => setSlideshowIdx(idx)}>
+                    <div key={photo.id} className="masonry-card" onClick={() => setSlideshowIdx(idx)} onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}>
                       {photo.thumbnailLink ? (
                         <LazyPhoto
                           key={thumbTimestamps[photo.id] || photo.id}
@@ -861,16 +960,14 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                         <div className="search-similar-badge">identica</div>
                       )}
                       <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
-                        <button className="thumb-overlay-btn" title="Cerca simili in cartella" onClick={() => handleSimilarity(photo)}><IconSimilar /></button>
-                        <button className="thumb-overlay-btn" title="Cerca simili per scope" onClick={() => setScopePickerPhoto(photo)}><IconGlobalSimilar /></button>
                         <button className="thumb-overlay-btn" title="Vai alla cartella" onClick={() => handleFolderJump(photo)}><IconFolderJump /></button>
-                        <button className="thumb-overlay-btn" title="QuickLook" onClick={() => setSlideshowIdx(idx)}><IconEye /></button>
                         {photo.thumbnailLink && (
                           <button className="thumb-overlay-btn" title="Crop" onClick={() => setCropPhoto(photo)}><IconCrop /></button>
                         )}
                         {photo.thumbnailLink && (
                           <button className="thumb-overlay-btn" title="Ruota 90° sx" onClick={() => handleRotate(photo)}><IconRotateCCW /></button>
                         )}
+                        <button className="thumb-overlay-btn" title="Altre azioni" onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setContextMenu({ photo, idx, x: r.left, y: r.bottom + 4 }) }}><IconDots /></button>
                       </div>
                       {(croppingIds.has(photo.id) || cropDoneIds.has(photo.id) || rotatingIds.has(photo.id) || rotateDoneIds.has(photo.id)) && (
                         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: (croppingIds.has(photo.id) || rotatingIds.has(photo.id)) ? 'rgba(0,0,0,0.55)' : 'rgba(16,185,129,0.7)', borderRadius: 8, pointerEvents: 'none', transition: 'background 0.3s' }}>
@@ -887,7 +984,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
               ) : (
                 <div className="search-grid" style={{ '--thumb-size': `${THUMB_SIZES[thumbSize]}px` }}>
                 {results.map((photo, idx) => (
-                  <div key={photo.id} className="thumb-card" onClick={() => setSlideshowIdx(idx)}>
+                  <div key={photo.id} className="thumb-card" onClick={() => setSlideshowIdx(idx)} onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}>
                     {photo.thumbnailLink ? (
                       <LazyPhoto
                         key={thumbTimestamps[photo.id] || photo.id}
@@ -910,16 +1007,14 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                       <div className="search-similar-badge">identica</div>
                     )}
                     <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
-                      <button className="thumb-overlay-btn" title="Cerca simili in cartella" onClick={() => handleSimilarity(photo)}><IconSimilar /></button>
-                      <button className="thumb-overlay-btn" title="Cerca simili per scope" onClick={() => setScopePickerPhoto(photo)}><IconGlobalSimilar /></button>
                       <button className="thumb-overlay-btn" title="Vai alla cartella" onClick={() => handleFolderJump(photo)}><IconFolderJump /></button>
-                      <button className="thumb-overlay-btn" title="QuickLook" onClick={() => setSlideshowIdx(idx)}><IconEye /></button>
                       {photo.thumbnailLink && (
                         <button className="thumb-overlay-btn" title="Crop" onClick={() => setCropPhoto(photo)}><IconCrop /></button>
                       )}
                       {photo.thumbnailLink && (
                         <button className="thumb-overlay-btn" title="Ruota 90° sx" onClick={() => handleRotate(photo)}><IconRotateCCW /></button>
                       )}
+                      <button className="thumb-overlay-btn" title="Altre azioni" onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setContextMenu({ photo, idx, x: r.left, y: r.bottom + 4 }) }}><IconDots /></button>
                     </div>
                     {(croppingIds.has(photo.id) || cropDoneIds.has(photo.id) || rotatingIds.has(photo.id) || rotateDoneIds.has(photo.id)) && (
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: (croppingIds.has(photo.id) || rotatingIds.has(photo.id)) ? 'rgba(0,0,0,0.55)' : 'rgba(16,185,129,0.7)', borderRadius: 8, pointerEvents: 'none', transition: 'background 0.3s' }}>
@@ -968,6 +1063,54 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           onClose={() => removeBalloon(b.id)}
         />
       ))}
+      {/* Context menu */}
+      {contextMenu && (
+        <PhotoContextMenu
+          photo={contextMenu.photo}
+          idx={contextMenu.idx}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          actions={{
+            onQuickLook: (idx) => setSlideshowIdx(idx),
+            onSimilarity: handleSimilarity,
+            onScopeSearch: setScopePickerPhoto,
+            onRename: (photo) => setRenamePhoto(photo),
+            onDuplicate: handleDuplicate,
+            onDownload: handleDownload,
+            onMove: (photo) => setMovePhoto(photo),
+            onDelete: handleDelete,
+          }}
+        />
+      )}
+
+      {/* Rename modal */}
+      {renamePhoto && (
+        <RenameModal
+          photo={renamePhoto}
+          onClose={() => setRenamePhoto(null)}
+          onConfirm={(newName) => { handleRename(renamePhoto, newName); setRenamePhoto(null) }}
+        />
+      )}
+
+      {/* Move modal */}
+      {movePhoto && (
+        <FolderPickerModal
+          accessToken={auth.accessToken}
+          title={`Sposta "${movePhoto.name}"`}
+          onClose={() => setMovePhoto(null)}
+          onConfirm={(folder) => { handleMove(movePhoto, folder); setMovePhoto(null) }}
+        />
+      )}
+
+      {/* Undo toast */}
+      {undoToast && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.18)', zIndex: 3000, fontSize: 13 }}>
+          <span>🗑 <strong>{undoToast.photo.name}</strong> eliminato</span>
+          <button onClick={handleUndoDelete} style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>Annulla</button>
+        </div>
+      )}
+
       {showStats && (
         <DriveStatsModal
           folderName={activeFolderName || 'My Drive'}

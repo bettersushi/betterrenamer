@@ -187,6 +187,22 @@ export const getFileMetadata = async (accessToken, fileId) => {
   return response.json()
 }
 
+export const trashFile = async (accessToken, fileId) =>
+  patchFileMetadata(accessToken, fileId, { trashed: true })
+
+export const restoreFile = async (accessToken, fileId) =>
+  patchFileMetadata(accessToken, fileId, { trashed: false })
+
+export const copyFile = async (accessToken, fileId) => {
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/copy?fields=id,name,mimeType,size,modifiedTime,thumbnailLink,parents,videoMediaMetadata`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  })
+  if (!res.ok) throw new Error('Failed to copy file')
+  return res.json()
+}
+
 export const patchFileMetadata = async (accessToken, fileId, fields) => {
   const response = await fetch(
     `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,modifiedTime`,
