@@ -503,13 +503,19 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     setGlobalQuery(q)
     clearTimeout(globalTimerRef.current)
     if (!q.trim()) { setGlobalResults(null); return }
-    if (globalResults === null) pushView()
     globalTimerRef.current = setTimeout(async () => {
       setGlobalLoading(true)
       if (gridRef.current) gridRef.current.scrollTop = 0
       try {
         const data = await searchFilesGlobal(auth.accessToken, q.trim())
-        setGlobalResults(data.files || [])
+        const files = data.files || []
+        setGlobalResults(files)
+        // Add history tag after results arrive, with the correct query and snapshot
+        setNavHistory(h => {
+          const snapshot = { activeFolderId, activeFolderName, allPhotos, globalQuery: q, globalResults: files, similarTo: null, similarResults: [] }
+          const entry = { type: 'search', label: q, key: 'q:' + q, Icon: IconSearch, snapshot }
+          return [entry, ...h.filter(e => e.key !== entry.key)].slice(0, 10)
+        })
       } catch (e) { console.error(e) }
       finally { setGlobalLoading(false) }
     }, 500)
