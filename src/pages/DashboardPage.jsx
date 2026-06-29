@@ -270,9 +270,13 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
   // Persist active jobs on unload
   useEffect(() => {
     const handler = () => {
-      const toSave = queueRef.current.filter(j => j.status === 'queued' || j.status === 'pending' || j.status === 'running' || j.status === 'interrupted')
-      if (toSave.length > 0) localStorage.setItem('br_queue_interrupted', JSON.stringify(toSave))
-      else localStorage.removeItem('br_queue_interrupted')
+      const toSave = queueRef.current
+        .filter(j => j.status === 'queued' || j.status === 'pending' || j.status === 'running' || j.status === 'interrupted')
+        .map(j => ({ ...j, entries: [] })) // strip log entries to save space
+      try {
+        if (toSave.length > 0) localStorage.setItem('br_queue_interrupted', JSON.stringify(toSave))
+        else localStorage.removeItem('br_queue_interrupted')
+      } catch { /* quota exceeded — skip */ }
     }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
