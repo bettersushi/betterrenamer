@@ -738,7 +738,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                         <div className="thumb-no-preview">📄</div>
                       )}
                       {isVideoFile(photo) && (
-                        <div style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.55)', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', pointerEvents: 'none' }}>
+                        <div className="video-icon-badge" style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', pointerEvents: 'none' }}>
                           <IconVideoFile />
                         </div>
                       )}

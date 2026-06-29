@@ -294,10 +294,27 @@
 
 .masonry-card .thumb-overlay {
   opacity: 0;
+  bottom: auto;
+  top: 8px;
+  right: 8px;
+  left: auto;
+  transform: none;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .masonry-card:hover .thumb-overlay {
   opacity: 1;
+}
+
+.masonry-card .thumb-overlay-btn {
+  width: 32px;
+  height: 32px;
+}
+
+.masonry-card .video-icon-badge {
+  width: 40px;
+  height: 40px;
 }
 
 .lazy-photo-wrap {
