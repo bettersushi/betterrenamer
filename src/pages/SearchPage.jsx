@@ -403,7 +403,12 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const [thumbSize, setThumbSizeRaw] = useState(() => localStorage.getItem('br_thumb_size') || 'md')
   const setThumbSize = (v) => { setThumbSizeRaw(v); localStorage.setItem('br_thumb_size', v) }
   const [sortOrder, setSortOrder] = useState('modified')
-  const [navHistory, setNavHistory] = useState([])
+  const [navHistory, setNavHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem('br_nav_history')
+      return saved ? JSON.parse(saved).map(e => ({ ...e, Icon: e.type === 'search' ? IconSearch : e.type === 'folder' ? IconFolder : IconSimilar })) : []
+    } catch { return [] }
+  })
 
   // Universal view history stack
   const [viewStack, setViewStack] = useState([])
@@ -434,18 +439,27 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     return () => window.removeEventListener('mouseup', up)
   }, [])
 
+  const saveNavHistory = (entries) => {
+    try {
+      localStorage.setItem('br_nav_history', JSON.stringify(entries.map(({ Icon, snapshot, ...rest }) => rest)))
+    } catch {}
+  }
+
   const pushView = () => {
     const snapshot = { activeFolderId, activeFolderName, allPhotos, globalQuery, globalResults, similarTo, similarResults }
-    // derive history entry from current state
     let entry
     if (similarTo) {
       entry = { type: 'similarity', label: similarTo.name, key: 'sim:' + similarTo.id, Icon: IconSimilar, snapshot }
     } else if (globalResults !== null) {
-      entry = { type: 'search', label: globalQuery || 'Ricerca', key: 'q:' + globalQuery, Icon: IconSearch, snapshot }
+      entry = { type: 'search', label: globalQuery || 'Ricerca', key: 'q:' + globalQuery, query: globalQuery, Icon: IconSearch, snapshot }
     } else {
-      entry = { type: 'folder', label: activeFolderName, key: 'f:' + activeFolderId, Icon: IconFolder, snapshot }
+      entry = { type: 'folder', label: activeFolderName, key: 'f:' + activeFolderId, folderId: activeFolderId, Icon: IconFolder, snapshot }
     }
-    setNavHistory(h => [entry, ...h.filter(e => e.key !== entry.key)].slice(0, 10))
+    setNavHistory(h => {
+      const next = [entry, ...h.filter(e => e.key !== entry.key)].slice(0, 10)
+      saveNavHistory(next)
+      return next
+    })
     setViewStack(s => [...s, snapshot])
   }
   const restoreState = (snapshot) => {
@@ -618,8 +632,10 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
         // Add history tag after results arrive, with the correct query and snapshot
         setNavHistory(h => {
           const snapshot = { activeFolderId, activeFolderName, allPhotos, globalQuery: q, globalResults: files, similarTo: null, similarResults: [] }
-          const entry = { type: 'search', label: q, key: 'q:' + q, Icon: IconSearch, snapshot }
-          return [entry, ...h.filter(e => e.key !== entry.key)].slice(0, 10)
+          const entry = { type: 'search', label: q, key: 'q:' + q, query: q, Icon: IconSearch, snapshot }
+          const next = [entry, ...h.filter(e => e.key !== entry.key)].slice(0, 10)
+          saveNavHistory(next)
+          return next
         })
       } catch (e) { console.error(e) }
       finally { setGlobalLoading(false) }
@@ -1004,7 +1020,15 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
             {navHistory.length > 0 && (
               <div className="sub-toolbar-tags">
                 {navHistory.map(entry => (
-                  <button key={entry.key} className="history-tag" onClick={() => restoreState(entry.snapshot)} title={entry.label}>
+                  <button key={entry.key} className="history-tag" onClick={() => {
+                    if (entry.snapshot) {
+                      restoreState(entry.snapshot)
+                    } else if (entry.type === 'folder') {
+                      selectFolder(entry.folderId, entry.label)
+                    } else if (entry.type === 'search') {
+                      handleGlobalSearch(entry.query)
+                    }
+                  }} title={entry.label}>
                     <entry.Icon />
                     <span>{entry.label}</span>
                   </button>
