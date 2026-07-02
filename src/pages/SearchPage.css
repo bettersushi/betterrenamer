@@ -665,8 +665,10 @@
 
 .thumb-card.selected .lazy-photo-wrap,
 .masonry-card.selected .lazy-photo-wrap {
-  transform: scale(0.93);
+  transform: scale(0.97);
   transition: transform 0.15s;
+  border-radius: 5px;
+  overflow: hidden;
 }
 
 .selection-check { display: none; }
