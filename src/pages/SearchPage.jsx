@@ -277,6 +277,26 @@ const IconMoon = () => (
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
   </svg>
 )
+const IconCheckSquare = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+  </svg>
+)
+const IconTrash = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+  </svg>
+)
+const IconDownloadBulk = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+  </svg>
+)
+const IconMoveBulk = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><line x1="12" y1="11" x2="12" y2="17"/><polyline points="9 14 12 17 15 14"/>
+  </svg>
+)
 const IconSpinner = () => (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
     <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" style={{ animation: 'spin 1s linear infinite' }}/>
@@ -371,6 +391,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const [cropDoneIds, setCropDoneIds] = useState(new Set())
   const [rotatingIds, setRotatingIds] = useState(new Set())
   const [rotateDoneIds, setRotateDoneIds] = useState(new Set())
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [bulkMoveActive, setBulkMoveActive] = useState(false)
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
+  const isDraggingSelect = useRef(false)
   const [currentSubfolders, setCurrentSubfolders] = useState([])
   const [thumbTimestamps, setThumbTimestamps] = useState({}) // forza reload thumbnail dopo crop
   const pHashCache = useRef({})
@@ -387,6 +412,27 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     setBalloons(bs => bs.map(b => b.id === id ? { ...b, ...patch } : b)), [])
   const removeBalloon = useCallback((id) =>
     setBalloons(bs => bs.filter(b => b.id !== id)), [])
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false)
+    setSelectedIds(new Set())
+    setBulkDeleteConfirm(false)
+    isDraggingSelect.current = false
+  }, [])
+
+  const toggleSelection = useCallback((photoId) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(photoId) ? next.delete(photoId) : next.add(photoId)
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    const up = () => { isDraggingSelect.current = false }
+    window.addEventListener('mouseup', up)
+    return () => window.removeEventListener('mouseup', up)
+  }, [])
 
   const pushView = () => {
     const snapshot = { activeFolderId, activeFolderName, allPhotos, globalQuery, globalResults, similarTo, similarResults }
@@ -685,6 +731,45 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     } catch (e) { console.error(e) }
   }, [auth.accessToken])
 
+  const handleBulkDelete = useCallback(async (currentResults) => {
+    const ids = [...selectedIds]
+    setAllPhotos(photos => photos.filter(p => !selectedIds.has(p.id)))
+    exitSelectionMode()
+    await Promise.all(ids.map(id => trashFile(auth.accessToken, id).catch(console.error)))
+  }, [auth.accessToken, selectedIds, exitSelectionMode])
+
+  const handleBulkDownload = useCallback(async (currentResults) => {
+    const photos = currentResults.filter(p => selectedIds.has(p.id))
+    for (const photo of photos) {
+      try {
+        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${photo.id}?alt=media`, {
+          headers: { Authorization: `Bearer ${auth.accessToken}` },
+        })
+        if (!res.ok) continue
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url; a.download = photo.name; a.click()
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+        await new Promise(r => setTimeout(r, 300))
+      } catch (e) { console.error(e) }
+    }
+  }, [auth.accessToken, selectedIds])
+
+  const handleBulkMove = useCallback(async (targetFolder) => {
+    const ids = new Set(selectedIds)
+    setBulkMoveActive(false)
+    exitSelectionMode()
+    setAllPhotos(photos => {
+      photos.filter(p => ids.has(p.id)).forEach(p => {
+        const oldParentId = p.parents?.[0]
+        if (oldParentId && oldParentId !== targetFolder.id)
+          moveFile(auth.accessToken, p.id, targetFolder.id, oldParentId).catch(console.error)
+      })
+      return photos.filter(p => !ids.has(p.id))
+    })
+  }, [auth.accessToken, selectedIds, exitSelectionMode])
+
   const handleRename = useCallback(async (photo, newName) => {
     if (!newName.trim() || newName === photo.name) return
     try {
@@ -890,6 +975,19 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                   <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
                 </svg>
               </button>
+              <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
+              <button
+                onClick={() => { setSelectionMode(m => !m); setSelectedIds(new Set()); setBulkDeleteConfirm(false) }}
+                className={`thumb-size-btn${selectionMode ? ' active' : ''}`}
+                title={selectionMode ? 'Esci dalla selezione' : 'Seleziona foto'}
+              >
+                <IconCheckSquare />
+              </button>
+              {selectionMode && (
+                <span style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600, marginLeft: 2, whiteSpace: 'nowrap' }}>
+                  {selectedIds.size > 0 ? `${selectedIds.size} sel.` : 'Seleziona'}
+                </span>
+              )}
             </div>
           </div>
 
@@ -957,7 +1055,14 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
               {thumbSize === 'masonry' ? (
                 <div className="search-masonry">
                   {results.map((photo, idx) => (
-                    <div key={photo.id} className="masonry-card" onClick={() => setSlideshowIdx(idx)} onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}>
+                    <div
+                      key={photo.id}
+                      className={`masonry-card${selectedIds.has(photo.id) ? ' selected' : ''}`}
+                      onClick={() => selectionMode ? toggleSelection(photo.id) : setSlideshowIdx(idx)}
+                      onMouseDown={() => { if (selectionMode) { isDraggingSelect.current = true; toggleSelection(photo.id) } }}
+                      onMouseEnter={() => { if (selectionMode && isDraggingSelect.current) setSelectedIds(prev => new Set([...prev, photo.id])) }}
+                      onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
+                    >
                       {photo.thumbnailLink ? (
                         <LazyPhoto
                           key={thumbTimestamps[photo.id] || photo.id}
@@ -987,7 +1092,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                       {similarTo && photo._dist !== undefined && photo._dist === 0 && (
                         <div className="search-similar-badge">identica</div>
                       )}
-                      <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
+                      {!selectionMode && <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
                         <button className="thumb-overlay-btn" title="Vai alla cartella" onClick={() => handleFolderJump(photo)}><IconFolderJump /></button>
                         {photo.thumbnailLink && (
                           <button className="thumb-overlay-btn" title="Crop" onClick={() => setCropPhoto(photo)}><IconCrop /></button>
@@ -996,7 +1101,10 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                           <button className="thumb-overlay-btn" title="Ruota 90° sx" onClick={() => handleRotate(photo)}><IconRotateCCW /></button>
                         )}
                         <button className="thumb-overlay-btn" title="Altre azioni" onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setContextMenu({ photo, idx, x: r.left, y: r.bottom + 4 }) }}><IconDots /></button>
-                      </div>
+                      </div>}
+                      {selectionMode && (
+                        <div className={`selection-check${selectedIds.has(photo.id) ? ' checked' : ''}`} />
+                      )}
                       {(croppingIds.has(photo.id) || cropDoneIds.has(photo.id) || rotatingIds.has(photo.id) || rotateDoneIds.has(photo.id)) && (
                         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: (croppingIds.has(photo.id) || rotatingIds.has(photo.id)) ? 'rgba(0,0,0,0.55)' : 'rgba(16,185,129,0.7)', borderRadius: 8, pointerEvents: 'none', transition: 'background 0.3s' }}>
                           {(croppingIds.has(photo.id) || rotatingIds.has(photo.id)) ? (
@@ -1012,7 +1120,14 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
               ) : (
                 <div className="search-grid" style={{ '--thumb-size': `${THUMB_SIZES[thumbSize]}px` }}>
                 {results.map((photo, idx) => (
-                  <div key={photo.id} className="thumb-card" onClick={() => setSlideshowIdx(idx)} onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}>
+                  <div
+                    key={photo.id}
+                    className={`thumb-card${selectedIds.has(photo.id) ? ' selected' : ''}`}
+                    onClick={() => selectionMode ? toggleSelection(photo.id) : setSlideshowIdx(idx)}
+                    onMouseDown={() => { if (selectionMode) { isDraggingSelect.current = true; toggleSelection(photo.id) } }}
+                    onMouseEnter={() => { if (selectionMode && isDraggingSelect.current) setSelectedIds(prev => new Set([...prev, photo.id])) }}
+                    onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
+                  >
                     {photo.thumbnailLink ? (
                       <LazyPhoto
                         key={thumbTimestamps[photo.id] || photo.id}
@@ -1034,7 +1149,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                     {similarTo && photo._dist !== undefined && photo._dist === 0 && (
                       <div className="search-similar-badge">identica</div>
                     )}
-                    <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
+                    {!selectionMode && <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
                       <button className="thumb-overlay-btn" title="Vai alla cartella" onClick={() => handleFolderJump(photo)}><IconFolderJump /></button>
                       {photo.thumbnailLink && (
                         <button className="thumb-overlay-btn" title="Crop" onClick={() => setCropPhoto(photo)}><IconCrop /></button>
@@ -1043,7 +1158,10 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                         <button className="thumb-overlay-btn" title="Ruota 90° sx" onClick={() => handleRotate(photo)}><IconRotateCCW /></button>
                       )}
                       <button className="thumb-overlay-btn" title="Altre azioni" onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setContextMenu({ photo, idx, x: r.left, y: r.bottom + 4 }) }}><IconDots /></button>
-                    </div>
+                    </div>}
+                    {selectionMode && (
+                      <div className={`selection-check${selectedIds.has(photo.id) ? ' checked' : ''}`} />
+                    )}
                     {(croppingIds.has(photo.id) || cropDoneIds.has(photo.id) || rotatingIds.has(photo.id) || rotateDoneIds.has(photo.id)) && (
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: (croppingIds.has(photo.id) || rotatingIds.has(photo.id)) ? 'rgba(0,0,0,0.55)' : 'rgba(16,185,129,0.7)', borderRadius: 8, pointerEvents: 'none', transition: 'background 0.3s' }}>
                         {(croppingIds.has(photo.id) || rotatingIds.has(photo.id)) ? (
@@ -1130,6 +1248,48 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           onClose={() => setMovePhoto(null)}
           onConfirm={(folder) => { handleMove(movePhoto, folder); setMovePhoto(null) }}
         />
+      )}
+
+      {/* Bulk move modal */}
+      {bulkMoveActive && (
+        <FolderPickerModal
+          accessToken={auth.accessToken}
+          title={`Sposta ${selectedIds.size} foto in...`}
+          onClose={() => setBulkMoveActive(false)}
+          onConfirm={(folder) => handleBulkMove(folder)}
+        />
+      )}
+
+      {/* Bulk action bar */}
+      {selectionMode && selectedIds.size > 0 && (
+        <div className="bulk-action-bar">
+          {bulkDeleteConfirm ? (
+            <>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Elimina {selectedIds.size} foto?</span>
+              <button className="bulk-btn bulk-btn-danger" onClick={() => handleBulkDelete(results)}>Conferma</button>
+              <button className="bulk-btn" onClick={() => setBulkDeleteConfirm(false)}>Annulla</button>
+            </>
+          ) : (
+            <>
+              <span className="bulk-count">{selectedIds.size} selezionate</span>
+              <button className="bulk-btn" onClick={() => setSelectedIds(new Set(results.map(p => p.id)))}>
+                Seleziona tutto ({results.length})
+              </button>
+              <div className="bulk-divider" />
+              <button className="bulk-btn" onClick={() => handleBulkDownload(results)} title="Download">
+                <IconDownloadBulk /> Download
+              </button>
+              <button className="bulk-btn" onClick={() => setBulkMoveActive(true)} title="Sposta in...">
+                <IconMoveBulk /> Sposta in...
+              </button>
+              <button className="bulk-btn bulk-btn-danger" onClick={() => setBulkDeleteConfirm(true)} title="Elimina">
+                <IconTrash /> Elimina
+              </button>
+              <div className="bulk-divider" />
+              <button className="bulk-btn" onClick={exitSelectionMode} title="Annulla selezione">✕</button>
+            </>
+          )}
+        </div>
       )}
 
       {/* Undo toast */}
