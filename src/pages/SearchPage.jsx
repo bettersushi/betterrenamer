@@ -438,7 +438,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   }, [])
 
   const handleGridMouseDown = useCallback((e) => {
-    if (!selectionMode) return
+    if (!selectionMode || e.button !== 0) return
     const container = gridRef.current
     if (!container) return
     const cr = container.getBoundingClientRect()
