@@ -246,6 +246,9 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
   const [separator, setSeparator] = useState('_')
   const [startNumber, setStartNumber] = useState(1)
   const [padding, setPadding] = useState(3)
+  const [customPrefix, setCustomPrefix] = useState('')
+  const [customAddSeq, setCustomAddSeq] = useState(true)
+  const [customSeqSeparator, setCustomSeqSeparator] = useState('-')
 
   // Preview inline
   const [preview, setPreview] = useState([])
@@ -675,6 +678,10 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
           if (pattern === 'folder-ext-seq') newName = `${currentFolder.name}${separator}${extName}${separator}${num}${ext}`
           else if (pattern === 'seq-ext') newName = `${num}${separator}${extName}${ext}`
           else if (pattern === 'folder-seq') newName = `${currentFolder.name}${separator}${num}${ext}`
+          else if (pattern === 'custom-free') {
+            const prefix = customPrefix || 'file'
+            newName = customAddSeq ? `${prefix}${customSeqSeparator}${num}${ext}` : `${prefix}${ext}`
+          }
           return { id: file.id, oldName: file.name, newName, folderName: currentFolder.name, folderId: currentFolder.id, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || null, skip: file.name === newName }
         })
         setPreview(previewList)
@@ -915,12 +922,34 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                     <option value="folder-ext-seq">Cartella + Estensione + Sequenza</option>
                     <option value="seq-ext">Sequenza + Estensione</option>
                     <option value="folder-seq">Cartella + Sequenza</option>
+                    <option value="custom-free">Personalizzato</option>
                   </select>
                 </div>
+                {pattern === 'custom-free' ? (
+                  <>
+                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                      <label>Prefisso libero</label>
+                      <input type="text" value={customPrefix} onChange={e => { setCustomPrefix(e.target.value); setPreview([]) }} placeholder="es. vacanze-estate" />
+                    </div>
+                    <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 10, gridColumn: '1 / -1' }}>
+                      <label style={{ margin: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input type="checkbox" checked={customAddSeq} onChange={e => { setCustomAddSeq(e.target.checked); setPreview([]) }} />
+                        Aggiungi sequenza numerica
+                      </label>
+                    </div>
+                    {customAddSeq && (
+                      <div className="form-group">
+                        <label>Separatore sequenza</label>
+                        <input type="text" value={customSeqSeparator} onChange={e => { setCustomSeqSeparator(e.target.value); setPreview([]) }} maxLength="3" />
+                      </div>
+                    )}
+                  </>
+                ) : (
                 <div className="form-group">
                   <label>Separatore</label>
                   <input type="text" value={separator} onChange={(e) => { setSeparator(e.target.value); setPreview([]) }} maxLength="3" />
                 </div>
+                )}
                 <div className="form-group">
                   <label>Numero iniziale</label>
                   <input type="number" value={startNumber} onChange={(e) => { setStartNumber(parseInt(e.target.value)); setPreview([]) }} />
