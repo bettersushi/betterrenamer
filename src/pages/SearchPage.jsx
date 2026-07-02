@@ -395,7 +395,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkMoveActive, setBulkMoveActive] = useState(false)
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
-  const isDraggingSelect = useRef(false)
+  const rubberBand = useRef(null) // { startX, startY, rect: {x,y,w,h} }
+  const [rubberRect, setRubberRect] = useState(null) // { x, y, w, h } in px relative to scroll container
   const [currentSubfolders, setCurrentSubfolders] = useState([])
   const [thumbTimestamps, setThumbTimestamps] = useState({}) // forza reload thumbnail dopo crop
   const pHashCache = useRef({})
@@ -422,7 +423,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     setSelectionMode(false)
     setSelectedIds(new Set())
     setBulkDeleteConfirm(false)
-    isDraggingSelect.current = false
+    rubberBand.current = null
+    setRubberRect(null)
   }, [])
 
   const toggleSelection = useCallback((photoId) => {
@@ -433,11 +435,63 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     })
   }, [])
 
-  useEffect(() => {
-    const up = () => { isDraggingSelect.current = false }
-    window.addEventListener('mouseup', up)
-    return () => window.removeEventListener('mouseup', up)
+  const handleGridMouseDown = useCallback((e) => {
+    if (!selectionMode) return
+    // Only start rubber band if clicking on the scroll container itself (not a card)
+    if (e.target !== e.currentTarget) return
+    const container = gridRef.current
+    if (!container) return
+    const cr = container.getBoundingClientRect()
+    const x = e.clientX - cr.left
+    const y = e.clientY - cr.top + container.scrollTop
+    rubberBand.current = { startX: x, startY: y }
+    setRubberRect({ x, y, w: 0, h: 0 })
+    e.preventDefault()
+  }, [selectionMode])
+
+  const handleGridMouseMove = useCallback((e) => {
+    if (!selectionMode || !rubberBand.current) return
+    const container = gridRef.current
+    if (!container) return
+    const cr = container.getBoundingClientRect()
+    const curX = e.clientX - cr.left
+    const curY = e.clientY - cr.top + container.scrollTop
+    const { startX, startY } = rubberBand.current
+    const rect = {
+      x: Math.min(startX, curX),
+      y: Math.min(startY, curY),
+      w: Math.abs(curX - startX),
+      h: Math.abs(curY - startY),
+    }
+    setRubberRect(rect)
+    // Hit-test all cards
+    const cards = container.querySelectorAll('[data-photo-id]')
+    const newSelected = new Set()
+    cards.forEach(card => {
+      const r = card.getBoundingClientRect()
+      const cardX = r.left - cr.left
+      const cardY = r.top - cr.top + container.scrollTop
+      if (
+        cardX < rect.x + rect.w &&
+        cardX + r.width > rect.x &&
+        cardY < rect.y + rect.h &&
+        cardY + r.height > rect.y
+      ) {
+        newSelected.add(card.dataset.photoId)
+      }
+    })
+    setSelectedIds(newSelected)
+  }, [selectionMode])
+
+  const handleGridMouseUp = useCallback(() => {
+    rubberBand.current = null
+    setRubberRect(null)
   }, [])
+
+  useEffect(() => {
+    window.addEventListener('mouseup', handleGridMouseUp)
+    return () => window.removeEventListener('mouseup', handleGridMouseUp)
+  }, [handleGridMouseUp])
 
   const saveNavHistory = (entries) => {
     try {
@@ -1075,16 +1129,21 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
             <div
               ref={gridRef}
               className={thumbSize === 'masonry' ? 'search-masonry-scroll' : 'search-grid-scroll'}
+              onMouseDown={handleGridMouseDown}
+              onMouseMove={handleGridMouseMove}
+              style={selectionMode ? { userSelect: 'none', position: 'relative' } : { position: 'relative' }}
             >
+              {rubberRect && rubberRect.w > 4 && rubberRect.h > 4 && (
+                <div className="rubber-band" style={{ left: rubberRect.x, top: rubberRect.y, width: rubberRect.w, height: rubberRect.h }} />
+              )}
               {thumbSize === 'masonry' ? (
                 <div className="search-masonry">
                   {results.map((photo, idx) => (
                     <div
                       key={photo.id}
+                      data-photo-id={photo.id}
                       className={`masonry-card${selectedIds.has(photo.id) ? ' selected' : ''}`}
                       onClick={() => selectionMode ? toggleSelection(photo.id) : setSlideshowIdx(idx)}
-                      onMouseDown={() => { if (selectionMode) { isDraggingSelect.current = true; toggleSelection(photo.id) } }}
-                      onMouseEnter={() => { if (selectionMode && isDraggingSelect.current) setSelectedIds(prev => new Set([...prev, photo.id])) }}
                       onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
                     >
                       {photo.thumbnailLink ? (
@@ -1146,10 +1205,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                 {results.map((photo, idx) => (
                   <div
                     key={photo.id}
+                    data-photo-id={photo.id}
                     className={`thumb-card${selectedIds.has(photo.id) ? ' selected' : ''}`}
                     onClick={() => selectionMode ? toggleSelection(photo.id) : setSlideshowIdx(idx)}
-                    onMouseDown={() => { if (selectionMode) { isDraggingSelect.current = true; toggleSelection(photo.id) } }}
-                    onMouseEnter={() => { if (selectionMode && isDraggingSelect.current) setSelectedIds(prev => new Set([...prev, photo.id])) }}
                     onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
                   >
                     {photo.thumbnailLink ? (

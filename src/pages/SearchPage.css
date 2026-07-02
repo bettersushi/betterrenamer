@@ -747,3 +747,13 @@
   background: var(--border);
   margin: 0 2px;
 }
+
+/* Rubber band selection */
+.rubber-band {
+  position: absolute;
+  border: 1.5px solid var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 10;
+}
