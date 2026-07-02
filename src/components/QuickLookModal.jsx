@@ -17,7 +17,7 @@ export default function QuickLookModal({ files, onClose, onPrev, onNext, current
 
   return (
     <div
-      onClick={onClose}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
         background: 'rgba(0,0,0,0.85)',
@@ -52,7 +52,7 @@ export default function QuickLookModal({ files, onClose, onPrev, onNext, current
 
       {/* Content */}
       <div
-        onClick={e => e.stopPropagation()}
+        onClick={e => { if (e.target === e.currentTarget) onClose() }}
         style={{ flex: 1, overflow: 'auto', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       >
         {files.length === 1 ? (
