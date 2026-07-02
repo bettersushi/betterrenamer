@@ -21,6 +21,10 @@ const THUMB_SIZES = { sm: 72, md: 120, lg: 200, masonry: 0 }
 function getExt(name) {
   return name.includes('.') ? name.substring(name.lastIndexOf('.')).toLowerCase() : ''
 }
+function getBaseName(name) {
+  const ext = getExt(name)
+  return ext ? name.slice(0, -ext.length) : name
+}
 function isMediaFile(f) {
   if (f.mimeType === 'application/vnd.google-apps.shortcut') return false
   const ext = getExt(f.name)
@@ -279,6 +283,11 @@ const IconMoon = () => (
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
   </svg>
 )
+const IconPencilLine = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+  </svg>
+)
 const IconCheckSquare = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
@@ -395,6 +404,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const [rotateDoneIds, setRotateDoneIds] = useState(new Set())
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
+  const [renameMode, setRenameMode] = useState(false)
+  const [renameDrafts, setRenameDrafts] = useState({})
   const [bulkMoveActive, setBulkMoveActive] = useState(false)
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
   const rubberBand = useRef(null) // { startX, startY, rect: {x,y,w,h} }
@@ -1051,7 +1062,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
               </button>
               <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
               <button
-                onClick={() => { setSelectionMode(m => !m); setSelectedIds(new Set()); setBulkDeleteConfirm(false) }}
+                onClick={() => { setSelectionMode(m => !m); setSelectedIds(new Set()); setBulkDeleteConfirm(false); setRenameMode(false); setRenameDrafts({}) }}
                 className={`thumb-size-btn${selectionMode ? ' active' : ''}`}
                 title={selectionMode ? 'Esci dalla selezione' : 'Seleziona foto'}
               >
@@ -1062,6 +1073,13 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                   {selectedIds.size > 0 ? `${selectedIds.size} sel.` : 'Seleziona'}
                 </span>
               )}
+              <button
+                onClick={() => { setRenameMode(m => !m); setRenameDrafts({}); setSelectionMode(false); setSelectedIds(new Set()) }}
+                className={`thumb-size-btn${renameMode ? ' active' : ''}`}
+                title={renameMode ? 'Esci dal rename rapido' : 'Rinomina rapido'}
+              >
+                <IconPencilLine />
+              </button>
             </div>
           </div>
 
@@ -1147,7 +1165,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                       key={photo.id}
                       data-photo-id={photo.id}
                       className={`masonry-card${selectedIds.has(photo.id) ? ' selected' : ''}`}
-                      onClick={() => { if (selectionMode) { if (!wasDragging.current) toggleSelection(photo.id) } else setSlideshowIdx(idx) }}
+                      onClick={() => { if (selectionMode) { if (!wasDragging.current) toggleSelection(photo.id) } else if (!renameMode) setSlideshowIdx(idx) }}
                       onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
                     >
                       {photo.thumbnailLink ? (
@@ -1179,7 +1197,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                       {similarTo && photo._dist !== undefined && photo._dist === 0 && (
                         <div className="search-similar-badge">identica</div>
                       )}
-                      {!selectionMode && <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
+                      {!selectionMode && !renameMode && <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
                         <button className="thumb-overlay-btn" title="Vai alla cartella" onClick={() => handleFolderJump(photo)}><IconFolderJump /></button>
                         {photo.thumbnailLink && (
                           <button className="thumb-overlay-btn" title="Crop" onClick={() => setCropPhoto(photo)}><IconCrop /></button>
@@ -1191,6 +1209,32 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                       </div>}
                       {selectionMode && (
                         <div className={`selection-check${selectedIds.has(photo.id) ? ' checked' : ''}`} />
+                      )}
+                      {renameMode && (
+                        <div className="rename-inline-overlay" onClick={e => e.stopPropagation()}>
+                          <div className="rename-inline-row">
+                            <input
+                              className="rename-inline-input"
+                              value={renameDrafts[photo.id] ?? getBaseName(photo.name)}
+                              onChange={e => setRenameDrafts(d => ({ ...d, [photo.id]: e.target.value }))}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  const draft = renameDrafts[photo.id] ?? getBaseName(photo.name)
+                                  const ext = getExt(photo.name)
+                                  const newName = (draft.trim() || getBaseName(photo.name)) + ext
+                                  if (newName !== photo.name) handleRename(photo, newName)
+                                }
+                                if (e.key === 'Escape') setRenameDrafts(d => ({ ...d, [photo.id]: getBaseName(photo.name) }))
+                              }}
+                              onClick={e => e.stopPropagation()}
+                            />
+                            <button
+                              className="rename-inline-clear"
+                              onMouseDown={e => { e.preventDefault(); setRenameDrafts(d => ({ ...d, [photo.id]: '' })); e.currentTarget.previousSibling.focus() }}
+                              title="Svuota"
+                            >✕</button>
+                          </div>
+                        </div>
                       )}
                       {(croppingIds.has(photo.id) || cropDoneIds.has(photo.id) || rotatingIds.has(photo.id) || rotateDoneIds.has(photo.id)) && (
                         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: (croppingIds.has(photo.id) || rotatingIds.has(photo.id)) ? 'rgba(0,0,0,0.55)' : 'rgba(16,185,129,0.7)', borderRadius: 8, pointerEvents: 'none', transition: 'background 0.3s' }}>
@@ -1211,7 +1255,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                     key={photo.id}
                     data-photo-id={photo.id}
                     className={`thumb-card${selectedIds.has(photo.id) ? ' selected' : ''}`}
-                    onClick={() => { if (selectionMode) { if (!wasDragging.current) toggleSelection(photo.id) } else setSlideshowIdx(idx) }}
+                    onClick={() => { if (selectionMode) { if (!wasDragging.current) toggleSelection(photo.id) } else if (!renameMode) setSlideshowIdx(idx) }}
                     onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
                   >
                     {photo.thumbnailLink ? (
@@ -1235,7 +1279,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                     {similarTo && photo._dist !== undefined && photo._dist === 0 && (
                       <div className="search-similar-badge">identica</div>
                     )}
-                    {!selectionMode && <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
+                    {!selectionMode && !renameMode && <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
                       <button className="thumb-overlay-btn" title="Vai alla cartella" onClick={() => handleFolderJump(photo)}><IconFolderJump /></button>
                       {photo.thumbnailLink && (
                         <button className="thumb-overlay-btn" title="Crop" onClick={() => setCropPhoto(photo)}><IconCrop /></button>
@@ -1247,6 +1291,32 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                     </div>}
                     {selectionMode && (
                       <div className={`selection-check${selectedIds.has(photo.id) ? ' checked' : ''}`} />
+                    )}
+                    {renameMode && (
+                      <div className="rename-inline-overlay" onClick={e => e.stopPropagation()}>
+                        <div className="rename-inline-row">
+                          <input
+                            className="rename-inline-input"
+                            value={renameDrafts[photo.id] ?? getBaseName(photo.name)}
+                            onChange={e => setRenameDrafts(d => ({ ...d, [photo.id]: e.target.value }))}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                const draft = renameDrafts[photo.id] ?? getBaseName(photo.name)
+                                const ext = getExt(photo.name)
+                                const newName = (draft.trim() || getBaseName(photo.name)) + ext
+                                if (newName !== photo.name) handleRename(photo, newName)
+                              }
+                              if (e.key === 'Escape') setRenameDrafts(d => ({ ...d, [photo.id]: getBaseName(photo.name) }))
+                            }}
+                            onClick={e => e.stopPropagation()}
+                          />
+                          <button
+                            className="rename-inline-clear"
+                            onMouseDown={e => { e.preventDefault(); setRenameDrafts(d => ({ ...d, [photo.id]: '' })); e.currentTarget.previousSibling.focus() }}
+                            title="Svuota"
+                          >✕</button>
+                        </div>
+                      </div>
                     )}
                     {(croppingIds.has(photo.id) || cropDoneIds.has(photo.id) || rotatingIds.has(photo.id) || rotateDoneIds.has(photo.id)) && (
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: (croppingIds.has(photo.id) || rotatingIds.has(photo.id)) ? 'rgba(0,0,0,0.55)' : 'rgba(16,185,129,0.7)', borderRadius: 8, pointerEvents: 'none', transition: 'background 0.3s' }}>
