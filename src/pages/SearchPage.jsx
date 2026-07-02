@@ -147,6 +147,8 @@ function LazyPhoto({ src, alt, className, style }) {
       {src_ && (
         <img src={src_} alt={alt} className={className}
           onLoad={() => setLoaded(true)}
+          draggable="false"
+          onDragStart={e => e.preventDefault()}
           style={{ opacity: loaded ? 1 : 0, transition: 'opacity 0.3s' }} />
       )}
     </div>
