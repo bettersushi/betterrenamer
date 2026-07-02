@@ -660,7 +660,7 @@
 /* Selection mode */
 .thumb-card.selected,
 .masonry-card.selected {
-  box-shadow: inset 0 0 0 3px #c9a227;
+  box-shadow: inset 0 0 0 3px #ffe033;
   outline: none;
 }
 
