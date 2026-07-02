@@ -437,8 +437,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
 
   const handleGridMouseDown = useCallback((e) => {
     if (!selectionMode) return
-    // Only start rubber band if clicking on the scroll container itself (not a card)
-    if (e.target !== e.currentTarget) return
     const container = gridRef.current
     if (!container) return
     const cr = container.getBoundingClientRect()
@@ -483,10 +481,13 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     setSelectedIds(newSelected)
   }, [selectionMode])
 
+  const wasDragging = useRef(false)
+
   const handleGridMouseUp = useCallback(() => {
+    wasDragging.current = rubberRect !== null && (rubberRect?.w > 4 || rubberRect?.h > 4)
     rubberBand.current = null
     setRubberRect(null)
-  }, [])
+  }, [rubberRect])
 
   useEffect(() => {
     window.addEventListener('mouseup', handleGridMouseUp)
@@ -1143,7 +1144,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                       key={photo.id}
                       data-photo-id={photo.id}
                       className={`masonry-card${selectedIds.has(photo.id) ? ' selected' : ''}`}
-                      onClick={() => selectionMode ? toggleSelection(photo.id) : setSlideshowIdx(idx)}
+                      onClick={() => { if (selectionMode) { if (!wasDragging.current) toggleSelection(photo.id) } else setSlideshowIdx(idx) }}
                       onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
                     >
                       {photo.thumbnailLink ? (
@@ -1207,7 +1208,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                     key={photo.id}
                     data-photo-id={photo.id}
                     className={`thumb-card${selectedIds.has(photo.id) ? ' selected' : ''}`}
-                    onClick={() => selectionMode ? toggleSelection(photo.id) : setSlideshowIdx(idx)}
+                    onClick={() => { if (selectionMode) { if (!wasDragging.current) toggleSelection(photo.id) } else setSlideshowIdx(idx) }}
                     onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
                   >
                     {photo.thumbnailLink ? (
