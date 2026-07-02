@@ -464,6 +464,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
       h: Math.abs(curY - startY),
     }
     setRubberRect(rect)
+    if (rect.w < 6 && rect.h < 6) return
     // Hit-test all cards
     const cards = container.querySelectorAll('[data-photo-id]')
     const newSelected = new Set()
