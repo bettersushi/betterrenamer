@@ -660,7 +660,7 @@
 /* Selection mode */
 .thumb-card.selected,
 .masonry-card.selected {
-  box-shadow: inset 0 0 0 3px #ffe033;
+  box-shadow: inset 0 0 0 3px #e879a0;
 }
 
 .thumb-card.selected .lazy-photo-wrap,
