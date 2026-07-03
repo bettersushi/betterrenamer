@@ -32,7 +32,7 @@
 
 .header-actions {
   display: flex;
-  gap: 12px;
+  gap: 6px;
   align-items: center;
 }
 
