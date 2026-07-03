@@ -139,9 +139,9 @@ function EditStage({ clips, setClips, auth }) {
       const next = [...prev]
       const [moved] = next.splice(dragIdx.current, 1)
       next.splice(i, 0, moved)
-      dragIdx.current = i
       return next
     })
+    dragIdx.current = i
   }
   function onDragEnd() { dragIdx.current = null }
 
@@ -185,6 +185,7 @@ function EditStage({ clips, setClips, auth }) {
         </div>
         {clips[activeIdx] && (
           <VideoTrimCrop
+            key={clips[activeIdx].file.id}
             clip={clips[activeIdx]}
             auth={auth}
             onChange={updated => updateClip(activeIdx, updated)}
@@ -248,10 +249,16 @@ function RenderStage({ clips, auth, onClose }) {
           // Convert CSS px crop to video pixel coords
           const scaleX = file.videoMediaMetadata?.width  ? file.videoMediaMetadata.width  / crop.vw : 1
           const scaleY = file.videoMediaMetadata?.height ? file.videoMediaMetadata.height / crop.vh : 1
-          const cx = Math.round(crop.x * scaleX)
-          const cy = Math.round(crop.y * scaleY)
-          const cw = Math.round(crop.w * scaleX)
-          const ch = Math.round(crop.h * scaleY)
+          const rawCx = Math.round(crop.x * scaleX)
+          const rawCy = Math.round(crop.y * scaleY)
+          const rawCw = Math.round(crop.w * scaleX)
+          const rawCh = Math.round(crop.h * scaleY)
+          const vidW = file.videoMediaMetadata?.width  ?? rawCw
+          const vidH = file.videoMediaMetadata?.height ?? rawCh
+          const cx = Math.max(0, Math.min(rawCx, vidW - 2))
+          const cy = Math.max(0, Math.min(rawCy, vidH - 2))
+          const cw = Math.max(2, Math.min(rawCw, vidW - cx))
+          const ch = Math.max(2, Math.min(rawCh, vidH - cy))
           vf = `crop=${cw}:${ch}:${cx}:${cy},${scale}`
         } else {
           vf = scale
