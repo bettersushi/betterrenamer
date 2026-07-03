@@ -4,6 +4,7 @@ import './VideoMontageModal.css'
 import VideoTrimCrop from './VideoTrimCrop'
 import { useFFmpeg } from '../hooks/useFFmpeg'
 import { fetchFile } from '@ffmpeg/util'
+import { uploadFile } from '../drive'
 
 function formatSize(bytes) {
   if (!bytes) return ''
@@ -21,7 +22,7 @@ function IconFilm() {
 
 const STAGES = ['Selezione', 'Modifica clip', 'Esporta']
 
-export default function VideoMontageModal({ videos, auth, onClose }) {
+export default function VideoMontageModal({ videos, auth, folderId, folderName, onClose }) {
   const [stage, setStage] = useState(0)          // 0=select, 1=edit, 2=render
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [clips, setClips] = useState([])         // ordered array of clip objects {file, trim, crop}
@@ -86,7 +87,7 @@ export default function VideoMontageModal({ videos, auth, onClose }) {
           )}
 
           {stage === 1 && <EditStage clips={clips} setClips={setClips} auth={auth} />}
-          {stage === 2 && <RenderStage clips={clips} auth={auth} onClose={onClose} />}
+          {stage === 2 && <RenderStage clips={clips} auth={auth} folderId={folderId} folderName={folderName} onClose={onClose} />}
         </div>
 
         {/* Footer */}
@@ -196,7 +197,7 @@ function EditStage({ clips, setClips, auth }) {
   )
 }
 
-function RenderStage({ clips, auth, onClose }) {
+function RenderStage({ clips, auth, folderId, folderName, onClose }) {
   const { ffmpeg, loaded, load, progress } = useFFmpeg()
   const [quality, setQuality] = useState(() => {
     const totalMB = clips.reduce((s, c) => s + (parseInt(c.file.size) || 0), 0) / (1024 * 1024)
@@ -207,7 +208,9 @@ function RenderStage({ clips, auth, onClose }) {
   const [status, setStatus] = useState('idle')  // idle | loading | processing | done | error
   const [errorMsg, setErrorMsg] = useState('')
   const [outputUrl, setOutputUrl] = useState(null)
+  const [outputBlob, setOutputBlob] = useState(null)
   const [currentClip, setCurrentClip] = useState(0)
+  const [saveStatus, setSaveStatus] = useState('idle') // idle | saving | saved | error
 
   useEffect(() => {
     return () => { if (outputUrl) URL.revokeObjectURL(outputUrl) }
@@ -281,7 +284,9 @@ function RenderStage({ clips, auth, onClose }) {
       await ff.exec(['-y', '-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-c', 'copy', 'output.mp4'])
 
       const data = await ff.readFile('output.mp4')
-      const url = URL.createObjectURL(new Blob([data], { type: 'video/mp4' }))
+      const blob = new Blob([data], { type: 'video/mp4' })
+      const url = URL.createObjectURL(blob)
+      setOutputBlob(blob)
       setOutputUrl(url)
       setStatus('done')
 
@@ -363,15 +368,48 @@ function RenderStage({ clips, auth, onClose }) {
 
       {/* Done */}
       {status === 'done' && outputUrl && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center', padding: 20 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', padding: 20 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>✓ Montaggio completato</div>
-          <a
-            href={outputUrl}
-            download="montaggio.mp4"
-            style={{ padding: '9px 24px', borderRadius: 9, background: 'var(--primary)', color: 'white', fontWeight: 600, fontSize: 14, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}
-          >
-            ⬇ Scarica MP4
-          </a>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <a
+              href={outputUrl}
+              download={`00_${(folderName || 'reel').replace(/\s+/g, '-').toLowerCase()}-reel.mp4`}
+              style={{ padding: '9px 20px', borderRadius: 9, background: 'var(--primary)', color: 'white', fontWeight: 600, fontSize: 13, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 7 }}
+            >
+              ⬇ Scarica MP4
+            </a>
+            <button
+              onClick={async () => {
+                if (!outputBlob || !folderId) return
+                setSaveStatus('saving')
+                try {
+                  const fileName = `00_${(folderName || 'reel').replace(/\s+/g, '-').toLowerCase()}-reel.mp4`
+                  await uploadFile(auth.accessToken, outputBlob, fileName, 'video/mp4', folderId)
+                  setSaveStatus('saved')
+                } catch (e) {
+                  console.error(e)
+                  setSaveStatus('error')
+                }
+              }}
+              disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+              style={{
+                padding: '9px 20px', borderRadius: 9, border: '1px solid var(--border)',
+                background: saveStatus === 'saved' ? 'color-mix(in srgb, var(--primary) 12%, transparent)' : 'transparent',
+                color: saveStatus === 'saved' ? 'var(--primary)' : 'var(--text-secondary)',
+                fontWeight: 600, fontSize: 13, cursor: saveStatus === 'saving' || saveStatus === 'saved' ? 'default' : 'pointer',
+                fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 7,
+              }}
+            >
+              {saveStatus === 'saving' ? '⏳ Salvataggio...' : saveStatus === 'saved' ? '✓ Salvato su Drive' : saveStatus === 'error' ? '✕ Errore salvataggio' : '☁ Salva su Drive'}
+            </button>
+          </div>
+          {saveStatus === 'saved' && (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              Salvato come <code style={{ background: 'var(--surface-2,var(--border))', padding: '1px 5px', borderRadius: 4, fontSize: 11 }}>
+                00_{(folderName || 'reel').replace(/\s+/g, '-').toLowerCase()}-reel.mp4
+              </code> nella cartella corrente
+            </div>
+          )}
         </div>
       )}
 

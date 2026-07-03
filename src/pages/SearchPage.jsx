@@ -1764,6 +1764,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
         <VideoMontageModal
           videos={videoFiles}
           auth={auth}
+          folderId={activeFolderId}
+          folderName={activeFolderName}
           onClose={() => setShowVideoMontage(false)}
         />
       )}
