@@ -579,65 +579,44 @@
 .content-area {
   flex: 1;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   overflow: hidden;
   min-height: 0;
 }
 
-.subfolder-sidebar {
-  width: 200px;
+.subfolder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 6px;
+  padding: 10px 12px 4px;
   flex-shrink: 0;
-  border-right: 1px solid var(--border);
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 10px 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 
-.subfolder-sidebar-header {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  padding: 2px 8px 8px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.subfolder-sidebar-header span {
-  background: color-mix(in srgb, var(--border) 80%, transparent);
-  border-radius: 10px;
-  padding: 0 5px;
-  font-size: 10px;
-}
-
-.subfolder-sidebar-item {
+.subfolder-grid-item {
+  height: 46px;
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 5px 8px;
-  border-radius: 6px;
-  border: none;
-  background: none;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--border) 30%, transparent);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-secondary);
   font-family: inherit;
   text-align: left;
-  width: 100%;
-  transition: background 0.1s, color 0.1s;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  overflow: hidden;
 }
 
-.subfolder-sidebar-item:hover {
+.subfolder-grid-item:hover {
   background: color-mix(in srgb, var(--border) 60%, transparent);
   color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--border) 80%, transparent);
 }
 
-.subfolder-sidebar-item span {
+.subfolder-grid-item span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

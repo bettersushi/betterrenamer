@@ -411,6 +411,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const rubberBand = useRef(null) // { startX, startY, rect: {x,y,w,h} }
   const [rubberRect, setRubberRect] = useState(null) // { x, y, w, h } in px relative to scroll container
   const [currentSubfolders, setCurrentSubfolders] = useState([])
+  const [showSubfolders, setShowSubfolders] = useState(true)
   const [thumbTimestamps, setThumbTimestamps] = useState({}) // forza reload thumbnail dopo crop
   const pHashCache = useRef({})
   const gridRef = useRef(null)
@@ -1080,6 +1081,20 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
               >
                 <IconPencilLine />
               </button>
+              {currentSubfolders.length > 0 && globalResults === null && similarTo === null && (
+                <>
+                  <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
+                  <button
+                    onClick={() => setShowSubfolders(v => !v)}
+                    className={`thumb-size-btn${showSubfolders ? ' active' : ''}`}
+                    title={showSubfolders ? 'Nascondi sottocartelle' : 'Mostra sottocartelle'}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+                    </svg>
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -1137,8 +1152,15 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
 
           {/* Grid */}
           <div className="content-area">
-            {showSubfolderSidebar && (
-              <SubfolderSidebar folders={currentSubfolders} onSelect={(id, name) => selectFolder(id, name)} />
+            {showSubfolderSidebar && showSubfolders && (
+              <div className="subfolder-grid">
+                {currentSubfolders.map(f => (
+                  <button key={f.id} className="subfolder-grid-item" onClick={() => selectFolder(f.id, f.name)}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+                    <span>{f.name}</span>
+                  </button>
+                ))}
+              </div>
             )}
           {loading ? (
             <div className="search-empty" style={{ flex: 1 }}><span>Caricamento...</span></div>
