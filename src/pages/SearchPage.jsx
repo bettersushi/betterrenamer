@@ -10,6 +10,7 @@ import DriveStatsModal from '../components/DriveStatsModal'
 import PhotoContextMenu from '../components/PhotoContextMenu'
 import FolderPickerModal from '../components/FolderPickerModal'
 import CropModal from '../components/CropModal'
+import EnhanceModal from '../components/EnhanceModal'
 import VideoMontageModal from '../components/VideoMontageModal'
 import StatusModal from '../components/StatusModal'
 import './SearchPage.css'
@@ -234,6 +235,11 @@ const IconCrop = () => (
     <path d="M18 22V8a2 2 0 0 0-2-2H2"/>
   </svg>
 )
+const IconEnhance = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/>
+  </svg>
+)
 const IconRotateCCW = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
@@ -395,6 +401,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [similarResults, setSimilarResults] = useState([])
   const [balloons, setBalloons] = useState([])
   const [cropPhoto, setCropPhoto] = useState(null)
+  const [enhancePhoto, setEnhancePhoto] = useState(null)
   const [scopePickerPhoto, setScopePickerPhoto] = useState(null)
   const [showStats, setShowStats] = useState(false)
   const [contextMenu, setContextMenu] = useState(null) // { photo, idx, x, y }
@@ -1538,6 +1545,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                           <button className="thumb-overlay-btn" title="Crop" onClick={() => setCropPhoto(photo)}><IconCrop /></button>
                         )}
                         {photo.thumbnailLink && (
+                          <button className="thumb-overlay-btn" title="Enhance (AI upscale)" onClick={() => setEnhancePhoto(photo)}><IconEnhance /></button>
+                        )}
+                        {photo.thumbnailLink && (
                           <button className="thumb-overlay-btn" title="Ruota 90° sx" onClick={() => handleRotate(photo)}><IconRotateCCW /></button>
                         )}
                         <button className="thumb-overlay-btn" title="Altre azioni" onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setContextMenu({ photo, idx, x: r.left, y: r.bottom + 4 }) }}><IconDots /></button>
@@ -1900,6 +1910,21 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
           onConfirm={(scopeFolder) => {
             setScopePickerPhoto(null)
             handleGlobalSimilarity(scopePickerPhoto, scopeFolder)
+          }}
+        />
+      )}
+
+      {enhancePhoto && (
+        <EnhanceModal
+          photo={enhancePhoto}
+          accessToken={auth.accessToken}
+          onClose={() => setEnhancePhoto(null)}
+          onDone={(photoId, updatedMeta) => {
+            setEnhancePhoto(null)
+            if (photoId && updatedMeta?.thumbnailLink) {
+              setAllPhotos(photos => photos.map(p => p.id === photoId ? { ...p, thumbnailLink: updatedMeta.thumbnailLink } : p))
+              setThumbTimestamps(ts => ({ ...ts, [photoId]: Date.now() }))
+            }
           }}
         />
       )}

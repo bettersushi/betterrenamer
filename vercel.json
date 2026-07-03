@@ -12,5 +12,8 @@
   ],
   "rewrites": [
     { "source": "/((?!api/|ffmpeg/|assets/)(?!.*\\.[a-zA-Z0-9]+$).*)", "destination": "/index.html" }
-  ]
+  ],
+  "functions": {
+    "api/enhance.js": { "maxDuration": 60 }
+  }
 }
