@@ -1,0 +1,24 @@
+.ql-img-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 900px;
+}
+
+.ql-actions {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+}
+
+.ql-img-wrap:hover .ql-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
