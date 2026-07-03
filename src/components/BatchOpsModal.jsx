@@ -29,6 +29,12 @@ const ACTIVITIES = [
     description: 'Applica il colore della cartella genitore a tutte le sottocartelle * Vid e * Gif create dalla funzione organizza media.',
   },
   {
+    id: 'colorAllSubfolders',
+    icon: IColor,
+    title: 'Colora tutte le sottocartelle',
+    description: 'Propaga il colore di ogni cartella a tutte le sue sottocartelle in modo ricorsivo.',
+  },
+  {
     id: 'normalizeNames',
     icon: IText,
     title: 'Normalizza nomi file',
@@ -37,7 +43,7 @@ const ACTIVITIES = [
 ]
 
 export default function BatchOpsModal({ currentFolder, onClose, onAddJob }) {
-  const [scopes, setScopes] = useState({ colorVidFolders: 'folder', normalizeNames: 'folder' })
+  const [scopes, setScopes] = useState({ colorVidFolders: 'folder', colorAllSubfolders: 'folder', normalizeNames: 'folder' })
   const [added, setAdded] = useState({})
 
   const setScope = (id, scope) => setScopes(s => ({ ...s, [id]: scope }))

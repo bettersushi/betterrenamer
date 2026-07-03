@@ -550,6 +550,25 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
         }
         updateJob(job.id, { status: 'done', progress: { current: colored, total: colored, currentFile: '', phase: `${colored} cartelle colorate` } })
 
+      } else if (job.type === 'colorAllSubfolders') {
+        let colored = 0
+        const propagateColor = async (folderId, color) => {
+          const subs = await listSubfolders(auth.accessToken, folderId)
+          for (const sub of subs) {
+            if (sub.folderColorRgb !== color) {
+              updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: sub.name, phase: 'Coloro' } })
+              await patchFileMetadata(auth.accessToken, sub.id, { folderColorRgb: color })
+            }
+            await propagateColor(sub.id, color)
+          }
+        }
+        const rootFolderId = job.scope === 'drive' ? 'root' : job.folderId
+        const topFolders = await listSubfolders(auth.accessToken, rootFolderId)
+        for (const folder of topFolders) {
+          if (folder.folderColorRgb) await propagateColor(folder.id, folder.folderColorRgb)
+        }
+        updateJob(job.id, { status: 'done', progress: { current: colored, total: colored, currentFile: '', phase: `${colored} cartelle colorate` } })
+
       } else if (job.type === 'normalizeNames') {
         const normalize = (name) => {
           const dot = name.lastIndexOf('.')
@@ -591,7 +610,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     while (runningCount.current < MAX_PARALLEL) {
       const next = queueRef.current.find(j => j.status === 'pending')
       if (!next) break
-      if (next.type === 'colorVidFolders' || next.type === 'normalizeNames') {
+      if (next.type === 'colorVidFolders' || next.type === 'colorAllSubfolders' || next.type === 'normalizeNames') {
         processBatchOp(next)
       } else {
         processJob(next)
