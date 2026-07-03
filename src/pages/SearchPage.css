@@ -590,6 +590,8 @@
   gap: 6px;
   padding: 10px 12px 4px;
   flex-shrink: 0;
+  max-height: 33vh;
+  overflow-y: auto;
 }
 
 .subfolder-grid-item {
@@ -616,6 +618,13 @@
   border-color: color-mix(in srgb, var(--border) 80%, transparent);
 }
 
+.subfolder-grid-item.drop-target {
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
 .subfolder-grid-item span {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -640,6 +649,16 @@
 .thumb-card.selected,
 .masonry-card.selected {
   box-shadow: inset 0 0 0 3px #e879a0;
+}
+
+@keyframes drag-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.dragging-active .thumb-card.selected,
+.dragging-active .masonry-card.selected {
+  animation: drag-pulse 1.1s ease-in-out infinite;
 }
 
 .thumb-card.selected .lazy-photo-wrap,

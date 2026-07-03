@@ -404,6 +404,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const [rotateDoneIds, setRotateDoneIds] = useState(new Set())
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
+  const [isDraggingPhotos, setIsDraggingPhotos] = useState(false)
   const [renameMode, setRenameMode] = useState(false)
   const [renameDrafts, setRenameDrafts] = useState({})
   const [bulkMoveActive, setBulkMoveActive] = useState(false)
@@ -412,6 +413,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const [rubberRect, setRubberRect] = useState(null) // { x, y, w, h } in px relative to scroll container
   const [currentSubfolders, setCurrentSubfolders] = useState([])
   const [showSubfolders, setShowSubfolders] = useState(true)
+  const [dragOverFolder, setDragOverFolder] = useState(null) // folder id being hovered during drag
   const [thumbTimestamps, setThumbTimestamps] = useState({}) // forza reload thumbnail dopo crop
   const pHashCache = useRef({})
   const gridRef = useRef(null)
@@ -856,6 +858,89 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     })
   }, [auth.accessToken, selectedIds, exitSelectionMode])
 
+  const handleDropOnFolder = useCallback(async (targetFolder, draggedPhotoId) => {
+    setDragOverFolder(null)
+    // Determine which photos to move: selection if active and includes dragged, otherwise just dragged
+    const idsToMove = selectionMode && selectedIds.size > 0
+      ? new Set([...selectedIds, ...(draggedPhotoId ? [draggedPhotoId] : [])])
+      : draggedPhotoId ? new Set([draggedPhotoId]) : new Set()
+    if (idsToMove.size === 0) return
+    setAllPhotos(photos => {
+      photos.filter(p => idsToMove.has(p.id)).forEach(p => {
+        const oldParentId = p.parents?.[0]
+        if (oldParentId && oldParentId !== targetFolder.id)
+          moveFile(auth.accessToken, p.id, targetFolder.id, oldParentId).catch(console.error)
+      })
+      return photos.filter(p => !idsToMove.has(p.id))
+    })
+    if (selectionMode) exitSelectionMode()
+  }, [auth.accessToken, selectionMode, selectedIds, exitSelectionMode])
+
+  const DRAG_MAGENTA = '#e879a0'
+
+  const buildDragImage = useCallback((photo, count) => {
+    const SIZE = 72
+    const OFFSET = 7
+    const layers = Math.min(count, 3)
+    const totalW = SIZE + OFFSET * (layers - 1) + 8
+    const totalH = SIZE + OFFSET * (layers - 1) + 8
+
+    const wrap = document.createElement('div')
+    wrap.style.cssText = `position:fixed;left:-9999px;top:-9999px;width:${totalW}px;height:${totalH}px;pointer-events:none;`
+
+    for (let i = layers - 1; i >= 0; i--) {
+      const card = document.createElement('div')
+      const angle = (layers - 1 - i) * -3
+      const tx = (layers - 1 - i) * OFFSET * 0.5
+      const ty = i * OFFSET
+      const op = i === 0 ? 1 : i === 1 ? 0.7 : 0.45
+      card.style.cssText = `
+        position:absolute;left:4px;top:4px;
+        width:${SIZE}px;height:${SIZE}px;
+        border-radius:10px;
+        background:#222 url('${photo.thumbnailLink ? getLargeThumbUrl(photo.thumbnailLink, 200) : ''}') center/cover no-repeat;
+        transform:rotate(${angle}deg) translate(${tx}px,${ty}px);
+        opacity:${op};
+        box-shadow:0 4px 16px rgba(232,121,160,${i === 0 ? 0.55 : 0.2}),0 2px 6px rgba(0,0,0,0.3);
+        border:2px solid rgba(232,121,160,${i === 0 ? 0.8 : 0.3});
+      `
+      wrap.appendChild(card)
+    }
+
+    if (count > 1) {
+      const badge = document.createElement('div')
+      badge.textContent = count
+      badge.style.cssText = `
+        position:absolute;top:0;right:0;
+        width:22px;height:22px;border-radius:50%;
+        background:${DRAG_MAGENTA};color:#fff;
+        font-size:11px;font-weight:700;font-family:sans-serif;
+        display:flex;align-items:center;justify-content:center;
+        box-shadow:0 2px 8px rgba(232,121,160,0.5);
+        border:2px solid #fff;
+      `
+      wrap.appendChild(badge)
+    }
+
+    document.body.appendChild(wrap)
+    return wrap
+  }, [])
+
+  const handleDragStart = useCallback((e, photo) => {
+    e.dataTransfer.setData('photoId', photo.id)
+    e.dataTransfer.effectAllowed = 'move'
+    const count = selectionMode && selectedIds.size > 0 ? selectedIds.size : 1
+    const ghost = buildDragImage(photo, count)
+    e.dataTransfer.setDragImage(ghost, 40, 40)
+    setTimeout(() => document.body.removeChild(ghost), 0)
+    setIsDraggingPhotos(true)
+  }, [selectionMode, selectedIds, buildDragImage])
+
+  const handleDragEnd = useCallback(() => {
+    setDragOverFolder(null)
+    setIsDraggingPhotos(false)
+  }, [])
+
   const handleRename = useCallback(async (photo, newName) => {
     if (!newName.trim() || newName === photo.name) return
     try {
@@ -978,7 +1063,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           <span style={{ fontSize: '15px', fontWeight: 600 }}>Ricerca foto</span>
         </div>
         <div className="header-actions">
-          <button onClick={onToggleTheme} className="nav-icon-btn" title="Tema">
+          <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Tema">
             {isDark ? <IconSun /> : <IconMoon />}
           </button>
           <button onClick={onLogout} className="btn-secondary" style={{ fontSize: '12px', padding: '4px 10px' }}>Logout</button>
@@ -1062,6 +1147,24 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                 </svg>
               </button>
               <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
+              {currentSubfolders.length > 0 && globalResults === null && similarTo === null && (
+                <button
+                  onClick={() => setShowSubfolders(v => !v)}
+                  className={`thumb-size-btn${showSubfolders ? ' active' : ''}`}
+                  title={showSubfolders ? 'Nascondi sottocartelle' : 'Mostra sottocartelle'}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+                  </svg>
+                </button>
+              )}
+              <button
+                onClick={() => { setRenameMode(m => !m); setRenameDrafts({}); setSelectionMode(false); setSelectedIds(new Set()) }}
+                className={`thumb-size-btn${renameMode ? ' active' : ''}`}
+                title={renameMode ? 'Esci dal rename rapido' : 'Rinomina rapido'}
+              >
+                <IconPencilLine />
+              </button>
               <button
                 onClick={() => { setSelectionMode(m => !m); setSelectedIds(new Set()); setBulkDeleteConfirm(false); setRenameMode(false); setRenameDrafts({}) }}
                 className={`thumb-size-btn${selectionMode ? ' active' : ''}`}
@@ -1073,27 +1176,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                 <span style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600, marginLeft: 2, whiteSpace: 'nowrap' }}>
                   {selectedIds.size > 0 ? `${selectedIds.size} sel.` : 'Seleziona'}
                 </span>
-              )}
-              <button
-                onClick={() => { setRenameMode(m => !m); setRenameDrafts({}); setSelectionMode(false); setSelectedIds(new Set()) }}
-                className={`thumb-size-btn${renameMode ? ' active' : ''}`}
-                title={renameMode ? 'Esci dal rename rapido' : 'Rinomina rapido'}
-              >
-                <IconPencilLine />
-              </button>
-              {currentSubfolders.length > 0 && globalResults === null && similarTo === null && (
-                <>
-                  <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
-                  <button
-                    onClick={() => setShowSubfolders(v => !v)}
-                    className={`thumb-size-btn${showSubfolders ? ' active' : ''}`}
-                    title={showSubfolders ? 'Nascondi sottocartelle' : 'Mostra sottocartelle'}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
-                    </svg>
-                  </button>
-                </>
               )}
             </div>
           </div>
@@ -1155,7 +1237,14 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
             {showSubfolderSidebar && showSubfolders && (
               <div className="subfolder-grid">
                 {currentSubfolders.map(f => (
-                  <button key={f.id} className="subfolder-grid-item" onClick={() => selectFolder(f.id, f.name)}>
+                  <button
+                    key={f.id}
+                    className={`subfolder-grid-item${dragOverFolder === f.id ? ' drop-target' : ''}`}
+                    onClick={() => selectFolder(f.id, f.name)}
+                    onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverFolder(f.id) }}
+                    onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverFolder(null) }}
+                    onDrop={e => { e.preventDefault(); handleDropOnFolder(f, e.dataTransfer.getData('photoId') || null) }}
+                  >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
                     <span>{f.name}</span>
                   </button>
@@ -1172,7 +1261,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           ) : (
             <div
               ref={gridRef}
-              className={thumbSize === 'masonry' ? 'search-masonry-scroll' : 'search-grid-scroll'}
+              className={`${thumbSize === 'masonry' ? 'search-masonry-scroll' : 'search-grid-scroll'}${isDraggingPhotos ? ' dragging-active' : ''}`}
               onMouseDown={handleGridMouseDown}
               onMouseMove={handleGridMouseMove}
               style={selectionMode ? { userSelect: 'none', position: 'relative' } : { position: 'relative' }}
@@ -1189,6 +1278,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                       className={`masonry-card${selectedIds.has(photo.id) ? ' selected' : ''}`}
                       onClick={() => { if (selectionMode) { if (!wasDragging.current) toggleSelection(photo.id) } else if (!renameMode) setSlideshowIdx(idx) }}
                       onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
+                      draggable={showSubfolderSidebar && showSubfolders}
+                      onDragStart={e => handleDragStart(e, photo)}
+                      onDragEnd={handleDragEnd}
                     >
                       {photo.thumbnailLink ? (
                         <LazyPhoto
@@ -1279,6 +1371,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                     className={`thumb-card${selectedIds.has(photo.id) ? ' selected' : ''}`}
                     onClick={() => { if (selectionMode) { if (!wasDragging.current) toggleSelection(photo.id) } else if (!renameMode) setSlideshowIdx(idx) }}
                     onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
+                    draggable={showSubfolderSidebar && showSubfolders}
+                    onDragStart={e => { e.dataTransfer.setData('photoId', photo.id); e.dataTransfer.effectAllowed = 'move' }}
+                    onDragEnd={() => setDragOverFolder(null)}
                   >
                     {photo.thumbnailLink ? (
                       <LazyPhoto
@@ -1368,6 +1463,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           onPrev={() => setSlideshowIdx(i => Math.max(0, i - 1))}
           onNext={() => setSlideshowIdx(i => Math.min(results.length - 1, i + 1))}
           onClose={() => setSlideshowIdx(null)}
+          onCrop={() => { setCropPhoto(results[slideshowIdx]); setSlideshowIdx(null) }}
+          onRename={() => { setRenamePhoto(results[slideshowIdx]); setSlideshowIdx(null) }}
+          onDownload={() => handleDownload(results[slideshowIdx])}
+          onDelete={() => { handleDelete(results[slideshowIdx]); setSlideshowIdx(null) }}
+          onDuplicate={() => handleDuplicate(results[slideshowIdx])}
         />
       )}
 
