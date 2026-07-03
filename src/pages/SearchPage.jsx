@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import logoSrc from '../assets/logo-bs.svg'
 import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata, patchFileMetadata, trashFile, restoreFile, copyFile, moveFile, renameFile } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
+import PalettePicker from '../components/PalettePicker'
 import SimilarityBalloon from '../components/SimilarityBalloon'
 import ScopePickerModal from '../components/ScopePickerModal'
 import DriveStatsModal from '../components/DriveStatsModal'
@@ -366,7 +367,7 @@ function ConnectedTreeNode({ folder, depth, activeId, onToggle, onSelect, treeEx
 }
 
 // ── Main Component ───────────────────────────────────────────────────────────
-export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTokenRefresh }) {
+export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colorScheme, onChangeScheme, onTokenRefresh }) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -1141,6 +1142,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Autenticato come</div>
             <div style={{ fontWeight: 600, fontSize: '13px' }}>{auth.email}</div>
           </div>
+          <PalettePicker colorScheme={colorScheme} onChangeScheme={onChangeScheme} isDark={isDark} />
           <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Tema">
             {isDark ? <IconSun /> : <IconMoon />}
           </button>

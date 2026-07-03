@@ -5,6 +5,7 @@ import { listFiles, listFilesRecursive, batchRenameFiles, getOrCreateFolder, mov
 import { saveSession, getSessions, clearSessions, downloadCSV } from '../logs'
 import QuickLookModal from '../components/QuickLookModal'
 import BatchOpsModal from '../components/BatchOpsModal'
+import PalettePicker from '../components/PalettePicker'
 import './DashboardPage.css'
 
 const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
@@ -250,7 +251,7 @@ const CbDot = ({ checked, onChange, refProp, id }) => (
   </span>
 )
 
-export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, onTokenRefresh }) {
+export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, colorScheme, onChangeScheme, onTokenRefresh }) {
   const navigate = useNavigate()
   const [logsOpen, setLogsOpen] = useState(false)
   const [logSessions, setLogSessions] = useState([])
@@ -916,22 +917,25 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
       )}
       {/* Header */}
       <div className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0 }}>
-        <div>
-          <h1 style={{ fontSize: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <img src={logoSrc} alt="" style={{ height: '24px', width: 'auto' }} />
-            BetterRenamer
-          </h1>
-          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Batch rename per Google Drive</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div>
+            <h1 style={{ fontSize: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <img src={logoSrc} alt="" style={{ height: '24px', width: 'auto' }} />
+              BetterRenamer
+            </h1>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Batch rename per Google Drive</p>
+          </div>
+          <button onClick={() => navigate('/search')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0, marginLeft: 4 }} title="Ricerca foto"><IconSearch /></button>
         </div>
         <div className="header-actions">
           <div className="user-info">
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Autenticato come</div>
             <div style={{ fontWeight: 600, fontSize: '13px' }}>{auth.email}</div>
           </div>
+          <PalettePicker colorScheme={colorScheme} onChangeScheme={onChangeScheme} isDark={isDark} />
           <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Tema">
             {isDark ? <IconSun /> : <IconMoon />}
           </button>
-          <button onClick={() => navigate('/search')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Ricerca foto"><IconSearch /></button>
           <button onClick={() => setShowBatchOps(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Operazioni batch"><IconWand /></button>
           <button onClick={openLogs} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><IconList /> Logs</button>
           <button onClick={handleLogout} className="btn-secondary">Logout</button>
