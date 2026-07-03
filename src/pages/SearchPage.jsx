@@ -10,6 +10,7 @@ import DriveStatsModal from '../components/DriveStatsModal'
 import PhotoContextMenu from '../components/PhotoContextMenu'
 import FolderPickerModal from '../components/FolderPickerModal'
 import CropModal from '../components/CropModal'
+import VideoMontageModal from '../components/VideoMontageModal'
 import './SearchPage.css'
 
 const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
@@ -399,6 +400,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [movePhoto, setMovePhoto] = useState(null)
   const [renamePhoto, setRenamePhoto] = useState(null)
   const [undoToast, setUndoToast] = useState(null) // { photo, insertIdx, timer }
+  const [showVideoMontage, setShowVideoMontage] = useState(false)
   const [croppingIds, setCroppingIds] = useState(new Set())
   const [cropDoneIds, setCropDoneIds] = useState(new Set())
   const [rotatingIds, setRotatingIds] = useState(new Set())
@@ -1110,6 +1112,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   }, [auth.accessToken, updateBalloon])
 
   // ── Results ─────────────────────────────────────────────────────────────
+  const videoFiles = useMemo(() => allPhotos.filter(f => isVideoFile(f)), [allPhotos])
+
   const results = useMemo(() => {
     let list = globalResults !== null ? globalResults : similarTo ? similarResults : allPhotos
     if (sortOrder === 'name') list = [...list].sort((a, b) => a.name.localeCompare(b.name))
@@ -1322,6 +1326,17 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                   </div>
                 )}
               </div>
+            )}
+            {videoFiles.length >= 2 && (
+              <button
+                className="btn-secondary"
+                onClick={() => setShowVideoMontage(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '5px 10px' }}
+                title="Monta video"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><polygon points="10,8 16,12 10,16"/></svg>
+                Monta video
+              </button>
             )}
           </div>
 
@@ -1742,6 +1757,14 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
               }, 1500)
             }, 2500)
           }}
+        />
+      )}
+
+      {showVideoMontage && (
+        <VideoMontageModal
+          videos={videoFiles}
+          auth={auth}
+          onClose={() => setShowVideoMontage(false)}
         />
       )}
 
