@@ -76,7 +76,7 @@
 }
 
 .file-item.folder:hover {
-  background: var(--btn-hover, #f9f9f9);
+  background: #f9f9f9;
 }
 
 .file-icon {
@@ -93,34 +93,52 @@
 }
 
 .pattern-info {
-  background: var(--surface-2, #f5f5f5);
+  background: #f5f5f5;
   border-radius: 8px;
   padding: 8px 10px;
   font-size: 12px;
-  color: var(--text-secondary);
+  color: #888;
   line-height: 1.6;
+}
+
+[data-theme="dark"] .pattern-info {
+  background: #222220;
+  color: var(--text-secondary);
 }
 
 .queue-panel {
   border-top: 2px solid var(--border);
-  background: var(--surface-2, #fafafa);
+  background: #fafafa;
   padding: 12px 24px;
   max-height: 260px;
   overflow-y: auto;
 }
 
+[data-theme="dark"] .queue-panel {
+  background: #161614;
+}
+
 .queue-job {
-  background: var(--surface, white);
-  border: 1px solid var(--border);
+  background: white;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
   padding: 10px 14px;
 }
 
+[data-theme="dark"] .queue-job {
+  background: #1e1e1c;
+  border-color: var(--border);
+}
+
 .queue-progress-bg {
-  background: var(--border, #e5e7eb);
+  background: #e5e7eb;
   border-radius: 999px;
   height: 6px;
   overflow: hidden;
+}
+
+[data-theme="dark"] .queue-progress-bg {
+  background: #2e2e2a;
 }
 
 .logs-drawer {

@@ -99,13 +99,6 @@
   color: var(--primary);
 }
 
-.tree-node.drop-target {
-  background: color-mix(in srgb, var(--primary) 18%, transparent);
-  border-radius: 7px;
-  outline: 1.5px solid var(--primary);
-  outline-offset: -1px;
-}
-
 .tree-chevron {
   width: 14px;
   height: 14px;

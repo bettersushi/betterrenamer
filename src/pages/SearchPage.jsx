@@ -1,17 +1,14 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import logoSrc from '../assets/logo-bs.svg'
-import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata, patchFileMetadata, trashFile, restoreFile, copyFile, moveFile, renameFile, createFolder } from '../drive'
+import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata, patchFileMetadata, trashFile, restoreFile, copyFile, moveFile, renameFile } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
-import PalettePicker from '../components/PalettePicker'
 import SimilarityBalloon from '../components/SimilarityBalloon'
 import ScopePickerModal from '../components/ScopePickerModal'
 import DriveStatsModal from '../components/DriveStatsModal'
 import PhotoContextMenu from '../components/PhotoContextMenu'
 import FolderPickerModal from '../components/FolderPickerModal'
 import CropModal from '../components/CropModal'
-import VideoMontageModal from '../components/VideoMontageModal'
-import StatusModal from '../components/StatusModal'
 import './SearchPage.css'
 
 const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
@@ -369,7 +366,7 @@ function ConnectedTreeNode({ folder, depth, activeId, onToggle, onSelect, treeEx
 }
 
 // ── Main Component ───────────────────────────────────────────────────────────
-export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colorScheme, onChangeScheme, onTokenRefresh }) {
+export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTokenRefresh }) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -398,14 +395,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [scopePickerPhoto, setScopePickerPhoto] = useState(null)
   const [showStats, setShowStats] = useState(false)
   const [contextMenu, setContextMenu] = useState(null) // { photo, idx, x, y }
-  const [folderContextMenu, setFolderContextMenu] = useState(null) // { folder, x, y }
-  const [movingFolder, setMovingFolder] = useState(null)
   const [movePhoto, setMovePhoto] = useState(null)
   const [renamePhoto, setRenamePhoto] = useState(null)
   const [undoToast, setUndoToast] = useState(null) // { photo, insertIdx, timer }
-  const [showVideoMontage, setShowVideoMontage] = useState(false)
-  const [showStatus, setShowStatus] = useState(false)
-  const [mediaFilter, setMediaFilter] = useState('all')
   const [croppingIds, setCroppingIds] = useState(new Set())
   const [cropDoneIds, setCropDoneIds] = useState(new Set())
   const [rotatingIds, setRotatingIds] = useState(new Set())
@@ -875,19 +867,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
     })
   }, [auth.accessToken, selectedIds, exitSelectionMode])
 
-  const handleCreateFolder = useCallback(async (parentId, parentName) => {
-    const name = window.prompt(`Nome della nuova cartella in "${parentName}":`)
-    if (!name || !name.trim()) return
-    try {
-      const newFolder = await createFolder(auth.accessToken, name.trim(), parentId)
-      // refresh subfolder list
-      setCurrentSubfolders(sf => [...sf, newFolder])
-      setTreeChildren(t => ({ ...t, [parentId]: [...(t[parentId] || []), newFolder] }))
-    } catch (e) {
-      alert('Errore nella creazione della cartella: ' + e.message)
-    }
-  }, [auth.accessToken])
-
   const handleDropOnFolder = useCallback(async (targetFolder, draggedPhotoId) => {
     setDragOverFolder(null)
     // Determine which photos to move: selection if active and includes dragged, otherwise just dragged
@@ -1130,17 +1109,12 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   }, [auth.accessToken, updateBalloon])
 
   // ── Results ─────────────────────────────────────────────────────────────
-  const videoFiles = useMemo(() => allPhotos.filter(f => isVideoFile(f)), [allPhotos])
-
   const results = useMemo(() => {
     let list = globalResults !== null ? globalResults : similarTo ? similarResults : allPhotos
-    if (mediaFilter === 'video') list = list.filter(f => isVideoFile(f))
-    else if (mediaFilter === 'gif') list = list.filter(f => getExt(f.name) === '.gif')
-    else if (mediaFilter === 'img') list = list.filter(f => !isVideoFile(f) && getExt(f.name) !== '.gif')
     if (sortOrder === 'name') list = [...list].sort((a, b) => a.name.localeCompare(b.name))
     else list = [...list].sort((a, b) => new Date(b.modifiedTime || 0) - new Date(a.modifiedTime || 0))
     return list
-  }, [allPhotos, similarTo, similarResults, globalResults, sortOrder, mediaFilter])
+  }, [allPhotos, similarTo, similarResults, globalResults, sortOrder])
 
   // ── Render ───────────────────────────────────────────────────────────────
   const rootFolders = treeChildren['root'] || []
@@ -1167,12 +1141,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Autenticato come</div>
             <div style={{ fontWeight: 600, fontSize: '13px' }}>{auth.email}</div>
           </div>
-          <PalettePicker colorScheme={colorScheme} onChangeScheme={onChangeScheme} isDark={isDark} />
           <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Tema">
             {isDark ? <IconSun /> : <IconMoon />}
-          </button>
-          <button onClick={() => setShowStatus(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Stato sistema">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           </button>
           <button onClick={onLogout} className="btn-secondary">Logout</button>
         </div>
@@ -1204,7 +1174,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
               activeId={activeFolderId}
               onToggle={handleTreeToggle}
               onSelect={handleTreeSelect}
-              onDrop={(folder, photoId) => handleDropOnFolder(folder, photoId)}
             />
           ))}
 
@@ -1256,27 +1225,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                 </svg>
               </button>
               <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
-              {(() => {
-                const CYCLE = ['all','video','gif','img']
-                const ICONS = {
-                  all:   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
-                  video: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>,
-                  gif:   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M9 9H6v6h3v-2H8"/><line x1="12" y1="9" x2="12" y2="15"/><path d="M15 9h3v2h-3v2h3"/></svg>,
-                  img:   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
-                }
-                const LABELS = { all: 'Tutti i file', video: 'Solo video', gif: 'Solo GIF', img: 'Solo immagini' }
-                const next = () => setMediaFilter(f => CYCLE[(CYCLE.indexOf(f) + 1) % CYCLE.length])
-                return (
-                  <button
-                    onClick={next}
-                    className={`thumb-size-btn${mediaFilter !== 'all' ? ' active' : ''}`}
-                    title={LABELS[mediaFilter]}
-                  >
-                    {ICONS[mediaFilter]}
-                  </button>
-                )
-              })()}
-              <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
               {currentSubfolders.length > 0 && globalResults === null && similarTo === null && (
                 <button
                   onClick={() => setShowSubfolders(v => !v)}
@@ -1288,16 +1236,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                   </svg>
                 </button>
               )}
-              <button
-                onClick={() => handleCreateFolder(activeFolderId, activeFolderName)}
-                className="thumb-size-btn"
-                title="Nuova cartella qui"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
-                  <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
-                </svg>
-              </button>
               <button
                 onClick={() => { setRenameMode(m => !m); setRenameDrafts({}); setSelectionMode(false); setSelectedIds(new Set()) }}
                 className={`thumb-size-btn${renameMode ? ' active' : ''}`}
@@ -1357,7 +1295,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                     {showHistoryOverflow && (
                       <div
                         style={{
-                          position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 200,
+                          position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 200,
                           background: 'var(--surface)', border: '1px solid var(--border)',
                           borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
                           padding: '6px', display: 'flex', flexDirection: 'column', gap: 3, minWidth: 160,
@@ -1382,17 +1320,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                   </div>
                 )}
               </div>
-            )}
-            {videoFiles.length >= 2 && (
-              <button
-                className="btn-secondary"
-                onClick={() => setShowVideoMontage(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '5px 10px' }}
-                title="Monta video"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><polygon points="10,8 16,12 10,16"/></svg>
-                Monta video
-              </button>
             )}
           </div>
 
@@ -1426,14 +1353,13 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                   <button
                     key={f.id}
                     className={`subfolder-grid-item${dragOverFolder === f.id ? ' drop-target' : ''}`}
-                    onClick={() => { setFolderTooltip(null); selectFolder(f.id, f.name) }}
+                    onClick={() => selectFolder(f.id, f.name)}
                     onMouseEnter={e => handleFolderGridEnter(e, f)}
                     onMouseMove={handleFolderGridMove}
                     onMouseLeave={handleFolderGridLeave}
                     onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverFolder(f.id) }}
                     onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverFolder(null) }}
                     onDrop={e => { e.preventDefault(); handleDropOnFolder(f, e.dataTransfer.getData('photoId') || null) }}
-                    onContextMenu={e => { e.preventDefault(); setFolderTooltip(null); setFolderContextMenu({ folder: f, x: e.clientX, y: e.clientY }) }}
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
                     <span>{f.name}</span>
@@ -1648,7 +1574,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
       {slideshowIdx !== null && (
         <QuickLookModal
           files={[results[slideshowIdx]]}
-          auth={auth}
           currentIndex={slideshowIdx}
           total={results.length}
           onPrev={() => setSlideshowIdx(i => Math.max(0, i - 1))}
@@ -1700,65 +1625,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
         />
       )}
 
-      {/* Folder context menu */}
-      {folderContextMenu && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 1500 }}
-          onClick={() => setFolderContextMenu(null)}
-          onContextMenu={e => { e.preventDefault(); setFolderContextMenu(null) }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              position: 'fixed',
-              left: Math.min(folderContextMenu.x, window.innerWidth - 200),
-              top: Math.min(folderContextMenu.y, window.innerHeight - 120),
-              background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 10, boxShadow: '0 8px 28px rgba(0,0,0,0.22)',
-              padding: '5px', minWidth: 190, zIndex: 1501,
-            }}
-          >
-            <button
-              onClick={() => { setFolderContextMenu(null); selectFolder(folderContextMenu.folder.id, folderContextMenu.folder.name) }}
-              style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '7px 12px', background: 'none', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'inherit', textAlign: 'left' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--btn-hover)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
-              Apri cartella
-            </button>
-            <button
-              onClick={() => { setFolderContextMenu(null); handleCreateFolder(folderContextMenu.folder.id, folderContextMenu.folder.name) }}
-              style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '7px 12px', background: 'none', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'inherit', textAlign: 'left' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--btn-hover)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
-              Nuova sottocartella
-            </button>
-            <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-            <button
-              onClick={() => { const f = folderContextMenu.folder; setFolderContextMenu(null); setMovingFolder(f) }}
-              style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '7px 12px', background: 'none', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'inherit', textAlign: 'left' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--btn-hover)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
-              Sposta in…
-            </button>
-            <button
-              onClick={async () => { const f = folderContextMenu.folder; setFolderContextMenu(null); if (!window.confirm(`Elimina la cartella "${f.name}"?`)) return; try { await trashFile(auth.accessToken, f.id); setCurrentSubfolders(sf => sf.filter(s => s.id !== f.id)); setTreeChildren(t => { const c = { ...t }; Object.keys(c).forEach(k => { c[k] = c[k].filter(x => x.id !== f.id) }); return c }) } catch (e) { alert('Errore: ' + e.message) } }}
-              style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '7px 12px', background: 'none', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, color: '#ef4444', fontFamily: 'inherit', textAlign: 'left' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
-              Elimina cartella
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Rename modal */}
       {renamePhoto && (
         <RenameModal
@@ -1775,23 +1641,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
           title={`Sposta "${movePhoto.name}"`}
           onClose={() => setMovePhoto(null)}
           onConfirm={(folder) => { handleMove(movePhoto, folder); setMovePhoto(null) }}
-        />
-      )}
-
-      {/* Move folder modal */}
-      {movingFolder && (
-        <FolderPickerModal
-          accessToken={auth.accessToken}
-          title={`Sposta cartella "${movingFolder.name}" in…`}
-          onClose={() => setMovingFolder(null)}
-          onConfirm={async (targetFolder) => {
-            try {
-              await moveFile(auth.accessToken, movingFolder.id, targetFolder.id, activeFolderId)
-              setCurrentSubfolders(sf => sf.filter(s => s.id !== movingFolder.id))
-              setTreeChildren(t => { const c = { ...t }; Object.keys(c).forEach(k => { c[k] = c[k].filter(x => x.id !== movingFolder.id) }); return c })
-            } catch (e) { alert('Errore: ' + e.message) }
-            setMovingFolder(null)
-          }}
         />
       )}
 
@@ -1894,17 +1743,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
         />
       )}
 
-      {showVideoMontage && (
-        <VideoMontageModal
-          videos={videoFiles}
-          auth={auth}
-          folderId={activeFolderId}
-          folderName={activeFolderName}
-          onClose={() => setShowVideoMontage(false)}
-        />
-      )}
-      {showStatus && <StatusModal auth={auth} onClose={() => setShowStatus(false)} />}
-
       {folderTooltip?.items && (
         <div style={{
           position: 'fixed', left: folderTooltip.x, top: folderTooltip.y,
@@ -1933,24 +1771,20 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
 }
 
 // Recursive tree node with full tree state passed as props
-function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildren, treeLoading, activeId, onToggle, onSelect, onDrop }) {
+function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildren, treeLoading, activeId, onToggle, onSelect }) {
   const expanded = treeExpanded[folder.id]
   const loading = treeLoading[folder.id]
   const children = treeChildren[folder.id]
   const hasChildren = children === undefined || children.length > 0
-  const [isDragOver, setIsDragOver] = useState(false)
 
   const childSiblingIds = (children || []).map(c => c.id)
 
   return (
     <div className="tree-node-wrap">
       <div
-        className={`tree-node${activeId === folder.id ? ' active' : ''}${isDragOver ? ' drop-target' : ''}`}
+        className={`tree-node${activeId === folder.id ? ' active' : ''}`}
         style={{ paddingLeft: 8 + depth * 12 }}
         onClick={() => onSelect(folder, siblingIds)}
-        onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setIsDragOver(true) }}
-        onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setIsDragOver(false) }}
-        onDrop={e => { e.preventDefault(); setIsDragOver(false); onDrop && onDrop(folder, e.dataTransfer.getData('photoId') || null) }}
       >
         <span
           className="tree-chevron"
@@ -1978,7 +1812,6 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
           activeId={activeId}
           onToggle={onToggle}
           onSelect={onSelect}
-          onDrop={onDrop}
         />
       ))}
       {/* skeleton while loading children */}

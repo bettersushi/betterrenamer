@@ -1,26 +1,17 @@
-@keyframes ql-spin {
-  to { transform: rotate(360deg) }
-}
-
 .ql-img-wrap {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 100%;
-  max-width: 1280px;
-  background-color: rgba(255, 255, 255, 0.16);
-  border-radius: 16px;
+  max-width: 900px;
 }
 
 .ql-actions {
   position: absolute;
   top: 50%;
-  right: 16px;
+  right: 14px;
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   z-index: 10;
   opacity: 0;
   transition: opacity 0.18s ease;
