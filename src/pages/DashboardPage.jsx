@@ -1025,7 +1025,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                           )}
                           <label style={{ display: 'flex', alignItems: 'center', gap: 7, margin: 0, fontSize: 13 }}>
                             Da
-                            <input type="number" value={startNumber} onChange={e => { setStartNumber(parseInt(e.target.value) || 1); setPreview([]) }} style={{ width: 52, textAlign: 'center' }} />
+                            <input type="number" value={startNumber} onChange={e => { setStartNumber(parseInt(e.target.value) || 1); setPreview([]) }} style={{ width: 90, textAlign: 'center' }} />
                           </label>
                           <label style={{ display: 'flex', alignItems: 'center', gap: 7, margin: 0, fontSize: 13 }}>
                             Cifre
