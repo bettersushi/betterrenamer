@@ -527,19 +527,26 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
             await patchFileMetadata(auth.accessToken, folder.id, { folderColorRgb: parent.color })
           }
         } else {
-          // Scope cartella: solo un livello — figli diretti della cartella selezionata
-          const topFolders = await listSubfolders(auth.accessToken, job.folderId)
-          for (const folder of topFolders) {
-            if (!folder.folderColorRgb) continue
-            const children = await listSubfolders(auth.accessToken, folder.id)
-            for (const child of children) {
-              if ((child.name === folder.name + ' Vid' || child.name === folder.name + ' Gif') &&
-                  child.folderColorRgb !== folder.folderColorRgb) {
-                updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: child.name, phase: 'Coloro' } })
-                await patchFileMetadata(auth.accessToken, child.id, { folderColorRgb: folder.folderColorRgb })
+          // Scope cartella: ricorsione fino a 3 livelli di profondità
+          const processFolder = async (folderId, depth) => {
+            if (depth > 3) return
+            const subs = await listSubfolders(auth.accessToken, folderId)
+            for (const folder of subs) {
+              if (folder.name.endsWith(' Vid') || folder.name.endsWith(' Gif')) continue
+              if (folder.folderColorRgb) {
+                const children = await listSubfolders(auth.accessToken, folder.id)
+                for (const child of children) {
+                  if ((child.name === folder.name + ' Vid' || child.name === folder.name + ' Gif') &&
+                      child.folderColorRgb !== folder.folderColorRgb) {
+                    updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: child.name, phase: 'Coloro' } })
+                    await patchFileMetadata(auth.accessToken, child.id, { folderColorRgb: folder.folderColorRgb })
+                  }
+                }
               }
+              await processFolder(folder.id, depth + 1)
             }
           }
+          await processFolder(job.folderId, 1)
         }
         updateJob(job.id, { status: 'done', progress: { current: colored, total: colored, currentFile: '', phase: `${colored} cartelle colorate` } })
 
