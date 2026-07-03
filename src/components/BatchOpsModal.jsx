@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const IColor = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -21,7 +21,7 @@ const IClose = () => (
   </svg>
 )
 
-const DRIVE_COLORS = [
+const FALLBACK_COLORS = [
   '#ac725e', '#d06b64', '#f83a22', '#ff7537', '#ffad46',
   '#16a765', '#7bd148', '#42d692', '#4986e7', '#9a9cff',
   '#b99aff', '#cd74e6',
@@ -86,10 +86,21 @@ function AddButton({ onClick, disabled, added }) {
   )
 }
 
-export default function BatchOpsModal({ currentFolder, onClose, onAddJob }) {
+export default function BatchOpsModal({ currentFolder, onClose, onAddJob, accessToken }) {
   const [scopes, setScopes] = useState({ colorByKeyword: 'folder', colorAllSubfolders: 'folder', normalizeNames: 'folder' })
   const [added, setAdded] = useState({})
   const [kwRules, setKwRules] = useState(DEFAULT_RULES)
+  const [palette, setPalette] = useState(FALLBACK_COLORS)
+
+  useEffect(() => {
+    if (!accessToken) return
+    fetch('https://www.googleapis.com/drive/v3/about?fields=folderColorPalette', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then(r => r.json())
+      .then(data => { if (data.folderColorPalette?.length) setPalette(data.folderColorPalette) })
+      .catch(() => {})
+  }, [accessToken])
 
   const setScope = (id, scope) => setScopes(s => ({ ...s, [id]: scope }))
 
@@ -188,7 +199,7 @@ export default function BatchOpsModal({ currentFolder, onClose, onAddJob }) {
                     style={{ width: 110, fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)', fontFamily: 'inherit' }}
                   />
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {DRIVE_COLORS.map(c => (
+                    {palette.map(c => (
                       <button
                         key={c}
                         onClick={() => updateRule(i, { color: c })}

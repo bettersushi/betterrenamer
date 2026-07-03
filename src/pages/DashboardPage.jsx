@@ -1368,6 +1368,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
       {showBatchOps && (
         <BatchOpsModal
           currentFolder={folderPath.length > 1 ? folderPath[folderPath.length - 1] : null}
+          accessToken={auth.accessToken}
           onClose={() => setShowBatchOps(false)}
           onAddJob={(job) => {
             const enriched = { ...job, rootFolderName: job.label, mode: job.scope === 'drive' ? 'Drive' : job.folderName }
