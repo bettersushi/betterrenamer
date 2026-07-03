@@ -66,7 +66,7 @@ export default function BatchOpsModal({ currentFolder, onClose, onAddJob }) {
   }
   const modal = {
     background: 'var(--surface)', borderRadius: 16, padding: '20px 22px',
-    width: 400, maxWidth: '94vw', boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+    width: '92vw', maxWidth: 768, boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
     border: '1px solid var(--border)',
   }
 
