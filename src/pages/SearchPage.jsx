@@ -414,6 +414,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const [currentSubfolders, setCurrentSubfolders] = useState([])
   const [showSubfolders, setShowSubfolders] = useState(true)
   const [dragOverFolder, setDragOverFolder] = useState(null)
+  const [showHistoryOverflow, setShowHistoryOverflow] = useState(false)
   const [folderTooltip, setFolderTooltip] = useState(null) // { items, x, y }
   const folderHoverTimer = useRef(null)
   const folderFileCache = useRef({})
@@ -1244,7 +1245,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
             )}
             {navHistory.length > 0 && (
               <div className="sub-toolbar-tags">
-                {navHistory.map(entry => (
+                {navHistory.slice(0, 5).map(entry => (
                   <button key={entry.key} className="history-tag" onClick={() => {
                     if (entry.snapshot) {
                       restoreState(entry.snapshot)
@@ -1258,6 +1259,41 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                     <span>{entry.label}</span>
                   </button>
                 ))}
+                {navHistory.length > 5 && (
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <button
+                      className="history-tag"
+                      style={{ maxWidth: 'none', padding: '7px 10px', letterSpacing: 1 }}
+                      onClick={() => setShowHistoryOverflow(v => !v)}
+                      title={`${navHistory.length - 5} precedenti`}
+                    >···</button>
+                    {showHistoryOverflow && (
+                      <div
+                        style={{
+                          position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 200,
+                          background: 'var(--surface)', border: '1px solid var(--border)',
+                          borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                          padding: '6px', display: 'flex', flexDirection: 'column', gap: 3, minWidth: 160,
+                        }}
+                        onMouseLeave={() => setShowHistoryOverflow(false)}
+                      >
+                        {navHistory.slice(5).map(entry => (
+                          <button key={entry.key} className="history-tag"
+                            style={{ maxWidth: '100%', borderRadius: 7 }}
+                            onClick={() => {
+                              setShowHistoryOverflow(false)
+                              if (entry.snapshot) restoreState(entry.snapshot)
+                              else if (entry.type === 'folder') selectFolder(entry.folderId, entry.label)
+                              else if (entry.type === 'search') handleGlobalSearch(entry.query)
+                            }} title={entry.label}>
+                            <entry.Icon />
+                            <span>{entry.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
