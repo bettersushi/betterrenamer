@@ -659,9 +659,8 @@
 }
 
 @keyframes drag-gather {
-  0%   { transform: scale(1);    opacity: 1;   filter: blur(0px); }
-  60%  { transform: scale(0.82); opacity: 0.55; filter: blur(1px); }
-  100% { transform: scale(0.75); opacity: 0.35; filter: blur(2px); }
+  0%   { transform: scale(1);    box-shadow: inset 0 0 0 3px #e879a0; }
+  100% { transform: scale(0.97); box-shadow: inset 0 0 0 3px #e879a0; }
 }
 
 .dragging-active .thumb-card.selected,
