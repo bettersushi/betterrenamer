@@ -1069,7 +1069,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Tema">
             {isDark ? <IconSun /> : <IconMoon />}
           </button>
-          <button onClick={onLogout} className="btn-secondary" style={{ fontSize: '12px', padding: '4px 10px' }}>Logout</button>
+          <button onClick={onLogout} className="btn-secondary">Logout</button>
         </div>
       </div>
 
