@@ -234,11 +234,11 @@ const IconDancer = () => (
   </svg>
 )
 
-const CbDot = ({ checked, onChange, onClick, refProp, id }) => (
+const CbDot = ({ checked, onChange, refProp, id }) => (
   <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-    <input type="checkbox" id={id} ref={refProp} checked={checked} onChange={onChange} onClick={onClick}
+    <input type="checkbox" id={id} ref={refProp} checked={checked} onChange={onChange}
       style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }} />
-    <span onClick={onClick || onChange} style={{
+    <span onClick={onChange} style={{
       width: 14, height: 14, borderRadius: '50%',
       border: `1.5px solid ${checked ? 'var(--primary)' : 'var(--border)'}`,
       background: 'transparent', cursor: 'pointer',
@@ -990,7 +990,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
               <>
                 {mode === 'legacy' && visibleFolders.length > 0 && (
                   <div className="folder-select-header" onClick={toggleAllFolders}>
-                    <CbDot refProp={selectAllRef} checked={allChecked} onChange={toggleAllFolders} onClick={e => e.stopPropagation()} />
+                    <CbDot refProp={selectAllRef} checked={allChecked} onChange={toggleAllFolders} />
                     <span style={{ fontSize: '11px', color: 'var(--text-muted)', userSelect: 'none' }}>
                       {checkedFolders.size > 0 ? `${checkedFolders.size} selezionat${checkedFolders.size === 1 ? 'a' : 'e'}` : 'Tutte le cartelle'}
                     </span>
@@ -1018,7 +1018,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                     >
                       {mode === 'legacy' && isFolder && (
                         <div style={{ paddingLeft: '10px', display: 'flex', alignItems: 'center' }} onClick={e => toggleFolder(file.id, e)}>
-                          <CbDot checked={isChecked} onChange={() => {}} onClick={e => toggleFolder(file.id, e)} />
+                          <CbDot checked={isChecked} onChange={e => toggleFolder(file.id, e)} />
                         </div>
                       )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, padding: '8px 10px', minWidth: 0 }}>

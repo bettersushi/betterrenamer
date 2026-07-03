@@ -13,25 +13,26 @@
 }
 
 [data-theme="dark"] {
-  --primary: #5a9ee8;
-  --primary-dark: #3a7dcc;
+  --primary: #7c6fcd;
+  --primary-dark: #5c50a8;
   --success: #7ec842;
   --danger: #f06060;
   --warning: #e0962a;
-  --bg: #111111;
-  --surface: #1c1c1c;
+  --bg: #0f0f14;
+  --surface: #17161f;
   --text-primary: #e8e6e0;
   --text-secondary: #9a9890;
   --text-muted: #5a5854;
-  --border: #2e2e2a;
+  --border: #2a2835;
 }
 
 [data-theme="dark"] body {
-  background: var(--bg);
+  background: linear-gradient(135deg, #0f0f14 0%, #13121c 60%, #0f0f14 100%);
+  min-height: 100vh;
 }
 
 [data-theme="dark"] .btn-secondary:hover {
-  background: #2a2a2a;
+  background: #242233;
 }
 
 [data-theme="dark"] thead {
