@@ -1021,7 +1021,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
           setFolderTooltip({ items, x: tx, y: ty })
         }
       } catch { /* non-critical */ }
-    }, 400)
+    }, 700)
   }, [auth.accessToken])
 
   const handleFolderGridMove = useCallback((e) => {
@@ -1443,7 +1443,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                     onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverFolder(f.id) }}
                     onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverFolder(null) }}
                     draggable
-                    onDragStart={e => { e.dataTransfer.setData('folderId', f.id); e.dataTransfer.effectAllowed = 'move' }}
+                    onMouseDown={() => { clearTimeout(folderHoverTimer.current); setFolderTooltip(null) }}
+                    onDragStart={e => { setFolderTooltip(null); e.dataTransfer.setData('folderId', f.id); e.dataTransfer.effectAllowed = 'move' }}
                     onDrop={e => { e.preventDefault(); handleDropOnFolder(f, e.dataTransfer.getData('photoId') || null, e.dataTransfer.getData('folderId') || null) }}
                     onContextMenu={e => { e.preventDefault(); setFolderTooltip(null); setFolderContextMenu({ folder: f, x: e.clientX, y: e.clientY }) }}
                   >
