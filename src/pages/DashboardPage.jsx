@@ -277,6 +277,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
   const [customPrefix, setCustomPrefix] = useState('')
   const [customAddSeq, setCustomAddSeq] = useState(true)
   const [customSeqSeparator, setCustomSeqSeparator] = useState('-')
+  const [customRecursive, setCustomRecursive] = useState(false)
   const customPrefixRef = useRef(null)
 
   const insertPlaceholder = (token) => {
@@ -712,25 +713,39 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
           }
         }
       } else {
-        const nonFolderFiles = files.filter(f => f.mimeType !== 'application/vnd.google-apps.folder' && f.mimeType !== 'application/vnd.google-apps.shortcut')
-        const previewList = nonFolderFiles.map((file, index) => {
-          const num = (startNumber + index).toString().padStart(padding, '0')
-          const ext = file.name.substring(file.name.lastIndexOf('.')) || ''
-          const extName = ext.slice(1) || 'file'
-          let newName = ''
-          if (pattern === 'folder-ext-seq') newName = `${currentFolder.name}${separator}${extName}${separator}${num}${ext}`
-          else if (pattern === 'seq-ext') newName = `${num}${separator}${extName}${ext}`
-          else if (pattern === 'folder-seq') newName = `${currentFolder.name}${separator}${num}${ext}`
-          else if (pattern === 'custom-free') {
-            const template = customPrefix || '{nome}'
-            const hasSeqToken = template.includes('{seq}')
-            const resolved = resolvePlaceholders(template, { folderName: currentFolder.name, file, num, ext, extName })
-            newName = hasSeqToken || !customAddSeq
-              ? `${resolved}${ext}`
-              : `${resolved}${customSeqSeparator}${num}${ext}`
+        let fileGroups
+        if (pattern === 'custom-free' && customRecursive) {
+          fileGroups = await listFilesRecursive(auth.accessToken, currentFolder.id, currentFolder.name, true)
+        } else {
+          const nonFolderFiles = files.filter(f => f.mimeType !== 'application/vnd.google-apps.folder' && f.mimeType !== 'application/vnd.google-apps.shortcut')
+          fileGroups = [{ files: nonFolderFiles, folderName: currentFolder.name, folderId: currentFolder.id }]
+        }
+        const previewList = []
+        let globalIndex = 0
+        for (const group of fileGroups) {
+          let groupIndex = 0
+          for (const file of group.files) {
+            const index = pattern === 'custom-free' && customRecursive ? groupIndex : globalIndex
+            const num = (startNumber + index).toString().padStart(padding, '0')
+            const ext = file.name.substring(file.name.lastIndexOf('.')) || ''
+            const extName = ext.slice(1) || 'file'
+            let newName = ''
+            if (pattern === 'folder-ext-seq') newName = `${currentFolder.name}${separator}${extName}${separator}${num}${ext}`
+            else if (pattern === 'seq-ext') newName = `${num}${separator}${extName}${ext}`
+            else if (pattern === 'folder-seq') newName = `${currentFolder.name}${separator}${num}${ext}`
+            else if (pattern === 'custom-free') {
+              const template = customPrefix || '{nome}'
+              const hasSeqToken = template.includes('{seq}')
+              const resolved = resolvePlaceholders(template, { folderName: group.folderName, file, num, ext, extName })
+              newName = hasSeqToken || !customAddSeq
+                ? `${resolved}${ext}`
+                : `${resolved}${customSeqSeparator}${num}${ext}`
+            }
+            previewList.push({ id: file.id, oldName: file.name, newName, folderName: group.folderName, folderId: group.folderId, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || null, skip: file.name === newName })
+            groupIndex++
+            globalIndex++
           }
-          return { id: file.id, oldName: file.name, newName, folderName: currentFolder.name, folderId: currentFolder.id, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || null, skip: file.name === newName }
-        })
+        }
         setPreview(previewList)
       }
     } catch (err) {
@@ -995,18 +1010,22 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                         ))}
                       </div>
                     </div>
-                    <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 10, gridColumn: '1 / -1' }}>
-                      <label style={{ margin: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <input type="checkbox" checked={customAddSeq} onChange={e => { setCustomAddSeq(e.target.checked); setPreview([]) }} />
+                    <div style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: '12px 20px', alignItems: 'center', fontSize: 13 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', margin: 0 }}>
+                        <input type="checkbox" style={{ width: 'auto', margin: 0 }} checked={customAddSeq} onChange={e => { setCustomAddSeq(e.target.checked); setPreview([]) }} />
                         Aggiungi sequenza numerica
                       </label>
+                      {customAddSeq && !customPrefix.includes('{seq}') && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 7, margin: 0, fontSize: 13 }}>
+                          Separatore
+                          <input type="text" value={customSeqSeparator} onChange={e => { setCustomSeqSeparator(e.target.value); setPreview([]) }} maxLength="3" style={{ width: 40, textAlign: 'center' }} />
+                        </label>
+                      )}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', margin: 0 }}>
+                        <input type="checkbox" style={{ width: 'auto', margin: 0 }} checked={customRecursive} onChange={e => { setCustomRecursive(e.target.checked); setPreview([]) }} />
+                        Includi sottocartelle
+                      </label>
                     </div>
-                    {customAddSeq && (
-                      <div className="form-group">
-                        <label>Separatore sequenza</label>
-                        <input type="text" value={customSeqSeparator} onChange={e => { setCustomSeqSeparator(e.target.value); setPreview([]) }} maxLength="3" />
-                      </div>
-                    )}
                   </>
                 ) : (
                 <div className="form-group">
