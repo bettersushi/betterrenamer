@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import logoSrc from '../assets/logo-br.svg'
+import logoSrc from '../assets/logo-bs.svg'
 import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata, patchFileMetadata, trashFile, restoreFile, copyFile, moveFile, renameFile } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
 import SimilarityBalloon from '../components/SimilarityBalloon'
@@ -1054,13 +1054,16 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   return (
     <div className="search-page-bg">
       {/* Header */}
-      <div className="header" style={{ padding: '10px 20px', flexShrink: 0, marginBottom: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button onClick={() => navigate('/')} className="nav-icon-btn" title="Torna al rename">
+      <div className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button onClick={() => navigate('/')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Torna a BetterRenamer">
             <IconChevronLeft />
           </button>
-          <img src={logoSrc} alt="" style={{ height: '20px', width: 'auto' }} />
-          <span style={{ fontSize: '15px', fontWeight: 600 }}>Ricerca foto</span>
+          <img src={logoSrc} alt="" style={{ height: '24px', width: 'auto', marginLeft: 4 }} />
+          <div>
+            <div style={{ fontSize: '20px', fontWeight: 700, lineHeight: 1.1 }}>BetterSearch</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Ricerca foto su Google Drive</div>
+          </div>
         </div>
         <div className="header-actions">
           <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Tema">
