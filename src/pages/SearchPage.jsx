@@ -1412,8 +1412,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                       )}
                       {isVideoFile(photo) && (
                         <>
-                          <div className="video-icon-badge" style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', pointerEvents: 'none' }}>
+                          <div className="video-icon-badge" style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 4, padding: '2px 6px 2px 4px', color: 'white', pointerEvents: 'none' }}>
                             <IconVideoFile />
+                            {photo.videoMediaMetadata?.durationMillis && (
+                              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.2, lineHeight: 1 }}>{formatDuration(photo.videoMediaMetadata.durationMillis)}</span>
+                            )}
                           </div>
                           <div className="masonry-video-hover">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
@@ -1505,8 +1508,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                       </div>
                     )}
                     {isVideoFile(photo) && (
-                      <div style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.55)', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', pointerEvents: 'none' }}>
+                      <div style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.55)', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 3, padding: '2px 5px 2px 3px', color: 'white', pointerEvents: 'none' }}>
                         <IconVideoFile />
+                        {photo.videoMediaMetadata?.durationMillis && (
+                          <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: 0.2, lineHeight: 1 }}>{formatDuration(photo.videoMediaMetadata.durationMillis)}</span>
+                        )}
                       </div>
                     )}
                     {similarTo && photo._dist !== undefined && photo._dist === 0 && (
