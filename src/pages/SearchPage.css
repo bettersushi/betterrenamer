@@ -94,6 +94,13 @@
   color: var(--primary);
 }
 
+.tree-node.drop-target {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  outline: 1.5px solid var(--primary);
+  outline-offset: -1px;
+  border-radius: 7px;
+}
+
 .tree-node.active .tree-label {
   font-weight: 600;
   color: var(--primary);

@@ -1433,10 +1433,13 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
             {showSubfolderSidebar && showSubfolders && (
               <div className="subfolder-grid">
                 {currentSubfolders.map(f => (
-                  <button
+                  <div
                     key={f.id}
+                    role="button"
+                    tabIndex={0}
                     className={`subfolder-grid-item${dragOverFolder === f.id ? ' drop-target' : ''}`}
                     onClick={() => { setFolderTooltip(null); selectFolder(f.id, f.name) }}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectFolder(f.id, f.name) } }}
                     onMouseEnter={e => handleFolderGridEnter(e, f)}
                     onMouseMove={handleFolderGridMove}
                     onMouseLeave={handleFolderGridLeave}
@@ -1450,7 +1453,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
                     <span>{f.name}</span>
-                  </button>
+                  </div>
                 ))}
               </div>
             )}
