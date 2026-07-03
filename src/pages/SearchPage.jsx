@@ -453,6 +453,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
 
   const handleGridMouseDown = useCallback((e) => {
     if (!selectionMode || e.button !== 0) return
+    // Don't start rubber band if clicking directly on a photo card — let drag handle it
+    if (e.target.closest('[data-photo-id]')) return
     const container = gridRef.current
     if (!container) return
     const cr = container.getBoundingClientRect()

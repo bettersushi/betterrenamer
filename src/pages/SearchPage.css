@@ -144,6 +144,25 @@
   background: color-mix(in srgb, var(--border) 25%, transparent);
 }
 
+.history-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 8px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  max-width: 130px;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: border-color .12s, color .12s, background .12s;
+  flex-shrink: 0;
+}
+
 .sub-toolbar-back {
   display: inline-flex;
   align-items: center;
