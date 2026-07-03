@@ -1015,11 +1015,23 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                         <input type="checkbox" style={{ width: 'auto', margin: 0 }} checked={customAddSeq} onChange={e => { setCustomAddSeq(e.target.checked); setPreview([]) }} />
                         Aggiungi sequenza numerica
                       </label>
-                      {customAddSeq && !customPrefix.includes('{seq}') && (
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 7, margin: 0, fontSize: 13 }}>
-                          Separatore
-                          <input type="text" value={customSeqSeparator} onChange={e => { setCustomSeqSeparator(e.target.value); setPreview([]) }} maxLength="3" style={{ width: 40, textAlign: 'center' }} />
-                        </label>
+                      {customAddSeq && (
+                        <>
+                          {!customPrefix.includes('{seq}') && (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 7, margin: 0, fontSize: 13 }}>
+                              Separatore
+                              <input type="text" value={customSeqSeparator} onChange={e => { setCustomSeqSeparator(e.target.value); setPreview([]) }} maxLength="3" style={{ width: 40, textAlign: 'center' }} />
+                            </label>
+                          )}
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 7, margin: 0, fontSize: 13 }}>
+                            Da
+                            <input type="number" value={startNumber} onChange={e => { setStartNumber(parseInt(e.target.value) || 1); setPreview([]) }} style={{ width: 52, textAlign: 'center' }} />
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 7, margin: 0, fontSize: 13 }}>
+                            Cifre
+                            <input type="number" value={padding} onChange={e => { setPadding(Math.max(1, Math.min(10, parseInt(e.target.value) || 1))); setPreview([]) }} min="1" max="10" style={{ width: 52, textAlign: 'center' }} />
+                          </label>
+                        </>
                       )}
                       <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', margin: 0 }}>
                         <input type="checkbox" style={{ width: 'auto', margin: 0 }} checked={customRecursive} onChange={e => { setCustomRecursive(e.target.checked); setPreview([]) }} />
@@ -1033,6 +1045,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                   <input type="text" value={separator} onChange={(e) => { setSeparator(e.target.value); setPreview([]) }} maxLength="3" />
                 </div>
                 )}
+                {pattern !== 'custom-free' && <>
                 <div className="form-group">
                   <label>Numero iniziale</label>
                   <input type="number" value={startNumber} onChange={(e) => { setStartNumber(parseInt(e.target.value)); setPreview([]) }} />
@@ -1041,6 +1054,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                   <label>Padding numerico</label>
                   <input type="number" value={padding} onChange={(e) => { setPadding(parseInt(e.target.value)); setPreview([]) }} min="1" max="10" />
                 </div>
+                </>}
               </div>
             )}
 
