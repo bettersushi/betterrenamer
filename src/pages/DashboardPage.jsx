@@ -486,18 +486,20 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
         let colored = 0
         const processFolder = async (folderId) => {
           const subs = await listSubfolders(auth.accessToken, folderId)
-          const byName = {}
-          subs.forEach(f => { byName[f.name] = f })
-          const parents = subs.filter(f => !f.name.endsWith(' Vid') && !f.name.endsWith(' Gif') && f.folderColorRgb)
-          for (const parent of parents) {
-            for (const suffix of [' Vid', ' Gif']) {
-              const child = byName[parent.name + suffix]
-              if (child && child.folderColorRgb !== parent.folderColorRgb) {
-                updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: child.name, phase: 'Coloro' } })
-                await patchFileMetadata(auth.accessToken, child.id, { folderColorRgb: parent.folderColorRgb })
+          for (const folder of subs) {
+            if (folder.name.endsWith(' Vid') || folder.name.endsWith(' Gif')) continue
+            if (folder.folderColorRgb) {
+              // Vid/Gif folders are INSIDE this folder, not siblings
+              const children = await listSubfolders(auth.accessToken, folder.id)
+              for (const child of children) {
+                if ((child.name === folder.name + ' Vid' || child.name === folder.name + ' Gif') &&
+                    child.folderColorRgb !== folder.folderColorRgb) {
+                  updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: child.name, phase: 'Coloro' } })
+                  await patchFileMetadata(auth.accessToken, child.id, { folderColorRgb: folder.folderColorRgb })
+                }
               }
             }
-            await processFolder(parent.id)
+            await processFolder(folder.id)
           }
         }
         await processFolder(job.scope === 'drive' ? 'root' : job.folderId)
