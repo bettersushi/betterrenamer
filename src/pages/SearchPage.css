@@ -94,6 +94,12 @@
   color: var(--primary);
 }
 
+.tree-node.drop-target {
+  background: color-mix(in srgb, #e879a0 14%, transparent);
+  color: #e879a0;
+  box-shadow: inset 0 0 0 1.5px #e879a0;
+}
+
 .tree-node.active .tree-label {
   font-weight: 600;
   color: var(--primary);

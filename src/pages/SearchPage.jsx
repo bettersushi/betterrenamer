@@ -990,7 +990,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           setFolderTooltip({ items, x: tx, y: ty })
         }
       } catch { /* non-critical */ }
-    }, 400)
+    }, 900)
   }, [auth.accessToken])
 
   const handleFolderGridMove = useCallback((e) => {
@@ -1174,6 +1174,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
               activeId={activeFolderId}
               onToggle={handleTreeToggle}
               onSelect={handleTreeSelect}
+              dragOverFolder={dragOverFolder}
+              setDragOverFolder={setDragOverFolder}
+              onDropPhoto={handleDropOnFolder}
             />
           ))}
 
@@ -1777,7 +1780,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
 }
 
 // Recursive tree node with full tree state passed as props
-function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildren, treeLoading, activeId, onToggle, onSelect }) {
+function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildren, treeLoading, activeId, onToggle, onSelect, dragOverFolder, setDragOverFolder, onDropPhoto }) {
   const expanded = treeExpanded[folder.id]
   const loading = treeLoading[folder.id]
   const children = treeChildren[folder.id]
@@ -1785,12 +1788,37 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
 
   const childSiblingIds = (children || []).map(c => c.id)
 
+  const springTimerRef = useRef(null)
+  const clearSpringTimer = () => {
+    if (springTimerRef.current) { clearTimeout(springTimerRef.current); springTimerRef.current = null }
+  }
+
   return (
     <div className="tree-node-wrap">
       <div
-        className={`tree-node${activeId === folder.id ? ' active' : ''}`}
+        className={`tree-node${activeId === folder.id ? ' active' : ''}${dragOverFolder === folder.id ? ' drop-target' : ''}`}
         style={{ paddingLeft: 8 + depth * 12 }}
         onClick={() => onSelect(folder, siblingIds)}
+        onDragOver={e => {
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'move'
+          if (dragOverFolder !== folder.id) setDragOverFolder(folder.id)
+          if (!expanded && !springTimerRef.current) {
+            springTimerRef.current = setTimeout(() => { onToggle(folder, siblingIds); springTimerRef.current = null }, 1000)
+          }
+        }}
+        onDragLeave={e => {
+          if (!e.currentTarget.contains(e.relatedTarget)) {
+            setDragOverFolder(null)
+            clearSpringTimer()
+          }
+        }}
+        onDrop={e => {
+          e.preventDefault()
+          e.stopPropagation()
+          clearSpringTimer()
+          onDropPhoto(folder, e.dataTransfer.getData('photoId') || null)
+        }}
       >
         <span
           className="tree-chevron"
@@ -1818,6 +1846,9 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
           activeId={activeId}
           onToggle={onToggle}
           onSelect={onSelect}
+          dragOverFolder={dragOverFolder}
+          setDragOverFolder={setDragOverFolder}
+          onDropPhoto={onDropPhoto}
         />
       ))}
       {/* skeleton while loading children */}
