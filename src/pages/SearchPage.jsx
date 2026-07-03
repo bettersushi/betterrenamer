@@ -867,9 +867,25 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     })
   }, [auth.accessToken, selectedIds, exitSelectionMode])
 
-  const handleDropOnFolder = useCallback(async (targetFolder, draggedPhotoId) => {
+  const handleDropOnFolder = useCallback(async (targetFolder, draggedPhotoId, draggedFolderId) => {
     setDragOverFolder(null)
-    // Determine which photos to move: selection if active and includes dragged, otherwise just dragged
+
+    // Folder drag: move the folder itself
+    if (draggedFolderId) {
+      if (draggedFolderId === targetFolder.id) return // drop on itself
+      try {
+        await moveFile(auth.accessToken, draggedFolderId, targetFolder.id, activeFolderId)
+        setCurrentSubfolders(sf => sf.filter(s => s.id !== draggedFolderId))
+        setTreeChildren(t => {
+          const c = { ...t }
+          Object.keys(c).forEach(k => { c[k] = c[k].filter(x => x.id !== draggedFolderId) })
+          return c
+        })
+      } catch (e) { console.error('Folder move failed', e) }
+      return
+    }
+
+    // Photo drag
     const idsToMove = selectionMode && selectedIds.size > 0
       ? new Set([...selectedIds, ...(draggedPhotoId ? [draggedPhotoId] : [])])
       : draggedPhotoId ? new Set([draggedPhotoId]) : new Set()
@@ -883,7 +899,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
       return photos.filter(p => !idsToMove.has(p.id))
     })
     if (selectionMode) exitSelectionMode()
-  }, [auth.accessToken, selectionMode, selectedIds, exitSelectionMode])
+  }, [auth.accessToken, selectionMode, selectedIds, exitSelectionMode, activeFolderId])
 
   const DRAG_MAGENTA = '#e879a0'
 
@@ -1174,6 +1190,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
               activeId={activeFolderId}
               onToggle={handleTreeToggle}
               onSelect={handleTreeSelect}
+              onDrop={(folder, photoId, folderId) => handleDropOnFolder(folder, photoId, folderId)}
             />
           ))}
 
@@ -1359,7 +1376,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                     onMouseLeave={handleFolderGridLeave}
                     onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverFolder(f.id) }}
                     onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverFolder(null) }}
-                    onDrop={e => { e.preventDefault(); handleDropOnFolder(f, e.dataTransfer.getData('photoId') || null) }}
+                    draggable
+                    onDragStart={e => { e.dataTransfer.setData('folderId', f.id); e.dataTransfer.effectAllowed = 'move' }}
+                    onDrop={e => { e.preventDefault(); handleDropOnFolder(f, e.dataTransfer.getData('photoId') || null, e.dataTransfer.getData('folderId') || null) }}
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
                     <span>{f.name}</span>
@@ -1771,20 +1790,24 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
 }
 
 // Recursive tree node with full tree state passed as props
-function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildren, treeLoading, activeId, onToggle, onSelect }) {
+function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildren, treeLoading, activeId, onToggle, onSelect, onDrop }) {
   const expanded = treeExpanded[folder.id]
   const loading = treeLoading[folder.id]
   const children = treeChildren[folder.id]
   const hasChildren = children === undefined || children.length > 0
+  const [isDragOver, setIsDragOver] = useState(false)
 
   const childSiblingIds = (children || []).map(c => c.id)
 
   return (
     <div className="tree-node-wrap">
       <div
-        className={`tree-node${activeId === folder.id ? ' active' : ''}`}
+        className={`tree-node${activeId === folder.id ? ' active' : ''}${isDragOver ? ' drop-target' : ''}`}
         style={{ paddingLeft: 8 + depth * 12 }}
         onClick={() => onSelect(folder, siblingIds)}
+        onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setIsDragOver(true) }}
+        onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setIsDragOver(false) }}
+        onDrop={e => { e.preventDefault(); setIsDragOver(false); if (onDrop) onDrop(folder, e.dataTransfer.getData('photoId') || null, e.dataTransfer.getData('folderId') || null) }}
       >
         <span
           className="tree-chevron"
@@ -1812,6 +1835,7 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
           activeId={activeId}
           onToggle={onToggle}
           onSelect={onSelect}
+          onDrop={onDrop}
         />
       ))}
       {/* skeleton while loading children */}
