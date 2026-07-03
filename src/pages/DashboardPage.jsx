@@ -234,6 +234,22 @@ const IconDancer = () => (
   </svg>
 )
 
+const CbDot = ({ checked, onChange, onClick, refProp, id }) => (
+  <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+    <input type="checkbox" id={id} ref={refProp} checked={checked} onChange={onChange} onClick={onClick}
+      style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }} />
+    <span onClick={onClick || onChange} style={{
+      width: 14, height: 14, borderRadius: '50%',
+      border: `1.5px solid ${checked ? 'var(--primary)' : 'var(--border)'}`,
+      background: 'transparent', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      transition: 'border-color 0.12s',
+    }}>
+      {checked && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)' }} />}
+    </span>
+  </span>
+)
+
 export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, onTokenRefresh }) {
   const navigate = useNavigate()
   const [logsOpen, setLogsOpen] = useState(false)
@@ -974,14 +990,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
               <>
                 {mode === 'legacy' && visibleFolders.length > 0 && (
                   <div className="folder-select-header" onClick={toggleAllFolders}>
-                    <input
-                      type="checkbox"
-                      ref={selectAllRef}
-                      checked={allChecked}
-                      onChange={toggleAllFolders}
-                      onClick={e => e.stopPropagation()}
-                      style={{ width: 'auto', margin: 0, cursor: 'pointer' }}
-                    />
+                    <CbDot refProp={selectAllRef} checked={allChecked} onChange={toggleAllFolders} onClick={e => e.stopPropagation()} />
                     <span style={{ fontSize: '11px', color: 'var(--text-muted)', userSelect: 'none' }}>
                       {checkedFolders.size > 0 ? `${checkedFolders.size} selezionat${checkedFolders.size === 1 ? 'a' : 'e'}` : 'Tutte le cartelle'}
                     </span>
@@ -1009,13 +1018,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                     >
                       {mode === 'legacy' && isFolder && (
                         <div style={{ paddingLeft: '10px', display: 'flex', alignItems: 'center' }} onClick={e => toggleFolder(file.id, e)}>
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => {}}
-                            onClick={e => toggleFolder(file.id, e)}
-                            style={{ width: 'auto', margin: 0, cursor: 'pointer' }}
-                          />
+                          <CbDot checked={isChecked} onChange={() => {}} onClick={e => toggleFolder(file.id, e)} />
                         </div>
                       )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, padding: '8px 10px', minWidth: 0 }}>
@@ -1072,20 +1075,20 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
 
             {mode === 'legacy' && (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input type="checkbox" id="moveOnly" checked={moveOnly} onChange={(e) => { setMoveOnly(e.target.checked); setPreview([]) }} style={{ width: 'auto', margin: 0 }} />
-                  <label htmlFor="moveOnly" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Solo sposta video/gif (senza rinominare)</label>
-                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
+                  <CbDot id="moveOnly" checked={moveOnly} onChange={(e) => { setMoveOnly(e.target.checked); setPreview([]) }} />
+                  <span style={{ fontSize: '13px' }}>Solo sposta video/gif (senza rinominare)</span>
+                </label>
                 {!moveOnly && (
                   <>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <input type="checkbox" id="includeRoot" checked={includeRoot} onChange={(e) => { setIncludeRoot(e.target.checked); setPreview([]) }} style={{ width: 'auto', margin: 0 }} />
-                      <label htmlFor="includeRoot" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Includi file nella cartella selezionata</label>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <input type="checkbox" id="organizeMedia" checked={organizeMedia} onChange={(e) => setOrganizeMedia(e.target.checked)} style={{ width: 'auto', margin: 0 }} />
-                      <label htmlFor="organizeMedia" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Sposta video/gif in sottocartelle</label>
-                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
+                      <CbDot id="includeRoot" checked={includeRoot} onChange={(e) => { setIncludeRoot(e.target.checked); setPreview([]) }} />
+                      <span style={{ fontSize: '13px' }}>Includi file nella cartella selezionata</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
+                      <CbDot id="organizeMedia" checked={organizeMedia} onChange={(e) => setOrganizeMedia(e.target.checked)} />
+                      <span style={{ fontSize: '13px' }}>Sposta video/gif in sottocartelle</span>
+                    </label>
                   </>
                 )}
                 <div className="pattern-info">
@@ -1132,7 +1135,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                     </div>
                     <div style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: '12px 20px', alignItems: 'center', fontSize: 13 }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', margin: 0 }}>
-                        <input type="checkbox" style={{ width: 'auto', margin: 0 }} checked={customAddSeq} onChange={e => { setCustomAddSeq(e.target.checked); setPreview([]) }} />
+                        <CbDot checked={customAddSeq} onChange={e => { setCustomAddSeq(e.target.checked); setPreview([]) }} />
                         Aggiungi sequenza numerica
                       </label>
                       {customAddSeq && (
@@ -1154,7 +1157,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                         </>
                       )}
                       <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', margin: 0 }}>
-                        <input type="checkbox" style={{ width: 'auto', margin: 0 }} checked={customRecursive} onChange={e => { setCustomRecursive(e.target.checked); setPreview([]) }} />
+                        <CbDot checked={customRecursive} onChange={e => { setCustomRecursive(e.target.checked); setPreview([]) }} />
                         Includi sottocartelle
                       </label>
                     </div>
