@@ -123,6 +123,11 @@
   cursor: grab;
 }
 
+.vmm-edit-item.selected {
+  border-color: var(--primary) !important;
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface-2, var(--bg)));
+}
+
 .vmm-edit-thumb {
   width: 80px; height: 48px; object-fit: cover; border-radius: 6px; flex-shrink: 0;
 }
