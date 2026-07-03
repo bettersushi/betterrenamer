@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import logoSrc from '../assets/logo-br.svg'
 import { useNavigate } from 'react-router-dom'
-import { listFiles, listFilesRecursive, batchRenameFiles, getOrCreateFolder, moveFile, renameFile, listSubfolders, patchFileMetadata } from '../drive'
+import { listFiles, listFilesRecursive, batchRenameFiles, getOrCreateFolder, moveFile, renameFile, listSubfolders, patchFileMetadata, getFolderAncestors } from '../drive'
 import { saveSession, getSessions, clearSessions, downloadCSV } from '../logs'
 import QuickLookModal from '../components/QuickLookModal'
 import BatchOpsModal from '../components/BatchOpsModal'
+import StatusModal from '../components/StatusModal'
+import PalettePicker from '../components/PalettePicker'
 import './DashboardPage.css'
 
 const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
@@ -12,6 +14,8 @@ const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv'
 
 const PLACEHOLDERS = [
   { token: '{cartella}', label: 'Cartella', desc: 'Nome della cartella corrente' },
+  { token: '{parent}',   label: 'Parent',   desc: 'Nome della cartella padre' },
+  { token: '{nonno}',    label: 'Nonno',    desc: 'Nome della cartella nonno' },
   { token: '{nome}',     label: 'Nome',     desc: 'Nome originale del file senza estensione' },
   { token: '{seq}',      label: 'Sequenza', desc: 'Numero progressivo (es. 001)' },
   { token: '{data}',     label: 'Data',     desc: 'Data modifica file: YYYYMMDD' },
@@ -21,7 +25,7 @@ const PLACEHOLDERS = [
   { token: '{ext}',      label: 'Ext',      desc: 'Estensione senza punto (es. jpg)' },
 ]
 
-function resolvePlaceholders(template, { folderName, file, num, ext, extName }) {
+function resolvePlaceholders(template, { folderName, parentName, nonnoName, file, num, ext, extName }) {
   const modified = file.modifiedTime ? new Date(file.modifiedTime) : new Date()
   const anno = modified.getFullYear().toString()
   const mese = (modified.getMonth() + 1).toString().padStart(2, '0')
@@ -29,6 +33,8 @@ function resolvePlaceholders(template, { folderName, file, num, ext, extName }) 
   const originalBase = file.name.includes('.') ? file.name.slice(0, file.name.lastIndexOf('.')) : file.name
   return template
     .replace(/{cartella}/g, folderName)
+    .replace(/{parent}/g, parentName || folderName)
+    .replace(/{nonno}/g, nonnoName || parentName || folderName)
     .replace(/{nome}/g, originalBase)
     .replace(/{seq}/g, num)
     .replace(/{data}/g, `${anno}${mese}${giorno}`)
@@ -234,7 +240,23 @@ const IconDancer = () => (
   </svg>
 )
 
-export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, onTokenRefresh }) {
+const CbDot = ({ checked, onChange, refProp, id }) => (
+  <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+    <input type="checkbox" id={id} ref={refProp} checked={checked} onChange={onChange}
+      style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }} />
+    <span onClick={onChange} style={{
+      width: 14, height: 14, borderRadius: '50%',
+      border: `1.5px solid ${checked ? 'var(--primary)' : 'var(--border)'}`,
+      background: 'transparent', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      transition: 'border-color 0.12s',
+    }}>
+      {checked && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)' }} />}
+    </span>
+  </span>
+)
+
+export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, colorScheme, onChangeScheme, onTokenRefresh }) {
   const navigate = useNavigate()
   const [logsOpen, setLogsOpen] = useState(false)
   const [logSessions, setLogSessions] = useState([])
@@ -243,6 +265,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
   const [undoingEntries, setUndoingEntries] = useState(new Set())
 
   const [showBatchOps, setShowBatchOps] = useState(false)
+  const [showStatus, setShowStatus] = useState(false)
 
   const openLogs = () => { setLogSessions(getSessions()); setLogsOpen(true) }
   const closeLogs = () => setLogsOpen(false)
@@ -839,9 +862,26 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
           const nonFolderFiles = files.filter(f => f.mimeType !== 'application/vnd.google-apps.folder' && f.mimeType !== 'application/vnd.google-apps.shortcut')
           fileGroups = [{ files: nonFolderFiles, folderName: currentFolder.name, folderId: currentFolder.id }]
         }
+        // Fetch ancestors if template uses {parent} or {nonno}
+        const template = pattern === 'custom-free' ? (customPrefix || '{nome}') : ''
+        const needsAncestors = template.includes('{parent}') || template.includes('{nonno}')
+        const ancestorsMap = {}
+        if (needsAncestors) {
+          const uniqueIds = [...new Set(fileGroups.map(g => g.folderId))]
+          await Promise.all(uniqueIds.map(async id => {
+            try {
+              const anc = await getFolderAncestors(auth.accessToken, id, 2)
+              ancestorsMap[id] = anc
+            } catch { ancestorsMap[id] = [] }
+          }))
+        }
+
         const previewList = []
         let globalIndex = 0
         for (const group of fileGroups) {
+          const ancestors = ancestorsMap[group.folderId] || []
+          const parentName = ancestors[0]?.name || ''
+          const nonnoName = ancestors[1]?.name || ''
           let groupIndex = 0
           for (const file of group.files) {
             const index = pattern === 'custom-free' && customRecursive ? groupIndex : globalIndex
@@ -853,9 +893,8 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
             else if (pattern === 'seq-ext') newName = `${num}${separator}${extName}${ext}`
             else if (pattern === 'folder-seq') newName = `${currentFolder.name}${separator}${num}${ext}`
             else if (pattern === 'custom-free') {
-              const template = customPrefix || '{nome}'
               const hasSeqToken = template.includes('{seq}')
-              const resolved = resolvePlaceholders(template, { folderName: group.folderName, file, num, ext, extName })
+              const resolved = resolvePlaceholders(template, { folderName: group.folderName, parentName, nonnoName, file, num, ext, extName })
               newName = hasSeqToken || !customAddSeq
                 ? `${resolved}${ext}`
                 : `${resolved}${customSeqSeparator}${num}${ext}`
@@ -900,23 +939,29 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
       )}
       {/* Header */}
       <div className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0 }}>
-        <div>
-          <h1 style={{ fontSize: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <img src={logoSrc} alt="" style={{ height: '24px', width: 'auto' }} />
-            BetterRenamer
-          </h1>
-          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Batch rename per Google Drive</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div>
+            <h1 style={{ fontSize: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <img src={logoSrc} alt="" style={{ height: '24px', width: 'auto' }} />
+              BetterRenamer
+            </h1>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Batch rename per Google Drive</p>
+          </div>
+          <button onClick={() => navigate('/search')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0, marginLeft: 4 }} title="Ricerca foto"><IconSearch /></button>
         </div>
         <div className="header-actions">
           <div className="user-info">
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Autenticato come</div>
             <div style={{ fontWeight: 600, fontSize: '13px' }}>{auth.email}</div>
           </div>
+          <PalettePicker colorScheme={colorScheme} onChangeScheme={onChangeScheme} isDark={isDark} />
           <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Tema">
             {isDark ? <IconSun /> : <IconMoon />}
           </button>
-          <button onClick={() => navigate('/search')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Ricerca foto"><IconSearch /></button>
           <button onClick={() => setShowBatchOps(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Operazioni batch"><IconWand /></button>
+          <button onClick={() => setShowStatus(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Stato sistema">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </button>
           <button onClick={openLogs} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><IconList /> Logs</button>
           <button onClick={handleLogout} className="btn-secondary">Logout</button>
         </div>
@@ -974,14 +1019,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
               <>
                 {mode === 'legacy' && visibleFolders.length > 0 && (
                   <div className="folder-select-header" onClick={toggleAllFolders}>
-                    <input
-                      type="checkbox"
-                      ref={selectAllRef}
-                      checked={allChecked}
-                      onChange={toggleAllFolders}
-                      onClick={e => e.stopPropagation()}
-                      style={{ width: 'auto', margin: 0, cursor: 'pointer' }}
-                    />
+                    <CbDot refProp={selectAllRef} checked={allChecked} onChange={toggleAllFolders} />
                     <span style={{ fontSize: '11px', color: 'var(--text-muted)', userSelect: 'none' }}>
                       {checkedFolders.size > 0 ? `${checkedFolders.size} selezionat${checkedFolders.size === 1 ? 'a' : 'e'}` : 'Tutte le cartelle'}
                     </span>
@@ -1009,13 +1047,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                     >
                       {mode === 'legacy' && isFolder && (
                         <div style={{ paddingLeft: '10px', display: 'flex', alignItems: 'center' }} onClick={e => toggleFolder(file.id, e)}>
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => {}}
-                            onClick={e => toggleFolder(file.id, e)}
-                            style={{ width: 'auto', margin: 0, cursor: 'pointer' }}
-                          />
+                          <CbDot checked={isChecked} onChange={e => toggleFolder(file.id, e)} />
                         </div>
                       )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, padding: '8px 10px', minWidth: 0 }}>
@@ -1072,20 +1104,20 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
 
             {mode === 'legacy' && (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input type="checkbox" id="moveOnly" checked={moveOnly} onChange={(e) => { setMoveOnly(e.target.checked); setPreview([]) }} style={{ width: 'auto', margin: 0 }} />
-                  <label htmlFor="moveOnly" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Solo sposta video/gif (senza rinominare)</label>
-                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
+                  <CbDot id="moveOnly" checked={moveOnly} onChange={(e) => { setMoveOnly(e.target.checked); setPreview([]) }} />
+                  <span style={{ fontSize: '13px' }}>Solo sposta video/gif (senza rinominare)</span>
+                </label>
                 {!moveOnly && (
                   <>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <input type="checkbox" id="includeRoot" checked={includeRoot} onChange={(e) => { setIncludeRoot(e.target.checked); setPreview([]) }} style={{ width: 'auto', margin: 0 }} />
-                      <label htmlFor="includeRoot" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Includi file nella cartella selezionata</label>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <input type="checkbox" id="organizeMedia" checked={organizeMedia} onChange={(e) => setOrganizeMedia(e.target.checked)} style={{ width: 'auto', margin: 0 }} />
-                      <label htmlFor="organizeMedia" style={{ margin: 0, cursor: 'pointer', fontSize: '13px' }}>Sposta video/gif in sottocartelle</label>
-                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
+                      <CbDot id="includeRoot" checked={includeRoot} onChange={(e) => { setIncludeRoot(e.target.checked); setPreview([]) }} />
+                      <span style={{ fontSize: '13px' }}>Includi file nella cartella selezionata</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
+                      <CbDot id="organizeMedia" checked={organizeMedia} onChange={(e) => setOrganizeMedia(e.target.checked)} />
+                      <span style={{ fontSize: '13px' }}>Sposta video/gif in sottocartelle</span>
+                    </label>
                   </>
                 )}
                 <div className="pattern-info">
@@ -1132,7 +1164,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                     </div>
                     <div style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: '12px 20px', alignItems: 'center', fontSize: 13 }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', margin: 0 }}>
-                        <input type="checkbox" style={{ width: 'auto', margin: 0 }} checked={customAddSeq} onChange={e => { setCustomAddSeq(e.target.checked); setPreview([]) }} />
+                        <CbDot checked={customAddSeq} onChange={e => { setCustomAddSeq(e.target.checked); setPreview([]) }} />
                         Aggiungi sequenza numerica
                       </label>
                       {customAddSeq && (
@@ -1154,7 +1186,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                         </>
                       )}
                       <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', margin: 0 }}>
-                        <input type="checkbox" style={{ width: 'auto', margin: 0 }} checked={customRecursive} onChange={e => { setCustomRecursive(e.target.checked); setPreview([]) }} />
+                        <CbDot checked={customRecursive} onChange={e => { setCustomRecursive(e.target.checked); setPreview([]) }} />
                         Includi sottocartelle
                       </label>
                     </div>
@@ -1365,6 +1397,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
           </div>
         </div>
       )}
+      {showStatus && <StatusModal auth={auth} onClose={() => setShowStatus(false)} />}
       {showBatchOps && (
         <BatchOpsModal
           currentFolder={folderPath.length > 1 ? folderPath[folderPath.length - 1] : null}
