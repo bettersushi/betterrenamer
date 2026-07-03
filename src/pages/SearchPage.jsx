@@ -1370,7 +1370,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                   <button
                     key={f.id}
                     className={`subfolder-grid-item${dragOverFolder === f.id ? ' drop-target' : ''}`}
-                    onClick={() => selectFolder(f.id, f.name)}
+                    onClick={() => { setFolderTooltip(null); selectFolder(f.id, f.name) }}
                     onMouseEnter={e => handleFolderGridEnter(e, f)}
                     onMouseMove={handleFolderGridMove}
                     onMouseLeave={handleFolderGridLeave}
