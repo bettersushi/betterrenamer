@@ -1,6 +1,7 @@
 // src/components/VideoMontageModal.jsx
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import './VideoMontageModal.css'
+import VideoTrimCrop from './VideoTrimCrop'
 
 function formatSize(bytes) {
   if (!bytes) return ''
@@ -105,16 +106,94 @@ export default function VideoMontageModal({ videos, auth, onClose }) {
               Avanti ({selectedIds.size} clip)
             </button>
           )}
+          {stage === 1 && (
+            <button
+              onClick={() => setStage(2)}
+              style={{ padding: '7px 18px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}
+            >
+              Esporta →
+            </button>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-// Stubs — implemented in Tasks 4 and 5
 function EditStage({ clips, setClips, auth }) {
-  return <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Edit stage — Task 4</div>
+  const [activeIdx, setActiveIdx] = useState(0)
+  const dragIdx = useRef(null)
+
+  function updateClip(idx, updated) {
+    setClips(prev => prev.map((c, i) => i === idx ? updated : c))
+  }
+
+  // Drag-to-reorder
+  function onDragStart(i) { dragIdx.current = i }
+  function onDragOver(e, i) {
+    e.preventDefault()
+    if (dragIdx.current === null || dragIdx.current === i) return
+    setClips(prev => {
+      const next = [...prev]
+      const [moved] = next.splice(dragIdx.current, 1)
+      next.splice(i, 0, moved)
+      dragIdx.current = i
+      return next
+    })
+  }
+  function onDragEnd() { dragIdx.current = null }
+
+  return (
+    <div style={{ display: 'flex', gap: 18 }}>
+      {/* Left: ordered list */}
+      <div style={{ width: 220, flexShrink: 0 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>ORDINE CLIP</div>
+        <div className="vmm-edit-list">
+          {clips.map((c, i) => (
+            <div
+              key={c.file.id}
+              className={`vmm-edit-item${i === activeIdx ? ' selected' : ''}`}
+              style={{ borderColor: i === activeIdx ? 'var(--primary)' : 'var(--border)', opacity: 1 }}
+              draggable
+              onDragStart={() => onDragStart(i)}
+              onDragOver={e => onDragOver(e, i)}
+              onDragEnd={onDragEnd}
+              onClick={() => setActiveIdx(i)}
+            >
+              {c.file.thumbnailLink
+                ? <img className="vmm-edit-thumb" src={c.file.thumbnailLink.replace(/=s\d+$/, '=s160')} alt="" />
+                : <div className="vmm-edit-thumb" style={{ background: 'var(--border)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-muted)', fontSize:18 }}>▶</div>
+              }
+              <div className="vmm-edit-info">
+                <div className="vmm-edit-name">{i + 1}. {c.file.name}</div>
+                <div className="vmm-edit-meta">
+                  {c.trim ? `✂ ${c.trim.start.toFixed(1)}s–${c.trim.end.toFixed(1)}s` : 'Clip intera'}
+                  {c.crop ? ' · Crop ✓' : ''}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Right: trim+crop editor for active clip */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>
+          MODIFICA: {clips[activeIdx]?.file.name}
+        </div>
+        {clips[activeIdx] && (
+          <VideoTrimCrop
+            clip={clips[activeIdx]}
+            auth={auth}
+            onChange={updated => updateClip(activeIdx, updated)}
+          />
+        )}
+      </div>
+    </div>
+  )
 }
+
+// Stub — implemented in Task 5
 function RenderStage({ clips, onClose }) {
   return <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Render stage — Task 5</div>
 }
