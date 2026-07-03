@@ -11,6 +11,7 @@ import PhotoContextMenu from '../components/PhotoContextMenu'
 import FolderPickerModal from '../components/FolderPickerModal'
 import CropModal from '../components/CropModal'
 import VideoMontageModal from '../components/VideoMontageModal'
+import StatusModal from '../components/StatusModal'
 import './SearchPage.css'
 
 const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
@@ -401,6 +402,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [renamePhoto, setRenamePhoto] = useState(null)
   const [undoToast, setUndoToast] = useState(null) // { photo, insertIdx, timer }
   const [showVideoMontage, setShowVideoMontage] = useState(false)
+  const [showStatus, setShowStatus] = useState(false)
+  const [mediaFilter, setMediaFilter] = useState('all')
   const [croppingIds, setCroppingIds] = useState(new Set())
   const [cropDoneIds, setCropDoneIds] = useState(new Set())
   const [rotatingIds, setRotatingIds] = useState(new Set())
@@ -1116,10 +1119,13 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
 
   const results = useMemo(() => {
     let list = globalResults !== null ? globalResults : similarTo ? similarResults : allPhotos
+    if (mediaFilter === 'video') list = list.filter(f => isVideoFile(f))
+    else if (mediaFilter === 'gif') list = list.filter(f => getExt(f.name) === '.gif')
+    else if (mediaFilter === 'img') list = list.filter(f => !isVideoFile(f) && getExt(f.name) !== '.gif')
     if (sortOrder === 'name') list = [...list].sort((a, b) => a.name.localeCompare(b.name))
     else list = [...list].sort((a, b) => new Date(b.modifiedTime || 0) - new Date(a.modifiedTime || 0))
     return list
-  }, [allPhotos, similarTo, similarResults, globalResults, sortOrder])
+  }, [allPhotos, similarTo, similarResults, globalResults, sortOrder, mediaFilter])
 
   // ── Render ───────────────────────────────────────────────────────────────
   const rootFolders = treeChildren['root'] || []
@@ -1149,6 +1155,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
           <PalettePicker colorScheme={colorScheme} onChangeScheme={onChangeScheme} isDark={isDark} />
           <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Tema">
             {isDark ? <IconSun /> : <IconMoon />}
+          </button>
+          <button onClick={() => setShowStatus(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Stato sistema">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           </button>
           <button onClick={onLogout} className="btn-secondary">Logout</button>
         </div>
@@ -1231,6 +1240,18 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                   <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
                 </svg>
               </button>
+              <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
+              {(['all','img','video','gif']).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setMediaFilter(f)}
+                  className={`thumb-size-btn${mediaFilter === f ? ' active' : ''}`}
+                  title={{ all: 'Tutti', img: 'Solo immagini', video: 'Solo video', gif: 'Solo GIF' }[f]}
+                  style={{ fontSize: 10, fontWeight: 600, width: 'auto', padding: '0 6px', minWidth: 28 }}
+                >
+                  {f === 'all' ? 'all' : f}
+                </button>
+              ))}
               <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
               {currentSubfolders.length > 0 && globalResults === null && similarTo === null && (
                 <button
@@ -1770,6 +1791,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
           onClose={() => setShowVideoMontage(false)}
         />
       )}
+      {showStatus && <StatusModal auth={auth} onClose={() => setShowStatus(false)} />}
 
       {folderTooltip?.items && (
         <div style={{

@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import logoSrc from '../assets/logo-br.svg'
 import { useNavigate } from 'react-router-dom'
-import { listFiles, listFilesRecursive, batchRenameFiles, getOrCreateFolder, moveFile, renameFile, listSubfolders, patchFileMetadata } from '../drive'
+import { listFiles, listFilesRecursive, batchRenameFiles, getOrCreateFolder, moveFile, renameFile, listSubfolders, patchFileMetadata, getFolderAncestors } from '../drive'
 import { saveSession, getSessions, clearSessions, downloadCSV } from '../logs'
 import QuickLookModal from '../components/QuickLookModal'
 import BatchOpsModal from '../components/BatchOpsModal'
+import StatusModal from '../components/StatusModal'
 import PalettePicker from '../components/PalettePicker'
 import './DashboardPage.css'
 
@@ -13,6 +14,8 @@ const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv'
 
 const PLACEHOLDERS = [
   { token: '{cartella}', label: 'Cartella', desc: 'Nome della cartella corrente' },
+  { token: '{parent}',   label: 'Parent',   desc: 'Nome della cartella padre' },
+  { token: '{nonno}',    label: 'Nonno',    desc: 'Nome della cartella nonno' },
   { token: '{nome}',     label: 'Nome',     desc: 'Nome originale del file senza estensione' },
   { token: '{seq}',      label: 'Sequenza', desc: 'Numero progressivo (es. 001)' },
   { token: '{data}',     label: 'Data',     desc: 'Data modifica file: YYYYMMDD' },
@@ -22,7 +25,7 @@ const PLACEHOLDERS = [
   { token: '{ext}',      label: 'Ext',      desc: 'Estensione senza punto (es. jpg)' },
 ]
 
-function resolvePlaceholders(template, { folderName, file, num, ext, extName }) {
+function resolvePlaceholders(template, { folderName, parentName, nonnoName, file, num, ext, extName }) {
   const modified = file.modifiedTime ? new Date(file.modifiedTime) : new Date()
   const anno = modified.getFullYear().toString()
   const mese = (modified.getMonth() + 1).toString().padStart(2, '0')
@@ -30,6 +33,8 @@ function resolvePlaceholders(template, { folderName, file, num, ext, extName }) 
   const originalBase = file.name.includes('.') ? file.name.slice(0, file.name.lastIndexOf('.')) : file.name
   return template
     .replace(/{cartella}/g, folderName)
+    .replace(/{parent}/g, parentName || folderName)
+    .replace(/{nonno}/g, nonnoName || parentName || folderName)
     .replace(/{nome}/g, originalBase)
     .replace(/{seq}/g, num)
     .replace(/{data}/g, `${anno}${mese}${giorno}`)
@@ -260,6 +265,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
   const [undoingEntries, setUndoingEntries] = useState(new Set())
 
   const [showBatchOps, setShowBatchOps] = useState(false)
+  const [showStatus, setShowStatus] = useState(false)
 
   const openLogs = () => { setLogSessions(getSessions()); setLogsOpen(true) }
   const closeLogs = () => setLogsOpen(false)
@@ -856,9 +862,26 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
           const nonFolderFiles = files.filter(f => f.mimeType !== 'application/vnd.google-apps.folder' && f.mimeType !== 'application/vnd.google-apps.shortcut')
           fileGroups = [{ files: nonFolderFiles, folderName: currentFolder.name, folderId: currentFolder.id }]
         }
+        // Fetch ancestors if template uses {parent} or {nonno}
+        const template = pattern === 'custom-free' ? (customPrefix || '{nome}') : ''
+        const needsAncestors = template.includes('{parent}') || template.includes('{nonno}')
+        const ancestorsMap = {}
+        if (needsAncestors) {
+          const uniqueIds = [...new Set(fileGroups.map(g => g.folderId))]
+          await Promise.all(uniqueIds.map(async id => {
+            try {
+              const anc = await getFolderAncestors(auth.accessToken, id, 2)
+              ancestorsMap[id] = anc
+            } catch { ancestorsMap[id] = [] }
+          }))
+        }
+
         const previewList = []
         let globalIndex = 0
         for (const group of fileGroups) {
+          const ancestors = ancestorsMap[group.folderId] || []
+          const parentName = ancestors[0]?.name || ''
+          const nonnoName = ancestors[1]?.name || ''
           let groupIndex = 0
           for (const file of group.files) {
             const index = pattern === 'custom-free' && customRecursive ? groupIndex : globalIndex
@@ -870,9 +893,8 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
             else if (pattern === 'seq-ext') newName = `${num}${separator}${extName}${ext}`
             else if (pattern === 'folder-seq') newName = `${currentFolder.name}${separator}${num}${ext}`
             else if (pattern === 'custom-free') {
-              const template = customPrefix || '{nome}'
               const hasSeqToken = template.includes('{seq}')
-              const resolved = resolvePlaceholders(template, { folderName: group.folderName, file, num, ext, extName })
+              const resolved = resolvePlaceholders(template, { folderName: group.folderName, parentName, nonnoName, file, num, ext, extName })
               newName = hasSeqToken || !customAddSeq
                 ? `${resolved}${ext}`
                 : `${resolved}${customSeqSeparator}${num}${ext}`
@@ -937,6 +959,9 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
             {isDark ? <IconSun /> : <IconMoon />}
           </button>
           <button onClick={() => setShowBatchOps(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Operazioni batch"><IconWand /></button>
+          <button onClick={() => setShowStatus(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Stato sistema">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </button>
           <button onClick={openLogs} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><IconList /> Logs</button>
           <button onClick={handleLogout} className="btn-secondary">Logout</button>
         </div>
@@ -1372,6 +1397,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
           </div>
         </div>
       )}
+      {showStatus && <StatusModal auth={auth} onClose={() => setShowStatus(false)} />}
       {showBatchOps && (
         <BatchOpsModal
           currentFolder={folderPath.length > 1 ? folderPath[folderPath.length - 1] : null}
