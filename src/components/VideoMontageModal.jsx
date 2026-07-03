@@ -1,5 +1,5 @@
 // src/components/VideoMontageModal.jsx
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import './VideoMontageModal.css'
 import VideoTrimCrop from './VideoTrimCrop'
 import { useFFmpeg } from '../hooks/useFFmpeg'
@@ -208,6 +208,10 @@ function RenderStage({ clips, auth, onClose }) {
   const [outputUrl, setOutputUrl] = useState(null)
   const [currentClip, setCurrentClip] = useState(0)
 
+  useEffect(() => {
+    return () => { if (outputUrl) URL.revokeObjectURL(outputUrl) }
+  }, [outputUrl])
+
   const QUALITY = {
     '480p':  { scale: 'scale=-2:480',  crf: 28 },
     '720p':  { scale: 'scale=-2:720',  crf: 26 },
@@ -218,7 +222,9 @@ function RenderStage({ clips, auth, onClose }) {
     setStatus('loading')
     setErrorMsg('')
     try {
-      if (!loaded) await load()
+      let ff = ffmpeg
+      if (!loaded) ff = await load()
+      if (!ff) throw new Error('FFmpeg non disponibile')
       setStatus('processing')
       const { scale, crf } = QUALITY[quality]
       const concatLines = []
@@ -234,7 +240,7 @@ function RenderStage({ clips, auth, onClose }) {
         if (!res.ok) throw new Error(`Download fallito: ${file.name}`)
         const blob = await res.blob()
         const inName = `in_${i}.mp4`
-        await ffmpeg.writeFile(inName, await fetchFile(blob))
+        await ff.writeFile(inName, await fetchFile(blob))
 
         // Build vf filter
         let vf = ''
@@ -257,24 +263,25 @@ function RenderStage({ clips, auth, onClose }) {
         args.push('-vf', vf, '-c:v', 'libx264', '-crf', String(crf), '-preset', 'fast', '-c:a', 'aac')
         const outName = `clip_${i}.mp4`
         args.push(outName)
-        await ffmpeg.exec(args)
-        await ffmpeg.deleteFile(inName)
+        await ff.exec(args)
+        await ff.deleteFile(inName)
         concatLines.push(`file '${outName}'`)
       }
 
       // Write concat list
       const concatTxt = concatLines.join('\n')
-      await ffmpeg.writeFile('concat.txt', concatTxt)
-      await ffmpeg.exec(['-y', '-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-c', 'copy', 'output.mp4'])
+      await ff.writeFile('concat.txt', concatTxt)
+      await ff.exec(['-y', '-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-c', 'copy', 'output.mp4'])
 
-      const data = await ffmpeg.readFile('output.mp4')
-      const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }))
+      const data = await ff.readFile('output.mp4')
+      const url = URL.createObjectURL(new Blob([data], { type: 'video/mp4' }))
       setOutputUrl(url)
       setStatus('done')
 
       // Cleanup
-      for (let i = 0; i < clips.length; i++) { try { await ffmpeg.deleteFile(`clip_${i}.mp4`) } catch {} }
-      try { await ffmpeg.deleteFile('concat.txt') } catch {}
+      for (let i = 0; i < clips.length; i++) { try { await ff.deleteFile(`clip_${i}.mp4`) } catch {} }
+      try { await ff.deleteFile('output.mp4') } catch {}
+      try { await ff.deleteFile('concat.txt') } catch {}
     } catch (e) {
       console.error(e)
       setErrorMsg(e.message || 'Errore durante l\'elaborazione')

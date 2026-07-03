@@ -24,6 +24,7 @@ export function useFFmpeg() {
       })
       ffmpegRef.current = ff
       setLoaded(true)
+      return ff
     } finally {
       loadingRef.current = false
     }
