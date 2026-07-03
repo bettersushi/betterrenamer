@@ -1241,17 +1241,26 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                 </svg>
               </button>
               <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
-              {(['all','img','video','gif']).map(f => (
-                <button
-                  key={f}
-                  onClick={() => setMediaFilter(f)}
-                  className={`thumb-size-btn${mediaFilter === f ? ' active' : ''}`}
-                  title={{ all: 'Tutti', img: 'Solo immagini', video: 'Solo video', gif: 'Solo GIF' }[f]}
-                  style={{ fontSize: 10, fontWeight: 600, width: 'auto', padding: '0 6px', minWidth: 28 }}
-                >
-                  {f === 'all' ? 'all' : f}
-                </button>
-              ))}
+              {(() => {
+                const CYCLE = ['all','video','gif','img']
+                const ICONS = {
+                  all:   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
+                  video: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>,
+                  gif:   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M9 9H6v6h3v-2H8"/><line x1="12" y1="9" x2="12" y2="15"/><path d="M15 9h3v2h-3v2h3"/></svg>,
+                  img:   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
+                }
+                const LABELS = { all: 'Tutti i file', video: 'Solo video', gif: 'Solo GIF', img: 'Solo immagini' }
+                const next = () => setMediaFilter(f => CYCLE[(CYCLE.indexOf(f) + 1) % CYCLE.length])
+                return (
+                  <button
+                    onClick={next}
+                    className={`thumb-size-btn${mediaFilter !== 'all' ? ' active' : ''}`}
+                    title={LABELS[mediaFilter]}
+                  >
+                    {ICONS[mediaFilter]}
+                  </button>
+                )
+              })()}
               <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
               {currentSubfolders.length > 0 && globalResults === null && similarTo === null && (
                 <button
