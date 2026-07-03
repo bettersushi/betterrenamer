@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import logoSrc from '../assets/logo-br.svg'
 import { useNavigate } from 'react-router-dom'
-import { listFiles, listFilesRecursive, batchRenameFiles, getOrCreateFolder, moveFile, renameFile } from '../drive'
+import { listFiles, listFilesRecursive, batchRenameFiles, getOrCreateFolder, moveFile, renameFile, listSubfolders, patchFileMetadata } from '../drive'
 import { saveSession, getSessions, clearSessions, downloadCSV } from '../logs'
 import QuickLookModal from '../components/QuickLookModal'
+import BatchOpsModal from '../components/BatchOpsModal'
 import './DashboardPage.css'
 
 const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
@@ -139,6 +140,12 @@ const IconSearch = () => (
     <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
   </svg>
 )
+const IconWand = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M15 4V2m0 18v-2M8 12H2m18 0h-2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+    <circle cx="12" cy="12" r="3"/>
+  </svg>
+)
 const IconPlus = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -234,6 +241,8 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
   const [logsExpanded, setLogsExpanded] = useState(null)
   const [undoneEntries, setUndoneEntries] = useState(new Set())
   const [undoingEntries, setUndoingEntries] = useState(new Set())
+
+  const [showBatchOps, setShowBatchOps] = useState(false)
 
   const openLogs = () => { setLogSessions(getSessions()); setLogsOpen(true) }
   const closeLogs = () => setLogsOpen(false)
@@ -468,13 +477,80 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     startPending()
   }, [auth.accessToken, updateJob])
 
+  const processBatchOp = useCallback(async (job) => {
+    runningCount.current++
+    updateJob(job.id, { status: 'running', progress: { current: 0, total: 0, currentFile: '', phase: 'Avvio...' } })
+
+    try {
+      if (job.type === 'colorVidFolders') {
+        let colored = 0
+        const processFolder = async (folderId) => {
+          const subs = await listSubfolders(auth.accessToken, folderId)
+          const byName = {}
+          subs.forEach(f => { byName[f.name] = f })
+          const parents = subs.filter(f => !f.name.endsWith(' Vid') && !f.name.endsWith(' Gif') && f.folderColorRgb)
+          for (const parent of parents) {
+            for (const suffix of [' Vid', ' Gif']) {
+              const child = byName[parent.name + suffix]
+              if (child && child.folderColorRgb !== parent.folderColorRgb) {
+                updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: child.name, phase: 'Coloro' } })
+                await patchFileMetadata(auth.accessToken, child.id, { folderColorRgb: parent.folderColorRgb })
+              }
+            }
+            await processFolder(parent.id)
+          }
+        }
+        await processFolder(job.scope === 'drive' ? 'root' : job.folderId)
+        updateJob(job.id, { status: 'done', progress: { current: colored, total: colored, currentFile: '', phase: `${colored} cartelle colorate` } })
+
+      } else if (job.type === 'normalizeNames') {
+        const normalize = (name) => {
+          const dot = name.lastIndexOf('.')
+          const base = dot > 0 ? name.slice(0, dot) : name
+          const ext = dot > 0 ? name.slice(dot).toLowerCase() : ''
+          const norm = base.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9._\-]/g, '')
+          return norm + ext
+        }
+        const collectFiles = async (folderId) => {
+          const data = await listFiles(auth.accessToken, folderId)
+          const all = data.files || []
+          const files = all.filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
+          const folders = all.filter(f => f.mimeType === 'application/vnd.google-apps.folder')
+          let result = [...files]
+          if (job.scope === 'drive') {
+            for (const f of folders) result = result.concat(await collectFiles(f.id))
+          }
+          return result
+        }
+        const allFiles = await collectFiles(job.scope === 'drive' ? 'root' : job.folderId)
+        const toRename = allFiles.filter(f => normalize(f.name) !== f.name)
+        let done = 0
+        for (const f of toRename) {
+          const newName = normalize(f.name)
+          updateJob(job.id, { progress: { current: ++done, total: toRename.length, currentFile: f.name, phase: 'Rinomino' } })
+          await renameFile(auth.accessToken, f.id, newName)
+        }
+        updateJob(job.id, { status: 'done', progress: { current: done, total: toRename.length, currentFile: '', phase: `${done} file rinominati` } })
+      }
+    } catch (err) {
+      updateJob(job.id, { status: 'error', progress: { current: 0, total: 0, currentFile: '', phase: err.message } })
+    }
+
+    runningCount.current--
+    startPending()
+  }, [auth.accessToken, updateJob])
+
   const startPending = useCallback(() => {
     while (runningCount.current < MAX_PARALLEL) {
       const next = queueRef.current.find(j => j.status === 'pending')
       if (!next) break
-      processJob(next)
+      if (next.type === 'colorVidFolders' || next.type === 'normalizeNames') {
+        processBatchOp(next)
+      } else {
+        processJob(next)
+      }
     }
-  }, [processJob])
+  }, [processJob, processBatchOp])
 
   const handleAddToQueue = () => {
     if (preview.length === 0 || !previewFolder) return
@@ -793,10 +869,11 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Autenticato come</div>
             <div style={{ fontWeight: 600, fontSize: '13px' }}>{auth.email}</div>
           </div>
-          <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px' }}>
+          <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Tema">
             {isDark ? <IconSun /> : <IconMoon />}
           </button>
-          <button onClick={() => navigate('/search')} className="nav-icon-btn" title="Ricerca foto" style={{ width: 28, height: 28 }}><IconSearch /></button>
+          <button onClick={() => navigate('/search')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Ricerca foto"><IconSearch /></button>
+          <button onClick={() => setShowBatchOps(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Operazioni batch"><IconWand /></button>
           <button onClick={openLogs} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><IconList /> Logs</button>
           <button onClick={handleLogout} className="btn-secondary">Logout</button>
         </div>
@@ -1198,7 +1275,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                       {job.status === 'interrupted' && (
                         <>
                           <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 600 }}>Interrotto</span>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{job.preview.length} file</span>
+                          {job.preview && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{job.preview.length} file</span>}
                           <button onClick={() => handleRestartJob(job.id)} className="btn-primary" style={{ fontSize: '11px', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <IconPlay /> Riavvia
                           </button>
@@ -1244,6 +1321,18 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
             })}
           </div>
         </div>
+      )}
+      {showBatchOps && (
+        <BatchOpsModal
+          currentFolder={folderPath.length > 1 ? folderPath[folderPath.length - 1] : null}
+          onClose={() => setShowBatchOps(false)}
+          onAddJob={(job) => {
+            const enriched = { ...job, rootFolderName: job.label, mode: job.scope === 'drive' ? 'Drive' : job.folderName }
+            queueRef.current = [...queueRef.current, enriched]
+            setQueue([...queueRef.current])
+            setShowBatchOps(false)
+          }}
+        />
       )}
       {/* Logs sidebar */}
       {logsOpen && (

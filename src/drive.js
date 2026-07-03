@@ -229,6 +229,19 @@ export const updateFileContent = async (accessToken, fileId, blob, mimeType) => 
   return response.json()
 }
 
+export const listSubfolders = async (accessToken, parentId) => {
+  const params = new URLSearchParams({
+    q: `'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+    fields: 'files(id,name,folderColorRgb)',
+    pageSize: 200,
+  })
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!res.ok) throw new Error('Failed to list subfolders')
+  return (await res.json()).files || []
+}
+
 export const batchRenameFiles = async (accessToken, files) => {
   const results = [];
 
