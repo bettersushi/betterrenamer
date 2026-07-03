@@ -1122,6 +1122,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   // ── Render ───────────────────────────────────────────────────────────────
   const rootFolders = treeChildren['root'] || []
   const showSubfolderSidebar = currentSubfolders.length > 0 && globalResults === null && similarTo === null
+  const canDragToFolders = globalResults === null && similarTo === null
 
   return (
     <div className="search-page-bg">
@@ -1406,7 +1407,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                       className={`masonry-card${selectedIds.has(photo.id) ? ' selected' : ''}`}
                       onClick={() => { if (selectionMode) { if (!wasDragging.current) toggleSelection(photo.id) } else if (!renameMode) setSlideshowIdx(idx) }}
                       onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
-                      draggable={showSubfolderSidebar && showSubfolders}
+                      draggable={canDragToFolders}
                       onDragStart={e => handleDragStart(e, photo, results)}
                       onDragEnd={handleDragEnd}
                     >
@@ -1502,7 +1503,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                     className={`thumb-card${selectedIds.has(photo.id) ? ' selected' : ''}`}
                     onClick={() => { if (selectionMode) { if (!wasDragging.current) toggleSelection(photo.id) } else if (!renameMode) setSlideshowIdx(idx) }}
                     onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
-                    draggable={showSubfolderSidebar && showSubfolders}
+                    draggable={canDragToFolders}
                     onDragStart={e => handleDragStart(e, photo, results)}
                     onDragEnd={() => setDragOverFolder(null)}
                   >
