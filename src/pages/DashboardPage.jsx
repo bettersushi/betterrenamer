@@ -9,6 +9,34 @@ import './DashboardPage.css'
 const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
 
+const PLACEHOLDERS = [
+  { token: '{cartella}', label: 'Cartella', desc: 'Nome della cartella corrente' },
+  { token: '{nome}',     label: 'Nome',     desc: 'Nome originale del file senza estensione' },
+  { token: '{seq}',      label: 'Sequenza', desc: 'Numero progressivo (es. 001)' },
+  { token: '{data}',     label: 'Data',     desc: 'Data modifica file: YYYYMMDD' },
+  { token: '{anno}',     label: 'Anno',     desc: 'Anno modifica file: YYYY' },
+  { token: '{mese}',     label: 'Mese',     desc: 'Mese modifica file: MM' },
+  { token: '{giorno}',   label: 'Giorno',   desc: 'Giorno modifica file: DD' },
+  { token: '{ext}',      label: 'Ext',      desc: 'Estensione senza punto (es. jpg)' },
+]
+
+function resolvePlaceholders(template, { folderName, file, num, ext, extName }) {
+  const modified = file.modifiedTime ? new Date(file.modifiedTime) : new Date()
+  const anno = modified.getFullYear().toString()
+  const mese = (modified.getMonth() + 1).toString().padStart(2, '0')
+  const giorno = modified.getDate().toString().padStart(2, '0')
+  const originalBase = file.name.includes('.') ? file.name.slice(0, file.name.lastIndexOf('.')) : file.name
+  return template
+    .replace(/{cartella}/g, folderName)
+    .replace(/{nome}/g, originalBase)
+    .replace(/{seq}/g, num)
+    .replace(/{data}/g, `${anno}${mese}${giorno}`)
+    .replace(/{anno}/g, anno)
+    .replace(/{mese}/g, mese)
+    .replace(/{giorno}/g, giorno)
+    .replace(/{ext}/g, extName)
+}
+
 const TAB_ID = crypto.randomUUID()
 const LOCK_KEY = 'br_processing_lock'
 const LOCK_TTL = 20000 // ms — lock scade se non refreshato
@@ -249,6 +277,21 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
   const [customPrefix, setCustomPrefix] = useState('')
   const [customAddSeq, setCustomAddSeq] = useState(true)
   const [customSeqSeparator, setCustomSeqSeparator] = useState('-')
+  const customPrefixRef = useRef(null)
+
+  const insertPlaceholder = (token) => {
+    const el = customPrefixRef.current
+    if (!el) return
+    const start = el.selectionStart ?? customPrefix.length
+    const end = el.selectionEnd ?? customPrefix.length
+    const next = customPrefix.slice(0, start) + token + customPrefix.slice(end)
+    setCustomPrefix(next)
+    setPreview([])
+    setTimeout(() => {
+      el.focus()
+      el.setSelectionRange(start + token.length, start + token.length)
+    }, 0)
+  }
 
   // Preview inline
   const [preview, setPreview] = useState([])
@@ -679,8 +722,12 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
           else if (pattern === 'seq-ext') newName = `${num}${separator}${extName}${ext}`
           else if (pattern === 'folder-seq') newName = `${currentFolder.name}${separator}${num}${ext}`
           else if (pattern === 'custom-free') {
-            const prefix = customPrefix || 'file'
-            newName = customAddSeq ? `${prefix}${customSeqSeparator}${num}${ext}` : `${prefix}${ext}`
+            const template = customPrefix || '{nome}'
+            const hasSeqToken = template.includes('{seq}')
+            const resolved = resolvePlaceholders(template, { folderName: currentFolder.name, file, num, ext, extName })
+            newName = hasSeqToken || !customAddSeq
+              ? `${resolved}${ext}`
+              : `${resolved}${customSeqSeparator}${num}${ext}`
           }
           return { id: file.id, oldName: file.name, newName, folderName: currentFolder.name, folderId: currentFolder.id, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || null, skip: file.name === newName }
         })
@@ -928,8 +975,25 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                 {pattern === 'custom-free' ? (
                   <>
                     <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                      <label>Prefisso libero</label>
-                      <input type="text" value={customPrefix} onChange={e => { setCustomPrefix(e.target.value); setPreview([]) }} placeholder="es. vacanze-estate" />
+                      <label>Pattern personalizzato</label>
+                      <input
+                        ref={customPrefixRef}
+                        type="text"
+                        value={customPrefix}
+                        onChange={e => { setCustomPrefix(e.target.value); setPreview([]) }}
+                        placeholder="es. vacanze-{anno} oppure {cartella}-{seq}"
+                      />
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 7 }}>
+                        {PLACEHOLDERS.map(p => (
+                          <button
+                            key={p.token}
+                            type="button"
+                            title={p.desc}
+                            onClick={() => insertPlaceholder(p.token)}
+                            style={{ padding: '2px 8px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--primary)', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer', fontWeight: 600 }}
+                          >{p.token}</button>
+                        ))}
+                      </div>
                     </div>
                     <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 10, gridColumn: '1 / -1' }}>
                       <label style={{ margin: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
