@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import './QuickLookModal.css'
 
 const VIDEO_EXTS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
@@ -61,7 +61,18 @@ const ICopy = () => (
   </svg>
 )
 
+const Spinner = () => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 80, minHeight: 80 }}>
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" style={{ animation: 'ql-spin 0.9s linear infinite' }}>
+      <circle cx="18" cy="18" r="14" stroke="rgba(255,255,255,0.12)" strokeWidth="3"/>
+      <path d="M18 4a14 14 0 0 1 14 14" stroke="rgba(255,255,255,0.75)" strokeWidth="3" strokeLinecap="round"/>
+    </svg>
+  </div>
+)
+
 function FilePreview({ file, token }) {
+  const [ready, setReady] = useState(false)
+
   if (!token) {
     return (
       <iframe
@@ -74,22 +85,31 @@ function FilePreview({ file, token }) {
   }
   if (isVideo(file)) {
     return (
-      <video
-        key={file.id}
-        src={vidSrc(file, token)}
-        controls
-        autoPlay
-        style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, background: '#111', display: 'block' }}
-      />
+      <>
+        {!ready && <Spinner />}
+        <video
+          key={file.id}
+          src={vidSrc(file, token)}
+          controls
+          autoPlay
+          onCanPlay={() => setReady(true)}
+          style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, background: '#111', display: ready ? 'block' : 'none' }}
+        />
+      </>
     )
   }
   return (
-    <img
-      key={file.id}
-      src={imgSrc(file, token)}
-      alt={file.name}
-      style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, objectFit: 'contain', display: 'block' }}
-    />
+    <>
+      {!ready && <Spinner />}
+      <img
+        key={file.id}
+        src={imgSrc(file, token)}
+        alt={file.name}
+        onLoad={() => setReady(true)}
+        onError={() => setReady(true)}
+        style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, objectFit: 'contain', display: ready ? 'block' : 'none' }}
+      />
+    </>
   )
 }
 

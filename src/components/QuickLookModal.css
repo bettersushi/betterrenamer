@@ -1,3 +1,7 @@
+@keyframes ql-spin {
+  to { transform: rotate(360deg) }
+}
+
 .ql-img-wrap {
   position: relative;
   display: flex;
