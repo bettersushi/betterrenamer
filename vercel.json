@@ -11,6 +11,6 @@
     }
   ],
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|ffmpeg/|assets/)(?!.*\\.[a-zA-Z0-9]+$).*)", "destination": "/index.html" }
   ]
 }
