@@ -526,7 +526,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   }
 
   const pushView = () => {
-    const snapshot = { activeFolderId, activeFolderName, allPhotos, globalQuery, globalResults, similarTo, similarResults }
+    const snapshot = { activeFolderId, activeFolderName, allPhotos, globalQuery, globalResults, similarTo, similarResults, currentSubfolders }
     let entry
     if (similarTo) {
       entry = { type: 'similarity', label: similarTo.name, key: 'sim:' + similarTo.id, Icon: IconSimilar, snapshot }
@@ -550,6 +550,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     setGlobalResults(snapshot.globalResults)
     setSimilarTo(snapshot.similarTo)
     setSimilarResults(snapshot.similarResults)
+    setCurrentSubfolders(snapshot.currentSubfolders || [])
   }
   const popView = () => {
     setViewStack(s => {
