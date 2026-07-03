@@ -19,7 +19,7 @@ export default function VideoTrimCrop({ clip, auth, onChange }) {
   const dragRef = useRef(null)
 
   // Drive video URL (authenticated)
-  const videoSrc = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`
+  const videoSrc = `/api/proxy-video?id=${file.id}&token=${encodeURIComponent(auth.accessToken)}`
 
   useEffect(() => {
     const v = videoRef.current
@@ -102,7 +102,6 @@ export default function VideoTrimCrop({ clip, auth, onChange }) {
           src={videoSrc}
           className="vtc-video"
           controls
-          crossOrigin="use-credentials"
           style={{ pointerEvents: cropMode ? 'none' : 'auto' }}
         />
         {/* Crop mode: draw overlay on top */}
