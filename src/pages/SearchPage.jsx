@@ -1180,6 +1180,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
               activeId={activeFolderId}
               onToggle={handleTreeToggle}
               onSelect={handleTreeSelect}
+              onDrop={(folder, photoId) => handleDropOnFolder(folder, photoId)}
             />
           ))}
 
@@ -1798,20 +1799,24 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
 }
 
 // Recursive tree node with full tree state passed as props
-function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildren, treeLoading, activeId, onToggle, onSelect }) {
+function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildren, treeLoading, activeId, onToggle, onSelect, onDrop }) {
   const expanded = treeExpanded[folder.id]
   const loading = treeLoading[folder.id]
   const children = treeChildren[folder.id]
   const hasChildren = children === undefined || children.length > 0
+  const [isDragOver, setIsDragOver] = useState(false)
 
   const childSiblingIds = (children || []).map(c => c.id)
 
   return (
     <div className="tree-node-wrap">
       <div
-        className={`tree-node${activeId === folder.id ? ' active' : ''}`}
+        className={`tree-node${activeId === folder.id ? ' active' : ''}${isDragOver ? ' drop-target' : ''}`}
         style={{ paddingLeft: 8 + depth * 12 }}
         onClick={() => onSelect(folder, siblingIds)}
+        onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setIsDragOver(true) }}
+        onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setIsDragOver(false) }}
+        onDrop={e => { e.preventDefault(); setIsDragOver(false); onDrop && onDrop(folder, e.dataTransfer.getData('photoId') || null) }}
       >
         <span
           className="tree-chevron"
@@ -1839,6 +1844,7 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
           activeId={activeId}
           onToggle={onToggle}
           onSelect={onSelect}
+          onDrop={onDrop}
         />
       ))}
       {/* skeleton while loading children */}
