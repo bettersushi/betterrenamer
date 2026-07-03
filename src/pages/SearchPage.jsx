@@ -399,6 +399,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [showStats, setShowStats] = useState(false)
   const [contextMenu, setContextMenu] = useState(null) // { photo, idx, x, y }
   const [folderContextMenu, setFolderContextMenu] = useState(null) // { folder, x, y }
+  const [movingFolder, setMovingFolder] = useState(null)
   const [movePhoto, setMovePhoto] = useState(null)
   const [renamePhoto, setRenamePhoto] = useState(null)
   const [undoToast, setUndoToast] = useState(null) // { photo, insertIdx, timer }
@@ -1441,8 +1442,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                     onMouseLeave={handleFolderGridLeave}
                     onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverFolder(f.id) }}
                     onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverFolder(null) }}
-                    onDrop={e => { e.preventDefault(); handleDropOnFolder(f, e.dataTransfer.getData('photoId') || null, e.dataTransfer.getData('folderId') || null) }}
+                    draggable
                     onDragStart={e => { e.dataTransfer.setData('folderId', f.id); e.dataTransfer.effectAllowed = 'move' }}
+                    onDrop={e => { e.preventDefault(); handleDropOnFolder(f, e.dataTransfer.getData('photoId') || null, e.dataTransfer.getData('folderId') || null) }}
                     onContextMenu={e => { e.preventDefault(); setFolderTooltip(null); setFolderContextMenu({ folder: f, x: e.clientX, y: e.clientY }) }}
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
@@ -1746,8 +1748,44 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
               Nuova sottocartella
             </button>
+            <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+            <button
+              onClick={() => { const f = folderContextMenu.folder; setFolderContextMenu(null); setMovingFolder(f) }}
+              style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '7px 12px', background: 'none', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'inherit', textAlign: 'left' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--btn-hover)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+              Sposta in…
+            </button>
+            <button
+              onClick={async () => { const f = folderContextMenu.folder; setFolderContextMenu(null); if (!window.confirm(`Elimina la cartella "${f.name}"?`)) return; try { await trashFile(auth.accessToken, f.id); setCurrentSubfolders(sf => sf.filter(s => s.id !== f.id)); setTreeChildren(t => { const c = { ...t }; Object.keys(c).forEach(k => { c[k] = c[k].filter(x => x.id !== f.id) }); return c }) } catch (e) { alert('Errore: ' + e.message) } }}
+              style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '7px 12px', background: 'none', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, color: '#ef4444', fontFamily: 'inherit', textAlign: 'left' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+              Elimina cartella
+            </button>
           </div>
         </div>
+      )}
+
+      {/* Move folder modal */}
+      {movingFolder && (
+        <FolderPickerModal
+          accessToken={auth.accessToken}
+          title={`Sposta "${movingFolder.name}" in…`}
+          onClose={() => setMovingFolder(null)}
+          onConfirm={async (targetFolder) => {
+            try {
+              await moveFile(auth.accessToken, movingFolder.id, targetFolder.id, activeFolderId)
+              setCurrentSubfolders(sf => sf.filter(s => s.id !== movingFolder.id))
+              setTreeChildren(t => { const c = { ...t }; Object.keys(c).forEach(k => { c[k] = c[k].filter(x => x.id !== movingFolder.id) }); return c })
+            } catch (e) { alert('Errore: ' + e.message) }
+            setMovingFolder(null)
+          }}
+        />
       )}
 
       {/* Rename modal */}
