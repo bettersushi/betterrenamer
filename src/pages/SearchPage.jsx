@@ -1622,6 +1622,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
       {slideshowIdx !== null && (
         <QuickLookModal
           files={[results[slideshowIdx]]}
+          auth={auth}
           currentIndex={slideshowIdx}
           total={results.length}
           onPrev={() => setSlideshowIdx(i => Math.max(0, i - 1))}

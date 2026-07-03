@@ -1,6 +1,22 @@
 import { useEffect } from 'react'
 import './QuickLookModal.css'
 
+const VIDEO_EXTS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
+
+function getExt(name) {
+  return name?.includes('.') ? name.substring(name.lastIndexOf('.')).toLowerCase() : ''
+}
+function isVideo(file) {
+  if (file.mimeType && file.mimeType.includes('video')) return true
+  return VIDEO_EXTS.has(getExt(file.name))
+}
+function imgSrc(file, token) {
+  return `/api/proxy-image?id=${file.id}&token=${encodeURIComponent(token)}`
+}
+function vidSrc(file, token) {
+  return `/api/proxy-video?id=${file.id}&token=${encodeURIComponent(token)}`
+}
+
 const BtnIcon = ({ onClick, title, children }) => (
   <button
     onClick={e => { e.stopPropagation(); onClick() }}
@@ -45,9 +61,42 @@ const ICopy = () => (
   </svg>
 )
 
-export default function QuickLookModal({ files, onClose, onPrev, onNext, currentIndex, total, onCrop, onRename, onDownload, onDelete, onDuplicate }) {
+function FilePreview({ file, token }) {
+  if (!token) {
+    return (
+      <iframe
+        src={`https://drive.google.com/file/d/${file.id}/preview`}
+        style={{ width: '100%', height: 'calc(100vh - 100px)', border: 'none', borderRadius: '8px', background: '#111', display: 'block' }}
+        allow="autoplay"
+        title={file.name}
+      />
+    )
+  }
+  if (isVideo(file)) {
+    return (
+      <video
+        key={file.id}
+        src={vidSrc(file, token)}
+        controls
+        autoPlay
+        style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, background: '#111', display: 'block' }}
+      />
+    )
+  }
+  return (
+    <img
+      key={file.id}
+      src={imgSrc(file, token)}
+      alt={file.name}
+      style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, objectFit: 'contain', display: 'block' }}
+    />
+  )
+}
+
+export default function QuickLookModal({ files, auth, onClose, onPrev, onNext, currentIndex, total, onCrop, onRename, onDownload, onDelete, onDuplicate }) {
   const hasNav = onPrev && onNext && total > 1
   const hasActions = onCrop || onRename || onDownload || onDelete || onDuplicate
+  const token = auth?.accessToken || null
 
   useEffect(() => {
     const handler = (e) => {
@@ -103,12 +152,7 @@ export default function QuickLookModal({ files, onClose, onPrev, onNext, current
       >
         {files.length === 1 ? (
           <div className="ql-img-wrap">
-            <iframe
-              src={`https://drive.google.com/file/d/${files[0].id}/preview`}
-              style={{ width: '100%', height: 'calc(100vh - 100px)', border: 'none', borderRadius: '8px', background: '#111', display: 'block' }}
-              allow="autoplay"
-              title={files[0].name}
-            />
+            <FilePreview file={files[0]} token={token} />
             {hasActions && (
               <div className="ql-actions" onClick={e => e.stopPropagation()}>
                 {onCrop && <BtnIcon onClick={onCrop} title="Ritaglia"><ICrop /></BtnIcon>}
@@ -123,12 +167,7 @@ export default function QuickLookModal({ files, onClose, onPrev, onNext, current
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', width: '100%' }}>
             {files.map(file => (
               <div key={file.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <iframe
-                  src={`https://drive.google.com/file/d/${file.id}/preview`}
-                  style={{ width: '100%', height: '340px', border: 'none', borderRadius: '8px', background: '#111' }}
-                  allow="autoplay"
-                  title={file.name}
-                />
+                <FilePreview file={file} token={token} />
                 <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', textAlign: 'center', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</p>
               </div>
             ))}

@@ -1633,7 +1633,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
       )}
 
       {quickLookOpen && (
-        <QuickLookModal files={selectedFiles} onClose={() => setQuickLookOpen(false)} />
+        <QuickLookModal files={selectedFiles} auth={auth} onClose={() => setQuickLookOpen(false)} />
       )}
     </div>
   )
