@@ -72,6 +72,7 @@ const Spinner = () => (
 
 function FilePreview({ file, token }) {
   const [ready, setReady] = useState(false)
+  const thumb = file.thumbnailLink || null
 
   if (!token) {
     return (
@@ -83,33 +84,57 @@ function FilePreview({ file, token }) {
       />
     )
   }
+
   if (isVideo(file)) {
     return (
-      <>
-        {!ready && <Spinner />}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {!ready && thumb && (
+          <img
+            src={thumb}
+            alt=""
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', filter: 'blur(12px)', transform: 'scale(1.04)', borderRadius: 8, opacity: 0.5 }}
+          />
+        )}
+        {!ready && <div style={{ position: 'relative', zIndex: 1 }}><Spinner /></div>}
         <video
           key={file.id}
           src={vidSrc(file, token)}
           controls
           autoPlay
           onCanPlay={() => setReady(true)}
-          style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, background: '#111', display: ready ? 'block' : 'none' }}
+          style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, background: '#111', display: ready ? 'block' : 'none', position: 'relative', zIndex: 1 }}
         />
-      </>
+      </div>
     )
   }
+
   return (
-    <>
-      {!ready && <Spinner />}
+    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', maxWidth: '100%', maxHeight: 'calc(100vh - 120px)' }}>
+      {/* blur placeholder */}
+      {!ready && thumb && (
+        <img
+          src={thumb}
+          alt=""
+          style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', objectFit: 'contain', borderRadius: 8, filter: 'blur(14px)', transform: 'scale(1.04)', opacity: 0.6 }}
+        />
+      )}
+      {/* spinner over placeholder when no thumb */}
+      {!ready && !thumb && <Spinner />}
+      {/* full-res crossfade in */}
       <img
         key={file.id}
         src={imgSrc(file, token)}
         alt={file.name}
         onLoad={() => setReady(true)}
         onError={() => setReady(true)}
-        style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, objectFit: 'contain', display: ready ? 'block' : 'none' }}
+        style={{
+          maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, objectFit: 'contain',
+          position: ready ? 'relative' : 'absolute', inset: 0,
+          opacity: ready ? 1 : 0,
+          transition: 'opacity 0.35s ease',
+        }}
       />
-    </>
+    </div>
   )
 }
 
