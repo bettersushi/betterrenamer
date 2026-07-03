@@ -485,28 +485,45 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
       if (job.type === 'colorByKeyword') {
         let colored = 0
         const rules = (job.rules || []).filter(r => r.keyword?.trim() && r.color)
-        for (const rule of rules) {
-          let pageToken = null
-          do {
-            const escaped = rule.keyword.replace(/'/g, "\\'")
-            const scopeQ = job.scope !== 'drive' ? ` and '${job.folderId}' in parents` : ''
-            const params = new URLSearchParams({
-              q: `mimeType = 'application/vnd.google-apps.folder' and trashed = false and name contains '${escaped}'${scopeQ}`,
-              fields: 'files(id,name,folderColorRgb),nextPageToken',
-              pageSize: 200,
-            })
-            if (pageToken) params.set('pageToken', pageToken)
-            const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
-              headers: { Authorization: `Bearer ${auth.accessToken}` },
-            })
-            const data = await res.json()
-            for (const folder of data.files || []) {
-              if (folder.folderColorRgb === rule.color) continue
-              updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: folder.name, phase: `"${rule.keyword}"` } })
-              await patchFileMetadata(auth.accessToken, folder.id, { folderColorRgb: rule.color })
+        if (job.scope === 'drive') {
+          // Query diretta Drive per ogni keyword
+          for (const rule of rules) {
+            let pageToken = null
+            do {
+              const escaped = rule.keyword.replace(/'/g, "\\'")
+              const params = new URLSearchParams({
+                q: `mimeType = 'application/vnd.google-apps.folder' and trashed = false and name contains '${escaped}'`,
+                fields: 'files(id,name,folderColorRgb),nextPageToken',
+                pageSize: 200,
+              })
+              if (pageToken) params.set('pageToken', pageToken)
+              const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+                headers: { Authorization: `Bearer ${auth.accessToken}` },
+              })
+              const data = await res.json()
+              for (const folder of data.files || []) {
+                if (folder.folderColorRgb === rule.color) continue
+                updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: folder.name, phase: `"${rule.keyword}"` } })
+                await patchFileMetadata(auth.accessToken, folder.id, { folderColorRgb: rule.color })
+              }
+              pageToken = data.nextPageToken || null
+            } while (pageToken)
+          }
+        } else {
+          // Scope cartella: ricorsione per trovare cartelle a qualsiasi profondità
+          const processFolder = async (folderId) => {
+            const subs = await listSubfolders(auth.accessToken, folderId)
+            for (const folder of subs) {
+              for (const rule of rules) {
+                if (folder.name.toLowerCase().includes(rule.keyword.toLowerCase()) && folder.folderColorRgb !== rule.color) {
+                  updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: folder.name, phase: `"${rule.keyword}"` } })
+                  await patchFileMetadata(auth.accessToken, folder.id, { folderColorRgb: rule.color })
+                }
+              }
+              await processFolder(folder.id)
             }
-            pageToken = data.nextPageToken || null
-          } while (pageToken)
+          }
+          await processFolder(job.folderId)
         }
         updateJob(job.id, { status: 'done', progress: { current: colored, total: colored, currentFile: '', phase: `${colored} cartelle colorate` } })
 
