@@ -413,7 +413,12 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const [rubberRect, setRubberRect] = useState(null) // { x, y, w, h } in px relative to scroll container
   const [currentSubfolders, setCurrentSubfolders] = useState([])
   const [showSubfolders, setShowSubfolders] = useState(true)
-  const [dragOverFolder, setDragOverFolder] = useState(null) // folder id being hovered during drag
+  const [dragOverFolder, setDragOverFolder] = useState(null)
+  const [folderTooltip, setFolderTooltip] = useState(null) // { items, x, y }
+  const folderHoverTimer = useRef(null)
+  const folderFileCache = useRef({})
+  const activeFolderRef = useRef(null)
+  const folderCursorRef = useRef({ x: 0, y: 0 })
   const [thumbTimestamps, setThumbTimestamps] = useState({}) // forza reload thumbnail dopo crop
   const pHashCache = useRef({})
   const gridRef = useRef(null)
@@ -943,6 +948,42 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     setIsDraggingPhotos(false)
   }, [])
 
+  const handleFolderGridEnter = useCallback((e, folder) => {
+    folderCursorRef.current = { x: e.clientX, y: e.clientY }
+    activeFolderRef.current = folder.id
+    clearTimeout(folderHoverTimer.current)
+    folderHoverTimer.current = setTimeout(async () => {
+      try {
+        if (activeFolderRef.current !== folder.id) return
+        let items = folderFileCache.current[folder.id]
+        if (!items) {
+          const data = await listFiles(auth.accessToken, folder.id)
+          items = (data.files || [])
+            .filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
+            .slice(0, 10)
+            .map(f => ({ name: f.name, thumb: f.thumbnailLink || null }))
+          folderFileCache.current[folder.id] = items
+        }
+        if (activeFolderRef.current !== folder.id) return
+        if (items.length > 0) {
+          const { x, y } = folderCursorRef.current
+          setFolderTooltip({ items, x: x + 16, y: y + 16 })
+        }
+      } catch { /* non-critical */ }
+    }, 400)
+  }, [auth.accessToken])
+
+  const handleFolderGridMove = useCallback((e) => {
+    folderCursorRef.current = { x: e.clientX, y: e.clientY }
+    setFolderTooltip(t => t ? { ...t, x: e.clientX + 16, y: e.clientY + 16 } : null)
+  }, [])
+
+  const handleFolderGridLeave = useCallback(() => {
+    activeFolderRef.current = null
+    clearTimeout(folderHoverTimer.current)
+    setFolderTooltip(null)
+  }, [])
+
   const handleRename = useCallback(async (photo, newName) => {
     if (!newName.trim() || newName === photo.name) return
     try {
@@ -1252,6 +1293,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                     key={f.id}
                     className={`subfolder-grid-item${dragOverFolder === f.id ? ' drop-target' : ''}`}
                     onClick={() => selectFolder(f.id, f.name)}
+                    onMouseEnter={e => handleFolderGridEnter(e, f)}
+                    onMouseMove={handleFolderGridMove}
+                    onMouseLeave={handleFolderGridLeave}
                     onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverFolder(f.id) }}
                     onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverFolder(null) }}
                     onDrop={e => { e.preventDefault(); handleDropOnFolder(f, e.dataTransfer.getData('photoId') || null) }}
@@ -1636,6 +1680,30 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
             }, 2500)
           }}
         />
+      )}
+
+      {folderTooltip?.items && (
+        <div style={{
+          position: 'fixed', left: folderTooltip.x, top: folderTooltip.y,
+          zIndex: 2000, pointerEvents: 'none',
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
+          padding: '6px', minWidth: '220px', maxWidth: '300px',
+        }}>
+          {folderTooltip.items.map((item, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '4px 6px',
+              borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+            }}>
+              {item.thumb
+                ? <img src={item.thumb} style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} alt="" />
+                : <span style={{ width: '32px', height: '32px', borderRadius: '4px', background: 'var(--border)', flexShrink: 0, display: 'block' }} />
+              }
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
