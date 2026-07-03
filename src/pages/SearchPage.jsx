@@ -968,7 +968,10 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
         if (activeFolderRef.current !== folder.id) return
         if (items.length > 0) {
           const { x, y } = folderCursorRef.current
-          setFolderTooltip({ items, x: x + 16, y: y + 16 })
+          const TW = 300, TH = 260
+          const tx = x + 16 + TW > window.innerWidth ? x - TW - 8 : x + 16
+          const ty = y + 16 + TH > window.innerHeight ? y - TH - 8 : y + 16
+          setFolderTooltip({ items, x: tx, y: ty })
         }
       } catch { /* non-critical */ }
     }, 400)
@@ -976,7 +979,13 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
 
   const handleFolderGridMove = useCallback((e) => {
     folderCursorRef.current = { x: e.clientX, y: e.clientY }
-    setFolderTooltip(t => t ? { ...t, x: e.clientX + 16, y: e.clientY + 16 } : null)
+    setFolderTooltip(t => {
+      if (!t) return null
+      const TW = 300, TH = 260
+      const x = e.clientX + 16 + TW > window.innerWidth ? e.clientX - TW - 8 : e.clientX + 16
+      const y = e.clientY + 16 + TH > window.innerHeight ? e.clientY - TH - 8 : e.clientY + 16
+      return { ...t, x, y }
+    })
   }, [])
 
   const handleFolderGridLeave = useCallback(() => {
