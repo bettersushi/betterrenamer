@@ -3,12 +3,15 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import logoSrc from '../assets/logo-bs.svg'
 import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata, patchFileMetadata, trashFile, restoreFile, copyFile, moveFile, renameFile, createFolder } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
+import PalettePicker from '../components/PalettePicker'
 import SimilarityBalloon from '../components/SimilarityBalloon'
 import ScopePickerModal from '../components/ScopePickerModal'
 import DriveStatsModal from '../components/DriveStatsModal'
 import PhotoContextMenu from '../components/PhotoContextMenu'
 import FolderPickerModal from '../components/FolderPickerModal'
 import CropModal from '../components/CropModal'
+import VideoMontageModal from '../components/VideoMontageModal'
+import StatusModal from '../components/StatusModal'
 import './SearchPage.css'
 
 const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
@@ -366,7 +369,7 @@ function ConnectedTreeNode({ folder, depth, activeId, onToggle, onSelect, treeEx
 }
 
 // ── Main Component ───────────────────────────────────────────────────────────
-export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTokenRefresh }) {
+export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colorScheme, onChangeScheme, onTokenRefresh }) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -400,6 +403,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const [movePhoto, setMovePhoto] = useState(null)
   const [renamePhoto, setRenamePhoto] = useState(null)
   const [undoToast, setUndoToast] = useState(null) // { photo, insertIdx, timer }
+  const [showVideoMontage, setShowVideoMontage] = useState(false)
+  const [showStatus, setShowStatus] = useState(false)
+  const [mediaFilter, setMediaFilter] = useState('all')
   const [croppingIds, setCroppingIds] = useState(new Set())
   const [cropDoneIds, setCropDoneIds] = useState(new Set())
   const [rotatingIds, setRotatingIds] = useState(new Set())
@@ -1137,12 +1143,17 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   }, [auth.accessToken, updateBalloon])
 
   // ── Results ─────────────────────────────────────────────────────────────
+  const videoFiles = useMemo(() => allPhotos.filter(f => isVideoFile(f)), [allPhotos])
+
   const results = useMemo(() => {
     let list = globalResults !== null ? globalResults : similarTo ? similarResults : allPhotos
+    if (mediaFilter === 'video') list = list.filter(f => isVideoFile(f))
+    else if (mediaFilter === 'gif') list = list.filter(f => getExt(f.name) === '.gif')
+    else if (mediaFilter === 'img') list = list.filter(f => !isVideoFile(f) && getExt(f.name) !== '.gif')
     if (sortOrder === 'name') list = [...list].sort((a, b) => a.name.localeCompare(b.name))
     else list = [...list].sort((a, b) => new Date(b.modifiedTime || 0) - new Date(a.modifiedTime || 0))
     return list
-  }, [allPhotos, similarTo, similarResults, globalResults, sortOrder])
+  }, [allPhotos, similarTo, similarResults, globalResults, sortOrder, mediaFilter])
 
   // ── Render ───────────────────────────────────────────────────────────────
   const rootFolders = treeChildren['root'] || []
@@ -1170,8 +1181,12 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Autenticato come</div>
             <div style={{ fontWeight: 600, fontSize: '13px' }}>{auth.email}</div>
           </div>
+          <PalettePicker colorScheme={colorScheme} onChangeScheme={onChangeScheme} isDark={isDark} />
           <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Tema">
             {isDark ? <IconSun /> : <IconMoon />}
+          </button>
+          <button onClick={() => setShowStatus(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Stato sistema">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           </button>
           <button onClick={onLogout} className="btn-secondary">Logout</button>
         </div>
@@ -1256,6 +1271,27 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                   <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
                 </svg>
               </button>
+              <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
+              {(() => {
+                const CYCLE = ['all','video','gif','img']
+                const ICONS = {
+                  all:   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
+                  video: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>,
+                  gif:   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M9 9H6v6h3v-2H8"/><line x1="12" y1="9" x2="12" y2="15"/><path d="M15 9h3v2h-3v2h3"/></svg>,
+                  img:   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
+                }
+                const LABELS = { all: 'Tutti i file', video: 'Solo video', gif: 'Solo GIF', img: 'Solo immagini' }
+                const next = () => setMediaFilter(f => CYCLE[(CYCLE.indexOf(f) + 1) % CYCLE.length])
+                return (
+                  <button
+                    onClick={next}
+                    className={`thumb-size-btn${mediaFilter !== 'all' ? ' active' : ''}`}
+                    title={LABELS[mediaFilter]}
+                  >
+                    {ICONS[mediaFilter]}
+                  </button>
+                )
+              })()}
               <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
               {currentSubfolders.length > 0 && globalResults === null && similarTo === null && (
                 <button
@@ -1362,6 +1398,17 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                   </div>
                 )}
               </div>
+            )}
+            {videoFiles.length >= 2 && (
+              <button
+                className="btn-secondary"
+                onClick={() => setShowVideoMontage(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '5px 10px' }}
+                title="Monta video"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><polygon points="10,8 16,12 10,16"/></svg>
+                Monta video
+              </button>
             )}
           </div>
 
@@ -1635,6 +1682,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
       {slideshowIdx !== null && (
         <QuickLookModal
           files={[results[slideshowIdx]]}
+          auth={auth}
           currentIndex={slideshowIdx}
           total={results.length}
           onPrev={() => setSlideshowIdx(i => Math.max(0, i - 1))}
@@ -1879,6 +1927,17 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           }}
         />
       )}
+
+      {showVideoMontage && (
+        <VideoMontageModal
+          videos={videoFiles}
+          auth={auth}
+          folderId={activeFolderId}
+          folderName={activeFolderName}
+          onClose={() => setShowVideoMontage(false)}
+        />
+      )}
+      {showStatus && <StatusModal auth={auth} onClose={() => setShowStatus(false)} />}
 
       {folderTooltip?.items && (
         <div style={{

@@ -229,6 +229,19 @@ export const updateFileContent = async (accessToken, fileId, blob, mimeType) => 
   return response.json()
 }
 
+export const uploadFile = async (accessToken, blob, name, mimeType, parentId) => {
+  const meta = JSON.stringify({ name, mimeType, parents: [parentId] })
+  const form = new FormData()
+  form.append('metadata', new Blob([meta], { type: 'application/json' }))
+  form.append('file', new Blob([blob], { type: mimeType }))
+  const response = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+    { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form }
+  )
+  if (!response.ok) throw new Error('Upload su Drive fallito')
+  return response.json()
+}
+
 export const listSubfolders = async (accessToken, parentId) => {
   const params = new URLSearchParams({
     q: `'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,

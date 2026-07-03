@@ -1,8 +1,19 @@
 export default async function handler(req, res) {
-  const { url } = req.query
-  if (!url) return res.status(400).end('Missing url')
+  const { url, id, token } = req.query
+
+  let fetchUrl, headers = {}
+
+  if (id && token) {
+    fetchUrl = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media`
+    headers['Authorization'] = `Bearer ${token}`
+  } else if (url) {
+    fetchUrl = decodeURIComponent(url)
+  } else {
+    return res.status(400).end('Missing url or id+token')
+  }
+
   try {
-    const response = await fetch(decodeURIComponent(url))
+    const response = await fetch(fetchUrl, { headers })
     if (!response.ok) return res.status(response.status).end()
     const buffer = await response.arrayBuffer()
     const contentType = response.headers.get('content-type') || 'image/jpeg'
