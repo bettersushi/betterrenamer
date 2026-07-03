@@ -14,18 +14,20 @@ export function useFFmpeg() {
     if (ffmpegRef.current && loaded) return
     if (loadingRef.current) return
     loadingRef.current = true
-
-    const ff = new FFmpeg()
-    ff.on('progress', ({ progress: p }) => setProgress(p))
-    await ff.load({
-      coreURL:   await toBlobURL(`${BASE}/ffmpeg-core.js`,   'text/javascript'),
-      wasmURL:   await toBlobURL(`${BASE}/ffmpeg-core.wasm`, 'application/wasm'),
-      workerURL: await toBlobURL(`${BASE}/ffmpeg-core.worker.js`, 'text/javascript'),
-    })
-    ffmpegRef.current = ff
-    setLoaded(true)
-    loadingRef.current = false
-  }, [loaded])
+    try {
+      const ff = new FFmpeg()
+      ff.on('progress', ({ progress: p }) => setProgress(p))
+      await ff.load({
+        coreURL:   await toBlobURL(`${BASE}/ffmpeg-core.js`,   'text/javascript'),
+        wasmURL:   await toBlobURL(`${BASE}/ffmpeg-core.wasm`, 'application/wasm'),
+        workerURL: await toBlobURL(`${BASE}/ffmpeg-core.worker.js`, 'text/javascript'),
+      })
+      ffmpegRef.current = ff
+      setLoaded(true)
+    } finally {
+      loadingRef.current = false
+    }
+  }, [])
 
   return { ffmpeg: ffmpegRef.current, loaded, load, progress }
 }
