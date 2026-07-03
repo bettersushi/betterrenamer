@@ -913,7 +913,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
 
   const DRAG_MAGENTA = '#e879a0'
 
-  const buildDragImage = useCallback((photos, count) => {
+  const buildDragImage = useCallback((photos, count, thumbSize) => {
     const D = 64       // circle diameter
     const STEP = 22    // horizontal overlap step
     const layers = Math.min(photos.length, 3)
@@ -934,7 +934,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     wrap.appendChild(shadow)
 
     for (let i = layers - 1; i >= 0; i--) {
-      const thumb = photos[i]?.thumbnailLink ? getLargeThumbUrl(photos[i].thumbnailLink, 200) : ''
+      const thumb = photos[i]?.thumbnailLink ? getLargeThumbUrl(photos[i].thumbnailLink, thumbSize) : ''
       const circle = document.createElement('div')
       const op = i === 0 ? 1 : i === 1 ? 0.82 : 0.6
       circle.style.cssText = `
@@ -969,7 +969,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     return wrap
   }, [])
 
-  const handleDragStart = useCallback((e, photo, allResults) => {
+  const handleDragStart = useCallback((e, photo, allResults, thumbSize) => {
     e.dataTransfer.setData('photoId', photo.id)
     e.dataTransfer.effectAllowed = 'move'
     const count = selectionMode && selectedIds.size > 0 ? selectedIds.size : 1
@@ -979,7 +979,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
       const others = allResults.filter(p => selectedIds.has(p.id) && p.id !== photo.id && p.thumbnailLink)
       photos = [photo, ...others].slice(0, 3)
     }
-    const ghost = buildDragImage(photos, count)
+    const ghost = buildDragImage(photos, count, thumbSize)
     const cx = Math.round(8 + (Math.min(photos.length, 3) - 1) * 22 / 2 + 32)
     e.dataTransfer.setDragImage(ghost, cx, 40)
     setTimeout(() => document.body.removeChild(ghost), 0)
@@ -1450,7 +1450,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                       onClick={() => { if (selectionMode) { if (!wasDragging.current) toggleSelection(photo.id) } else if (!renameMode) setSlideshowIdx(idx) }}
                       onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
                       draggable={canDragToFolders}
-                      onDragStart={e => handleDragStart(e, photo, results)}
+                      onDragStart={e => handleDragStart(e, photo, results, 1600)}
                       onDragEnd={handleDragEnd}
                     >
                       {photo.thumbnailLink ? (
@@ -1546,7 +1546,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                     onClick={() => { if (selectionMode) { if (!wasDragging.current) toggleSelection(photo.id) } else if (!renameMode) setSlideshowIdx(idx) }}
                     onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
                     draggable={canDragToFolders}
-                    onDragStart={e => handleDragStart(e, photo, results)}
+                    onDragStart={e => handleDragStart(e, photo, results, THUMB_SIZES[thumbSize] * 2)}
                     onDragEnd={() => setDragOverFolder(null)}
                   >
                     {photo.thumbnailLink ? (
