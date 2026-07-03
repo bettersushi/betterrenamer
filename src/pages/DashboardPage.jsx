@@ -482,16 +482,17 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     updateJob(job.id, { status: 'running', progress: { current: 0, total: 0, currentFile: '', phase: 'Avvio...' } })
 
     try {
-      if (job.type === 'colorVidFolders') {
+      if (job.type === 'colorByKeyword') {
         let colored = 0
-        if (job.scope === 'drive') {
-          // Cerca tutte le cartelle *Vid / *Gif in un'unica query Drive
+        const rules = (job.rules || []).filter(r => r.keyword?.trim() && r.color)
+        for (const rule of rules) {
           let pageToken = null
-          const vidGifFolders = []
           do {
+            const escaped = rule.keyword.replace(/'/g, "\\'")
+            const scopeQ = job.scope !== 'drive' ? ` and '${job.folderId}' in parents` : ''
             const params = new URLSearchParams({
-              q: `mimeType = 'application/vnd.google-apps.folder' and trashed = false and (name contains ' Vid' or name contains ' Gif')`,
-              fields: 'files(id,name,parents,folderColorRgb),nextPageToken',
+              q: `mimeType = 'application/vnd.google-apps.folder' and trashed = false and name contains '${escaped}'${scopeQ}`,
+              fields: 'files(id,name,folderColorRgb),nextPageToken',
               pageSize: 200,
             })
             if (pageToken) params.set('pageToken', pageToken)
@@ -499,54 +500,13 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
               headers: { Authorization: `Bearer ${auth.accessToken}` },
             })
             const data = await res.json()
-            vidGifFolders.push(...(data.files || []))
+            for (const folder of data.files || []) {
+              if (folder.folderColorRgb === rule.color) continue
+              updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: folder.name, phase: `"${rule.keyword}"` } })
+              await patchFileMetadata(auth.accessToken, folder.id, { folderColorRgb: rule.color })
+            }
             pageToken = data.nextPageToken || null
           } while (pageToken)
-
-          // Fetcha il colore del genitore per ciascuno (solo quelli con pattern corretto)
-          const parentCache = {}
-          const getParentColor = async (parentId) => {
-            if (parentCache[parentId] !== undefined) return parentCache[parentId]
-            const res = await fetch(`https://www.googleapis.com/drive/v3/files/${parentId}?fields=id,name,folderColorRgb`, {
-              headers: { Authorization: `Bearer ${auth.accessToken}` },
-            })
-            const data = await res.json()
-            parentCache[parentId] = { color: data.folderColorRgb || null, name: data.name }
-            return parentCache[parentId]
-          }
-          for (const folder of vidGifFolders) {
-            const parentId = folder.parents?.[0]
-            if (!parentId) continue
-            const parent = await getParentColor(parentId)
-            if (!parent.color) continue
-            const expectedBaseName = parent.name + ' Vid'
-            const expectedGifName = parent.name + ' Gif'
-            if (folder.name !== expectedBaseName && folder.name !== expectedGifName) continue
-            if (folder.folderColorRgb === parent.color) continue
-            updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: folder.name, phase: 'Coloro' } })
-            await patchFileMetadata(auth.accessToken, folder.id, { folderColorRgb: parent.color })
-          }
-        } else {
-          // Scope cartella: ricorsione fino a 3 livelli di profondità
-          const processFolder = async (folderId, depth) => {
-            if (depth > 3) return
-            const subs = await listSubfolders(auth.accessToken, folderId)
-            for (const folder of subs) {
-              if (folder.name.endsWith(' Vid') || folder.name.endsWith(' Gif')) continue
-              if (folder.folderColorRgb) {
-                const children = await listSubfolders(auth.accessToken, folder.id)
-                for (const child of children) {
-                  if ((child.name === folder.name + ' Vid' || child.name === folder.name + ' Gif') &&
-                      child.folderColorRgb !== folder.folderColorRgb) {
-                    updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: child.name, phase: 'Coloro' } })
-                    await patchFileMetadata(auth.accessToken, child.id, { folderColorRgb: folder.folderColorRgb })
-                  }
-                }
-              }
-              await processFolder(folder.id, depth + 1)
-            }
-          }
-          await processFolder(job.folderId, 1)
         }
         updateJob(job.id, { status: 'done', progress: { current: colored, total: colored, currentFile: '', phase: `${colored} cartelle colorate` } })
 
@@ -610,7 +570,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     while (runningCount.current < MAX_PARALLEL) {
       const next = queueRef.current.find(j => j.status === 'pending')
       if (!next) break
-      if (next.type === 'colorVidFolders' || next.type === 'colorAllSubfolders' || next.type === 'normalizeNames') {
+      if (next.type === 'colorByKeyword' || next.type === 'colorAllSubfolders' || next.type === 'normalizeNames') {
         processBatchOp(next)
       } else {
         processJob(next)

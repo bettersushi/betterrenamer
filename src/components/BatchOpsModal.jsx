@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 const IColor = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/>
     <circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/>
     <path d="M12 22c-4.4 0-8-2.5-8-7 0-3.6 2.3-6.5 5-8.5"/>
@@ -10,7 +10,7 @@ const IColor = () => (
 )
 
 const IText = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>
   </svg>
 )
@@ -21,68 +21,137 @@ const IClose = () => (
   </svg>
 )
 
-const ACTIVITIES = [
-  {
-    id: 'colorVidFolders',
-    icon: IColor,
-    title: 'Colora cartelle Vid/Gif',
-    description: 'Applica il colore della cartella genitore a tutte le sottocartelle * Vid e * Gif create dalla funzione organizza media.',
-  },
+const DRIVE_COLORS = [
+  '#ac725e', '#d06b64', '#f83a22', '#ff7537', '#ffad46',
+  '#16a765', '#7bd148', '#42d692', '#4986e7', '#9a9cff',
+  '#b99aff', '#cd74e6',
+]
+
+const DEFAULT_RULES = [
+  { keyword: 'Vid', color: '#4986e7' },
+  { keyword: 'Gif', color: '#ff7537' },
+]
+
+const SIMPLE_ACTIVITIES = [
   {
     id: 'colorAllSubfolders',
     icon: IColor,
     title: 'Colora tutte le sottocartelle',
-    description: 'Propaga il colore di ogni cartella a tutte le sue sottocartelle in modo ricorsivo.',
+    description: 'Propaga il colore di ogni cartella a tutte le sue sottocartelle ricorsivamente.',
   },
   {
     id: 'normalizeNames',
     icon: IText,
     title: 'Normalizza nomi file',
-    description: 'Converti in minuscolo, sostituisci spazi con trattini e rimuovi caratteri speciali (mantenendo estensione e trattini esistenti).',
+    description: 'Lowercase + trattini, rimuove caratteri speciali dai nomi file.',
   },
 ]
 
+function ScopeToggle({ id, scope, setScope, currentFolder }) {
+  return (
+    <div style={{ display: 'flex', gap: 4 }}>
+      {['folder', 'drive'].map(s => (
+        <button
+          key={s}
+          onClick={() => setScope(id, s)}
+          style={{
+            fontSize: 11, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
+            background: scope === s ? 'var(--primary)' : 'transparent',
+            color: scope === s ? '#fff' : 'var(--text-secondary)',
+            border: `1px solid ${scope === s ? 'var(--primary)' : 'var(--border)'}`,
+            transition: 'all 0.12s', whiteSpace: 'nowrap',
+          }}
+        >
+          {s === 'folder' ? (currentFolder ? currentFolder.name : 'Cartella corrente') : 'Tutto Drive'}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function AddButton({ onClick, disabled, added }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        fontSize: 11.5, padding: '4px 12px', borderRadius: 7, cursor: disabled ? 'not-allowed' : 'pointer',
+        background: added ? '#22c55e' : 'var(--primary)', color: '#fff',
+        border: 'none', fontFamily: 'inherit', fontWeight: 600,
+        opacity: disabled ? 0.4 : 1, transition: 'background 0.2s', whiteSpace: 'nowrap',
+      }}
+    >
+      {added ? '✓ Aggiunto' : '+ Aggiungi alla coda'}
+    </button>
+  )
+}
+
 export default function BatchOpsModal({ currentFolder, onClose, onAddJob }) {
-  const [scopes, setScopes] = useState({ colorVidFolders: 'folder', colorAllSubfolders: 'folder', normalizeNames: 'folder' })
+  const [scopes, setScopes] = useState({ colorByKeyword: 'folder', colorAllSubfolders: 'folder', normalizeNames: 'folder' })
   const [added, setAdded] = useState({})
+  const [kwRules, setKwRules] = useState(DEFAULT_RULES)
 
   const setScope = (id, scope) => setScopes(s => ({ ...s, [id]: scope }))
 
-  const handleAdd = (activity) => {
-    const job = {
+  const markAdded = (id) => {
+    setAdded(a => ({ ...a, [id]: true }))
+    setTimeout(() => setAdded(a => ({ ...a, [id]: false })), 2000)
+  }
+
+  const handleAddSimple = (act) => {
+    const isFolder = scopes[act.id] === 'folder'
+    if (isFolder && !currentFolder) return
+    onAddJob({
       id: Date.now() + Math.random(),
-      type: activity.id,
-      label: activity.title,
-      scope: scopes[activity.id],
+      type: act.id,
+      label: act.title,
+      scope: scopes[act.id],
       folderId: currentFolder?.id || 'root',
       folderName: currentFolder?.name || 'My Drive',
       status: 'queued',
       progress: { current: 0, total: 0, currentFile: '', phase: '' },
       entries: [],
-    }
-    onAddJob(job)
-    setAdded(a => ({ ...a, [activity.id]: true }))
-    setTimeout(() => setAdded(a => ({ ...a, [activity.id]: false })), 2000)
+    })
+    markAdded(act.id)
   }
 
-  const overlay = {
-    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    backdropFilter: 'blur(4px)',
+  const handleAddKw = () => {
+    const isFolder = scopes.colorByKeyword === 'folder'
+    if (isFolder && !currentFolder) return
+    if (kwRules.length === 0 || kwRules.every(r => !r.keyword.trim())) return
+    onAddJob({
+      id: Date.now() + Math.random(),
+      type: 'colorByKeyword',
+      label: 'Colora per parola chiave',
+      rules: kwRules.filter(r => r.keyword.trim()),
+      scope: scopes.colorByKeyword,
+      folderId: currentFolder?.id || 'root',
+      folderName: currentFolder?.name || 'My Drive',
+      status: 'queued',
+      progress: { current: 0, total: 0, currentFile: '', phase: '' },
+      entries: [],
+    })
+    markAdded('colorByKeyword')
   }
-  const modal = {
-    background: 'var(--surface)', borderRadius: 16, padding: '20px 22px',
-    width: '92vw', maxWidth: 768, boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
-    border: '1px solid var(--border)',
-  }
+
+  const updateRule = (i, patch) => setKwRules(rules => rules.map((r, idx) => idx === i ? { ...r, ...patch } : r))
+  const removeRule = (i) => setKwRules(rules => rules.filter((_, idx) => idx !== i))
+  const addRule = () => setKwRules(rules => [...rules, { keyword: '', color: DRIVE_COLORS[0] }])
+
+  const cardStyle = { border: '1px solid var(--border)', borderRadius: 12, padding: '12px 16px', background: 'color-mix(in srgb, var(--border) 25%, transparent)' }
+  const iconBox = { width: 28, height: 28, borderRadius: 7, background: 'color-mix(in srgb, var(--primary) 10%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', flexShrink: 0 }
 
   return (
-    <div style={overlay} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={modal}>
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div style={{ background: 'var(--surface)', borderRadius: 16, padding: '20px 22px', width: '92vw', maxWidth: 1024, boxShadow: '0 20px 60px rgba(0,0,0,0.25)', border: '1px solid var(--border)' }}>
+
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'color-mix(in srgb, var(--primary) 12%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', flexShrink: 0 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 8, background: 'color-mix(in srgb, var(--primary) 12%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', flexShrink: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M15 4V2m0 18v-2M8 12H2m18 0h-2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
               <circle cx="12" cy="12" r="3"/>
             </svg>
@@ -96,57 +165,79 @@ export default function BatchOpsModal({ currentFolder, onClose, onAddJob }) {
           </button>
         </div>
 
-        {/* Activity cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {ACTIVITIES.map(act => {
-            const scope = scopes[act.id]
-            const isFolder = scope === 'folder'
-            const isAdded = added[act.id]
-            const noFolder = isFolder && !currentFolder
-            return (
-              <div key={act.id} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', background: 'color-mix(in srgb, var(--border) 25%, transparent)' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
-                  <div style={{ width: 30, height: 30, borderRadius: 7, background: 'color-mix(in srgb, var(--primary) 10%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', flexShrink: 0, marginTop: 1 }}>
-                    <act.icon />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>{act.title}</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{act.description}</div>
-                  </div>
-                </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
 
-                {/* Scope toggle */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {['folder', 'drive'].map(s => (
+          {/* Colora per parola chiave — card espansa */}
+          <div style={cardStyle}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <div style={iconBox}><IColor /></div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Colora per parola chiave</div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Assegna un colore alle cartelle il cui nome contiene la parola chiave.</div>
+              </div>
+            </div>
+
+            {/* Regole */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+              {kwRules.map((rule, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    value={rule.keyword}
+                    onChange={e => updateRule(i, { keyword: e.target.value })}
+                    placeholder="parola chiave"
+                    style={{ width: 110, fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)', fontFamily: 'inherit' }}
+                  />
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {DRIVE_COLORS.map(c => (
                       <button
-                        key={s}
-                        onClick={() => setScope(act.id, s)}
+                        key={c}
+                        onClick={() => updateRule(i, { color: c })}
+                        title={c}
                         style={{
-                          fontSize: 11, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
-                          background: scope === s ? 'var(--primary)' : 'transparent',
-                          color: scope === s ? '#fff' : 'var(--text-secondary)',
-                          border: `1px solid ${scope === s ? 'var(--primary)' : 'var(--border)'}`,
-                          transition: 'all 0.12s',
+                          width: 16, height: 16, borderRadius: '50%', background: c, padding: 0, cursor: 'pointer',
+                          border: rule.color === c ? '2px solid var(--text-primary)' : '2px solid transparent',
+                          outline: rule.color === c ? '1px solid var(--surface)' : 'none',
+                          flexShrink: 0,
                         }}
-                      >
-                        {s === 'folder' ? (currentFolder ? currentFolder.name : 'Cartella corrente') : 'Tutto Drive'}
-                      </button>
+                      />
                     ))}
                   </div>
                   <button
-                    onClick={() => handleAdd(act)}
-                    disabled={noFolder}
-                    style={{
-                      fontSize: 11.5, padding: '4px 12px', borderRadius: 7, cursor: noFolder ? 'not-allowed' : 'pointer',
-                      background: isAdded ? '#22c55e' : 'var(--primary)', color: '#fff',
-                      border: 'none', fontFamily: 'inherit', fontWeight: 600,
-                      opacity: noFolder ? 0.4 : 1, transition: 'background 0.2s',
-                      whiteSpace: 'nowrap',
-                    }}
+                    onClick={() => removeRule(i)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, borderRadius: 4, display: 'flex', alignItems: 'center', flexShrink: 0 }}
                   >
-                    {isAdded ? '✓ Aggiunto' : '+ Aggiungi alla coda'}
+                    <IClose />
                   </button>
+                </div>
+              ))}
+              <button
+                onClick={addRule}
+                style={{ alignSelf: 'flex-start', fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px dashed var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                + Aggiungi regola
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <ScopeToggle id="colorByKeyword" scope={scopes.colorByKeyword} setScope={setScope} currentFolder={currentFolder} />
+              <AddButton onClick={handleAddKw} disabled={scopes.colorByKeyword === 'folder' && !currentFolder} added={added.colorByKeyword} />
+            </div>
+          </div>
+
+          {/* Attività semplici */}
+          {SIMPLE_ACTIVITIES.map(act => {
+            const scope = scopes[act.id]
+            const noFolder = scope === 'folder' && !currentFolder
+            return (
+              <div key={act.id} style={cardStyle}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={iconBox}><act.icon /></div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginRight: 8 }}>{act.title}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{act.description}</span>
+                  </div>
+                  <ScopeToggle id={act.id} scope={scope} setScope={setScope} currentFolder={currentFolder} />
+                  <AddButton onClick={() => handleAddSimple(act)} disabled={noFolder} added={added[act.id]} />
                 </div>
                 {noFolder && (
                   <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 5 }}>Seleziona una cartella nella sidebar per usare lo scope cartella</div>
@@ -154,6 +245,7 @@ export default function BatchOpsModal({ currentFolder, onClose, onAddJob }) {
               </div>
             )
           })}
+
         </div>
       </div>
     </div>
