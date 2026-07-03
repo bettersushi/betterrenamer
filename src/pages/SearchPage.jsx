@@ -419,6 +419,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
   const folderHoverTimer = useRef(null)
   const folderFileCache = useRef({})
   const activeFolderRef = useRef(null)
+  const tooltipSuppressUntilRef = useRef(0)
   const folderCursorRef = useRef({ x: 0, y: 0 })
   const [thumbTimestamps, setThumbTimestamps] = useState({}) // forza reload thumbnail dopo crop
   const pHashCache = useRef({})
@@ -969,9 +970,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     folderCursorRef.current = { x: e.clientX, y: e.clientY }
     activeFolderRef.current = folder.id
     clearTimeout(folderHoverTimer.current)
+    if (Date.now() < tooltipSuppressUntilRef.current) return
     folderHoverTimer.current = setTimeout(async () => {
       try {
         if (activeFolderRef.current !== folder.id) return
+        if (Date.now() < tooltipSuppressUntilRef.current) return
         let items = folderFileCache.current[folder.id]
         if (!items) {
           const data = await listFiles(auth.accessToken, folder.id)
@@ -1356,7 +1359,13 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                   <button
                     key={f.id}
                     className={`subfolder-grid-item${dragOverFolder === f.id ? ' drop-target' : ''}`}
-                    onClick={() => selectFolder(f.id, f.name)}
+                    onClick={() => {
+                      activeFolderRef.current = null
+                      clearTimeout(folderHoverTimer.current)
+                      setFolderTooltip(null)
+                      tooltipSuppressUntilRef.current = Date.now() + 1200
+                      selectFolder(f.id, f.name)
+                    }}
                     onMouseEnter={e => handleFolderGridEnter(e, f)}
                     onMouseMove={handleFolderGridMove}
                     onMouseLeave={handleFolderGridLeave}
