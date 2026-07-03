@@ -844,7 +844,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
   const pendingJobs = queue.filter(j => j.status === 'pending')
   const doneJobs = queue.filter(j => j.status === 'done' || j.status === 'error')
   const activeFolderIds = new Set(
-    [...queuedJobs, ...runningJobs, ...pendingJobs].flatMap(j => [j.rootFolderId, ...j.preview.map(p => p.folderId)])
+    [...queuedJobs, ...runningJobs, ...pendingJobs].flatMap(j => [j.rootFolderId, ...(j.preview || []).map(p => p.folderId)])
   )
 
   return (
@@ -1363,7 +1363,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
                   <div style={{ padding: '8px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <strong style={{ fontSize: '13px' }}>{job.rootFolderName}</strong>
-                      <span style={{ fontSize: '11px', color: '#f59e0b', marginLeft: '8px' }}>Interrotto — {job.preview.length} file</span>
+                      {job.preview && <span style={{ fontSize: '11px', color: '#f59e0b', marginLeft: '8px' }}>Interrotto — {job.preview.length} file</span>}
                     </div>
                     <button onClick={() => handleRestartJob(job.id)} className="btn-primary" style={{ fontSize: '11px', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <IconPlay /> Riavvia
