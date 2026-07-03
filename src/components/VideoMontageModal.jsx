@@ -62,9 +62,17 @@ export default function VideoMontageModal({ videos, auth, folderId, folderName, 
         <div className="vmm-body">
           {stage === 0 && (
             <>
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
-                Seleziona i video da includere nel montaggio ({videos.length} disponibili)
-              </p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
+                  Seleziona i video da includere nel montaggio ({videos.length} disponibili)
+                </p>
+                <button
+                  onClick={() => setSelectedIds(selectedIds.size === videos.length ? new Set() : new Set(videos.map(v => v.id)))}
+                  style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+                >
+                  {selectedIds.size === videos.length ? 'Deseleziona tutto' : 'Seleziona tutto'}
+                </button>
+              </div>
               <div className="vmm-clip-grid">
                 {videos.map(v => (
                   <div
