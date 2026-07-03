@@ -11,8 +11,7 @@ function isVideo(file) {
   return VIDEO_EXTS.has(getExt(file.name))
 }
 function imgSrc(file, token) {
-  const driveUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&access_token=${encodeURIComponent(token)}`
-  return `/api/proxy-image?url=${encodeURIComponent(driveUrl)}`
+  return `/api/proxy-image?id=${file.id}&token=${encodeURIComponent(token)}`
 }
 function vidSrc(file, token) {
   return `/api/proxy-video?id=${file.id}&token=${encodeURIComponent(token)}`
