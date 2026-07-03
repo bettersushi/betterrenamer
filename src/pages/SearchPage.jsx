@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import logoSrc from '../assets/logo-bs.svg'
-import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata, patchFileMetadata, trashFile, restoreFile, copyFile, moveFile, renameFile } from '../drive'
+import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata, patchFileMetadata, trashFile, restoreFile, copyFile, moveFile, renameFile, createFolder } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
 import PalettePicker from '../components/PalettePicker'
 import SimilarityBalloon from '../components/SimilarityBalloon'
@@ -398,6 +398,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [scopePickerPhoto, setScopePickerPhoto] = useState(null)
   const [showStats, setShowStats] = useState(false)
   const [contextMenu, setContextMenu] = useState(null) // { photo, idx, x, y }
+  const [folderContextMenu, setFolderContextMenu] = useState(null) // { folder, x, y }
   const [movePhoto, setMovePhoto] = useState(null)
   const [renamePhoto, setRenamePhoto] = useState(null)
   const [undoToast, setUndoToast] = useState(null) // { photo, insertIdx, timer }
@@ -873,6 +874,19 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
     })
   }, [auth.accessToken, selectedIds, exitSelectionMode])
 
+  const handleCreateFolder = useCallback(async (parentId, parentName) => {
+    const name = window.prompt(`Nome della nuova cartella in "${parentName}":`)
+    if (!name || !name.trim()) return
+    try {
+      const newFolder = await createFolder(auth.accessToken, name.trim(), parentId)
+      // refresh subfolder list
+      setCurrentSubfolders(sf => [...sf, newFolder])
+      setTreeChildren(t => ({ ...t, [parentId]: [...(t[parentId] || []), newFolder] }))
+    } catch (e) {
+      alert('Errore nella creazione della cartella: ' + e.message)
+    }
+  }, [auth.accessToken])
+
   const handleDropOnFolder = useCallback(async (targetFolder, draggedPhotoId) => {
     setDragOverFolder(null)
     // Determine which photos to move: selection if active and includes dragged, otherwise just dragged
@@ -1274,6 +1288,16 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                 </button>
               )}
               <button
+                onClick={() => handleCreateFolder(activeFolderId, activeFolderName)}
+                className="thumb-size-btn"
+                title="Nuova cartella qui"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+                  <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+                </svg>
+              </button>
+              <button
                 onClick={() => { setRenameMode(m => !m); setRenameDrafts({}); setSelectionMode(false); setSelectedIds(new Set()) }}
                 className={`thumb-size-btn${renameMode ? ' active' : ''}`}
                 title={renameMode ? 'Esci dal rename rapido' : 'Rinomina rapido'}
@@ -1332,7 +1356,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                     {showHistoryOverflow && (
                       <div
                         style={{
-                          position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 200,
+                          position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 200,
                           background: 'var(--surface)', border: '1px solid var(--border)',
                           borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
                           padding: '6px', display: 'flex', flexDirection: 'column', gap: 3, minWidth: 160,
@@ -1408,6 +1432,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                     onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverFolder(f.id) }}
                     onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverFolder(null) }}
                     onDrop={e => { e.preventDefault(); handleDropOnFolder(f, e.dataTransfer.getData('photoId') || null) }}
+                    onContextMenu={e => { e.preventDefault(); setFolderTooltip(null); setFolderContextMenu({ folder: f, x: e.clientX, y: e.clientY }) }}
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
                     <span>{f.name}</span>
@@ -1672,6 +1697,46 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
             onDelete: handleDelete,
           }}
         />
+      )}
+
+      {/* Folder context menu */}
+      {folderContextMenu && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 1500 }}
+          onClick={() => setFolderContextMenu(null)}
+          onContextMenu={e => { e.preventDefault(); setFolderContextMenu(null) }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              left: Math.min(folderContextMenu.x, window.innerWidth - 200),
+              top: Math.min(folderContextMenu.y, window.innerHeight - 120),
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 10, boxShadow: '0 8px 28px rgba(0,0,0,0.22)',
+              padding: '5px', minWidth: 190, zIndex: 1501,
+            }}
+          >
+            <button
+              onClick={() => { setFolderContextMenu(null); selectFolder(folderContextMenu.folder.id, folderContextMenu.folder.name) }}
+              style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '7px 12px', background: 'none', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'inherit', textAlign: 'left' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--btn-hover)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+              Apri cartella
+            </button>
+            <button
+              onClick={() => { setFolderContextMenu(null); handleCreateFolder(folderContextMenu.folder.id, folderContextMenu.folder.name) }}
+              style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '7px 12px', background: 'none', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'inherit', textAlign: 'left' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--btn-hover)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+              Nuova sottocartella
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Rename modal */}
