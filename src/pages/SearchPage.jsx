@@ -1059,13 +1059,19 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
           <button onClick={() => navigate('/')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Torna a BetterRenamer">
             <IconChevronLeft />
           </button>
-          <img src={logoSrc} alt="" style={{ height: '24px', width: 'auto', marginLeft: 4 }} />
           <div>
-            <div style={{ fontSize: '20px', fontWeight: 700, lineHeight: 1.1 }}>BetterSearch</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Ricerca foto su Google Drive</div>
+            <h1 style={{ fontSize: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <img src={logoSrc} alt="" style={{ height: '24px', width: 'auto' }} />
+              BetterSearch
+            </h1>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Ricerca foto su Google Drive</p>
           </div>
         </div>
         <div className="header-actions">
+          <div className="user-info">
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Autenticato come</div>
+            <div style={{ fontWeight: 600, fontSize: '13px' }}>{auth.email}</div>
+          </div>
           <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Tema">
             {isDark ? <IconSun /> : <IconMoon />}
           </button>
