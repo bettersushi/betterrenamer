@@ -887,46 +887,54 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
 
   const DRAG_MAGENTA = '#e879a0'
 
-  const buildDragImage = useCallback((photo, count) => {
-    const SIZE = 72
-    const OFFSET = 7
-    const layers = Math.min(count, 3)
-    const totalW = SIZE + OFFSET * (layers - 1) + 8
-    const totalH = SIZE + OFFSET * (layers - 1) + 8
+  const buildDragImage = useCallback((photos, count) => {
+    const D = 64       // circle diameter
+    const STEP = 22    // horizontal overlap step
+    const layers = Math.min(photos.length, 3)
+    const totalW = D + STEP * (layers - 1) + 24
+    const totalH = D + 24
 
     const wrap = document.createElement('div')
     wrap.style.cssText = `position:fixed;left:-9999px;top:-9999px;width:${totalW}px;height:${totalH}px;pointer-events:none;`
 
+    // Shadow backdrop
+    const shadow = document.createElement('div')
+    shadow.style.cssText = `
+      position:absolute;left:8px;top:8px;
+      width:${D + STEP*(layers-1)}px;height:${D}px;
+      border-radius:${D}px;
+      box-shadow:0 8px 28px rgba(232,121,160,0.55),0 2px 8px rgba(0,0,0,0.25);
+    `
+    wrap.appendChild(shadow)
+
     for (let i = layers - 1; i >= 0; i--) {
-      const card = document.createElement('div')
-      const angle = (layers - 1 - i) * -3
-      const tx = (layers - 1 - i) * OFFSET * 0.5
-      const ty = i * OFFSET
-      const op = i === 0 ? 1 : i === 1 ? 0.7 : 0.45
-      card.style.cssText = `
-        position:absolute;left:4px;top:4px;
-        width:${SIZE}px;height:${SIZE}px;
-        border-radius:10px;
-        background:#222 url('${photo.thumbnailLink ? getLargeThumbUrl(photo.thumbnailLink, 200) : ''}') center/cover no-repeat;
-        transform:rotate(${angle}deg) translate(${tx}px,${ty}px);
+      const thumb = photos[i]?.thumbnailLink ? getLargeThumbUrl(photos[i].thumbnailLink, 200) : ''
+      const circle = document.createElement('div')
+      const op = i === 0 ? 1 : i === 1 ? 0.82 : 0.6
+      circle.style.cssText = `
+        position:absolute;
+        left:${8 + i * STEP}px;top:8px;
+        width:${D}px;height:${D}px;
+        border-radius:50%;
+        background:#2a2a2a ${thumb ? `url('${thumb}') center/cover no-repeat` : ''};
+        border:3px solid #fff;
+        box-shadow:0 0 0 1.5px rgba(232,121,160,0.5);
         opacity:${op};
-        box-shadow:0 4px 16px rgba(232,121,160,${i === 0 ? 0.55 : 0.2}),0 2px 6px rgba(0,0,0,0.3);
-        border:2px solid rgba(232,121,160,${i === 0 ? 0.8 : 0.3});
       `
-      wrap.appendChild(card)
+      wrap.appendChild(circle)
     }
 
     if (count > 1) {
       const badge = document.createElement('div')
       badge.textContent = count
       badge.style.cssText = `
-        position:absolute;top:0;right:0;
-        width:22px;height:22px;border-radius:50%;
+        position:absolute;top:2px;right:2px;
+        width:20px;height:20px;border-radius:50%;
         background:${DRAG_MAGENTA};color:#fff;
-        font-size:11px;font-weight:700;font-family:sans-serif;
+        font-size:10px;font-weight:800;font-family:sans-serif;
         display:flex;align-items:center;justify-content:center;
-        box-shadow:0 2px 8px rgba(232,121,160,0.5);
         border:2px solid #fff;
+        box-shadow:0 2px 6px rgba(232,121,160,0.55);
       `
       wrap.appendChild(badge)
     }
@@ -935,12 +943,19 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
     return wrap
   }, [])
 
-  const handleDragStart = useCallback((e, photo) => {
+  const handleDragStart = useCallback((e, photo, allResults) => {
     e.dataTransfer.setData('photoId', photo.id)
     e.dataTransfer.effectAllowed = 'move'
     const count = selectionMode && selectedIds.size > 0 ? selectedIds.size : 1
-    const ghost = buildDragImage(photo, count)
-    e.dataTransfer.setDragImage(ghost, 40, 40)
+    // Pick up to 3 photos with thumbnails for the pile (dragged photo first, then other selected)
+    let photos = [photo]
+    if (selectionMode && selectedIds.size > 1 && allResults) {
+      const others = allResults.filter(p => selectedIds.has(p.id) && p.id !== photo.id && p.thumbnailLink)
+      photos = [photo, ...others].slice(0, 3)
+    }
+    const ghost = buildDragImage(photos, count)
+    const cx = Math.round(8 + (Math.min(photos.length, 3) - 1) * 22 / 2 + 32)
+    e.dataTransfer.setDragImage(ghost, cx, 40)
     setTimeout(() => document.body.removeChild(ghost), 0)
     setIsDraggingPhotos(true)
   }, [selectionMode, selectedIds, buildDragImage])
@@ -1380,7 +1395,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                       onClick={() => { if (selectionMode) { if (!wasDragging.current) toggleSelection(photo.id) } else if (!renameMode) setSlideshowIdx(idx) }}
                       onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
                       draggable={showSubfolderSidebar && showSubfolders}
-                      onDragStart={e => handleDragStart(e, photo)}
+                      onDragStart={e => handleDragStart(e, photo, results)}
                       onDragEnd={handleDragEnd}
                     >
                       {photo.thumbnailLink ? (
@@ -1473,7 +1488,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, onTo
                     onClick={() => { if (selectionMode) { if (!wasDragging.current) toggleSelection(photo.id) } else if (!renameMode) setSlideshowIdx(idx) }}
                     onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
                     draggable={showSubfolderSidebar && showSubfolders}
-                    onDragStart={e => { e.dataTransfer.setData('photoId', photo.id); e.dataTransfer.effectAllowed = 'move' }}
+                    onDragStart={e => handleDragStart(e, photo, results)}
                     onDragEnd={() => setDragOverFolder(null)}
                   >
                     {photo.thumbnailLink ? (

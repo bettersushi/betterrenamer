@@ -652,14 +652,15 @@
   box-shadow: inset 0 0 0 3px #e879a0;
 }
 
-@keyframes drag-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+@keyframes drag-gather {
+  0%   { transform: scale(1);    opacity: 1;   filter: blur(0px); }
+  60%  { transform: scale(0.82); opacity: 0.55; filter: blur(1px); }
+  100% { transform: scale(0.75); opacity: 0.35; filter: blur(2px); }
 }
 
 .dragging-active .thumb-card.selected,
 .dragging-active .masonry-card.selected {
-  animation: drag-pulse 1.1s ease-in-out infinite;
+  animation: drag-gather 0.28s ease-out forwards;
 }
 
 .thumb-card.selected .lazy-photo-wrap,
