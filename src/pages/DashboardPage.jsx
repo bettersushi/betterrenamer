@@ -484,25 +484,63 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, o
     try {
       if (job.type === 'colorVidFolders') {
         let colored = 0
-        const processFolder = async (folderId) => {
-          const subs = await listSubfolders(auth.accessToken, folderId)
-          for (const folder of subs) {
-            if (folder.name.endsWith(' Vid') || folder.name.endsWith(' Gif')) continue
-            if (folder.folderColorRgb) {
-              // Vid/Gif folders are INSIDE this folder, not siblings
-              const children = await listSubfolders(auth.accessToken, folder.id)
-              for (const child of children) {
-                if ((child.name === folder.name + ' Vid' || child.name === folder.name + ' Gif') &&
-                    child.folderColorRgb !== folder.folderColorRgb) {
-                  updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: child.name, phase: 'Coloro' } })
-                  await patchFileMetadata(auth.accessToken, child.id, { folderColorRgb: folder.folderColorRgb })
-                }
+        if (job.scope === 'drive') {
+          // Cerca tutte le cartelle *Vid / *Gif in un'unica query Drive
+          let pageToken = null
+          const vidGifFolders = []
+          do {
+            const params = new URLSearchParams({
+              q: `mimeType = 'application/vnd.google-apps.folder' and trashed = false and (name contains ' Vid' or name contains ' Gif')`,
+              fields: 'files(id,name,parents,folderColorRgb),nextPageToken',
+              pageSize: 200,
+            })
+            if (pageToken) params.set('pageToken', pageToken)
+            const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+              headers: { Authorization: `Bearer ${auth.accessToken}` },
+            })
+            const data = await res.json()
+            vidGifFolders.push(...(data.files || []))
+            pageToken = data.nextPageToken || null
+          } while (pageToken)
+
+          // Fetcha il colore del genitore per ciascuno (solo quelli con pattern corretto)
+          const parentCache = {}
+          const getParentColor = async (parentId) => {
+            if (parentCache[parentId] !== undefined) return parentCache[parentId]
+            const res = await fetch(`https://www.googleapis.com/drive/v3/files/${parentId}?fields=id,name,folderColorRgb`, {
+              headers: { Authorization: `Bearer ${auth.accessToken}` },
+            })
+            const data = await res.json()
+            parentCache[parentId] = { color: data.folderColorRgb || null, name: data.name }
+            return parentCache[parentId]
+          }
+          for (const folder of vidGifFolders) {
+            const parentId = folder.parents?.[0]
+            if (!parentId) continue
+            const parent = await getParentColor(parentId)
+            if (!parent.color) continue
+            const expectedBaseName = parent.name + ' Vid'
+            const expectedGifName = parent.name + ' Gif'
+            if (folder.name !== expectedBaseName && folder.name !== expectedGifName) continue
+            if (folder.folderColorRgb === parent.color) continue
+            updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: folder.name, phase: 'Coloro' } })
+            await patchFileMetadata(auth.accessToken, folder.id, { folderColorRgb: parent.color })
+          }
+        } else {
+          // Scope cartella: solo un livello — figli diretti della cartella selezionata
+          const topFolders = await listSubfolders(auth.accessToken, job.folderId)
+          for (const folder of topFolders) {
+            if (!folder.folderColorRgb) continue
+            const children = await listSubfolders(auth.accessToken, folder.id)
+            for (const child of children) {
+              if ((child.name === folder.name + ' Vid' || child.name === folder.name + ' Gif') &&
+                  child.folderColorRgb !== folder.folderColorRgb) {
+                updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: child.name, phase: 'Coloro' } })
+                await patchFileMetadata(auth.accessToken, child.id, { folderColorRgb: folder.folderColorRgb })
               }
             }
-            await processFolder(folder.id)
           }
         }
-        await processFolder(job.scope === 'drive' ? 'root' : job.folderId)
         updateJob(job.id, { status: 'done', progress: { current: colored, total: colored, currentFile: '', phase: `${colored} cartelle colorate` } })
 
       } else if (job.type === 'normalizeNames') {
