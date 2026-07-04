@@ -136,8 +136,11 @@ function isVideoFile(name, mimeType) {
   if (mimeType && mimeType.includes('video')) return true
   return VIDEO_EXTENSIONS.has(getExt(name))
 }
+function baseFolderName(folderName) {
+  return folderName.replace(/ (Vid|Gif)$/, '')
+}
 function generateLegacyName(folderName, fileName, mimeType, counter) {
-  const sanitized = folderName.toLowerCase().replace(/[^a-z0-9]/g, '-')
+  const sanitized = baseFolderName(folderName).toLowerCase().replace(/[^a-z0-9]/g, '-')
   const ext = fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : ''
   let prefix = ''
   if (isVideoFile(fileName, mimeType)) prefix = 'vid-'
@@ -145,13 +148,13 @@ function generateLegacyName(folderName, fileName, mimeType, counter) {
   return `${sanitized}-${prefix}${counter}${ext}`
 }
 function matchesLegacyPattern(folderName, fileName, mimeType) {
-  const sanitized = folderName.toLowerCase().replace(/[^a-z0-9]/g, '-')
+  const sanitized = baseFolderName(folderName).toLowerCase().replace(/[^a-z0-9]/g, '-')
   const ext = getExt(fileName).replace('.', '\\.')
   const prefix = isVideoFile(fileName, mimeType) ? 'vid-' : getExt(fileName) === '.gif' ? 'gif-' : ''
   return new RegExp(`^${sanitized}-${prefix}\\d+${ext}$`).test(fileName)
 }
 function extractLegacyCounter(folderName, fileName) {
-  const sanitized = folderName.toLowerCase().replace(/[^a-z0-9]/g, '-')
+  const sanitized = baseFolderName(folderName).toLowerCase().replace(/[^a-z0-9]/g, '-')
   const ext = getExt(fileName).replace('.', '\\.')
   const m = fileName.match(new RegExp(`^${sanitized}-(?:vid-|gif-)?(\\d+)${ext}$`))
   return m ? parseInt(m[1], 10) : null
@@ -521,23 +524,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
     const total = moveItems.length + renameItems.length
     let current = 0
 
-    // Fase 1: sposta
-    for (const item of moveItems) {
-      current++
-      updateJob(job.id, { progress: { current, total, currentFile: item.oldName, phase: `Sposto → ${item.folderName} ${isVideoFile(item.oldName, item.mimeType) ? 'Vid' : 'Gif'}` } })
-      try {
-        const suffix = isVideoFile(item.oldName, item.mimeType) ? 'Vid' : 'Gif'
-        const destFolder = await getMediaFolder(item.folderId, item.folderName, suffix)
-        await moveFile(auth.accessToken, item.id, destFolder.id, item.folderId)
-        item.folderId = destFolder.id
-        item.folderName = destFolder.name
-        entries.push({ type: 'move', oldName: item.oldName, newName: item.newName, folderName: destFolder.name, success: true })
-      } catch (err) {
-        entries.push({ type: 'move', oldName: item.oldName, newName: item.newName, folderName: item.folderName, success: false, error: err.message })
-      }
-    }
-
-    // Fase 2: rinomina (skip in moveOnly)
+    // Fase 1: rinomina (skip in moveOnly)
     for (let i = 0; i < renameItems.length; i++) {
       const item = renameItems[i]
       current++
@@ -553,6 +540,27 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
         entries.push({ type: 'rename', ...item, success: false, error: err.message })
       }
       if ((i + 1) % 50 === 0) await new Promise(r => setTimeout(r, 500))
+    }
+
+    // Fase 2: sposta
+    for (const item of moveItems) {
+      current++
+      const suffix = isVideoFile(item.oldName, item.mimeType) ? 'Vid' : 'Gif'
+      const alreadyInPlace = item.folderName === `${baseFolderName(item.folderName)} ${suffix}`
+      if (alreadyInPlace) {
+        entries.push({ type: 'move', oldName: item.oldName, newName: item.newName, folderName: item.folderName, success: true, skipped: true })
+        continue
+      }
+      updateJob(job.id, { progress: { current, total, currentFile: item.oldName, phase: `Sposto → ${item.folderName} ${suffix}` } })
+      try {
+        const destFolder = await getMediaFolder(item.folderId, item.folderName, suffix)
+        await moveFile(auth.accessToken, item.id, destFolder.id, item.folderId)
+        item.folderId = destFolder.id
+        item.folderName = destFolder.name
+        entries.push({ type: 'move', oldName: item.oldName, newName: item.newName, folderName: destFolder.name, success: true })
+      } catch (err) {
+        entries.push({ type: 'move', oldName: item.oldName, newName: item.newName, folderName: item.folderName, success: false, error: err.message })
+      }
     }
 
     saveSession({ date: new Date().toISOString(), rootFolder: job.rootFolderName, mode: job.mode, entries })
