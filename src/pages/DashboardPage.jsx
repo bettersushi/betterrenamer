@@ -136,6 +136,15 @@ function isVideoFile(name, mimeType) {
   if (mimeType && mimeType.includes('video')) return true
   return VIDEO_EXTENSIONS.has(getExt(name))
 }
+function formatETA(ms) {
+  const totalSec = Math.round(ms / 1000)
+  if (totalSec < 60) return `${totalSec}s`
+  const min = Math.floor(totalSec / 60)
+  const sec = totalSec % 60
+  if (min < 60) return `${min}m ${sec}s`
+  const h = Math.floor(min / 60)
+  return `${h}h ${min % 60}m`
+}
 function baseFolderName(folderName) {
   return folderName.replace(/ (Vid|Gif)$/, '').replace(/^[-_*]+/, '')
 }
@@ -489,7 +498,18 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
   }, [queue])
 
   const updateJob = useCallback((id, updates) => {
-    queueRef.current = queueRef.current.map(j => j.id === id ? { ...j, ...updates } : j)
+    queueRef.current = queueRef.current.map(j => {
+      if (j.id !== id) return j
+      const merged = { ...j, ...updates }
+      if (updates.status === 'running' && !j.startedAt) merged.startedAt = Date.now()
+      if (merged.progress && merged.startedAt && merged.progress.current > 0 && merged.progress.total > 0) {
+        const elapsed = Date.now() - merged.startedAt
+        const rate = elapsed / merged.progress.current
+        const remaining = merged.progress.total - merged.progress.current
+        merged.progress = { ...merged.progress, etaMs: Math.max(0, Math.round(rate * remaining)) }
+      }
+      return merged
+    })
     setQueue([...queueRef.current])
   }, [])
 
@@ -1440,7 +1460,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
                         </>
                       )}
                       {job.status === 'pending' && 'In partenza...'}
-                      {job.status === 'running' && `${job.progress.current} / ${job.progress.total}`}
+                      {job.status === 'running' && `${job.progress.current} / ${job.progress.total}${job.progress.etaMs ? ` · ~${formatETA(job.progress.etaMs)}` : ''}`}
                       {job.status === 'done' && (
                         <>
                           <span style={{ color: '#16a34a' }}>{successCount} ok</span>
@@ -1593,7 +1613,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
                         )}
                       </div>
                       <span style={{ fontSize: '12px', color: '#3b82f6', flexShrink: 0 }}>
-                        {job.status === 'running' ? `${pct}%` : '⏳'}
+                        {job.status === 'running' ? `${pct}%${job.progress.etaMs ? ` · ~${formatETA(job.progress.etaMs)}` : ''}` : '⏳'}
                       </span>
                     </div>
                     {job.status === 'running' && (
