@@ -1510,7 +1510,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                       {photo.thumbnailLink ? (
                         <LazyPhoto
                           key={thumbTimestamps[photo.id] || photo.id}
-                          src={getLargeThumbUrl(photo.thumbnailLink, 1600)}
+                          src={getLargeThumbUrl(photo.thumbnailLink, 1000)}
                           alt={photo.name}
                           className="masonry-img"
                         />

@@ -66,9 +66,9 @@ const traverseFolder = async (accessToken, folderId, folderName, isRoot, include
 
   if (onProgress) onProgress(folderName, results.reduce((n, f) => n + f.files.length, 0), subfolders.length)
 
-  for (const subfolder of subfolders) {
-    await traverseFolder(accessToken, subfolder.id, subfolder.name, false, includeRoot, results, onProgress)
-  }
+  await Promise.all(subfolders.map(subfolder =>
+    traverseFolder(accessToken, subfolder.id, subfolder.name, false, includeRoot, results, onProgress)
+  ))
 }
 
 export const listFilesRecursive = async (accessToken, rootFolderId, rootFolderName, includeRoot, onProgress) => {
