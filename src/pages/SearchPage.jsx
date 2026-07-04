@@ -13,6 +13,7 @@ import CropModal from '../components/CropModal'
 import BatchCropModal from '../components/BatchCropModal'
 import EnhanceModal from '../components/EnhanceModal'
 import VideoMontageModal from '../components/VideoMontageModal'
+import { useVideoMontage } from '../context/VideoMontageContext'
 import StatusModal from '../components/StatusModal'
 import './SearchPage.css'
 
@@ -424,7 +425,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [movePhoto, setMovePhoto] = useState(null)
   const [renamePhoto, setRenamePhoto] = useState(null)
   const [undoToast, setUndoToast] = useState(null) // { photo, insertIdx, timer }
-  const [showVideoMontage, setShowVideoMontage] = useState(false)
+  const { wizardOpen, wizardMeta, openWizard } = useVideoMontage()
   const [showStatus, setShowStatus] = useState(false)
   const [mediaFilter, setMediaFilter] = useState('all')
   const [croppingIds, setCroppingIds] = useState(new Set())
@@ -1589,7 +1590,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
             {videoFiles.length >= 2 && (
               <button
                 className="btn-secondary"
-                onClick={() => setShowVideoMontage(true)}
+                onClick={() => openWizard(videoFiles, activeFolderId, activeFolderName)}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '5px 10px' }}
                 title="Monta video"
               >
@@ -2072,13 +2073,12 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
         />
       )}
 
-      {showVideoMontage && (
+      {wizardOpen && wizardMeta && (
         <VideoMontageModal
-          videos={videoFiles}
+          videos={wizardMeta.videos}
           auth={auth}
-          folderId={activeFolderId}
-          folderName={activeFolderName}
-          onClose={() => setShowVideoMontage(false)}
+          folderId={wizardMeta.folderId}
+          folderName={wizardMeta.folderName}
         />
       )}
       {showStatus && <StatusModal auth={auth} onClose={() => setShowStatus(false)} />}

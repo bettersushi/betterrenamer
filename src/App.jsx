@@ -5,6 +5,8 @@ import CallbackPage from './pages/CallbackPage'
 import DashboardPage from './pages/DashboardPage'
 import LogsPage from './pages/LogsPage'
 import SearchPage from './pages/SearchPage'
+import { VideoMontageProvider } from './context/VideoMontageContext'
+import VideoMontageBalloon from './components/VideoMontageBalloon'
 import { refreshAccessToken } from './auth'
 import './App.css'
 
@@ -107,14 +109,17 @@ function App() {
   return (
     <ErrorBoundary>
     <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
-        <Route path="/callback" element={<CallbackPage onLogin={handleLogin} />} />
-        <Route path="/" element={auth ? <DashboardPage auth={auth} onLogout={handleLogout} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} colorScheme={colorScheme} onChangeScheme={handleScheme} onTokenRefresh={handleTokenRefresh} /> : <Navigate to="/login" />} />
-        <Route path="/logs" element={auth ? <LogsPage onLogout={handleLogout} /> : <Navigate to="/login" />} />
-        <Route path="/search" element={auth ? <SearchPage auth={auth} onLogout={handleLogout} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} colorScheme={colorScheme} onChangeScheme={handleScheme} onTokenRefresh={handleTokenRefresh} /> : <Navigate to="/login" />} />
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+      <VideoMontageProvider auth={auth} onTokenRefresh={handleTokenRefresh}>
+        <Routes>
+          <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
+          <Route path="/callback" element={<CallbackPage onLogin={handleLogin} />} />
+          <Route path="/" element={auth ? <DashboardPage auth={auth} onLogout={handleLogout} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} colorScheme={colorScheme} onChangeScheme={handleScheme} onTokenRefresh={handleTokenRefresh} /> : <Navigate to="/login" />} />
+          <Route path="/logs" element={auth ? <LogsPage onLogout={handleLogout} /> : <Navigate to="/login" />} />
+          <Route path="/search" element={auth ? <SearchPage auth={auth} onLogout={handleLogout} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} colorScheme={colorScheme} onChangeScheme={handleScheme} onTokenRefresh={handleTokenRefresh} /> : <Navigate to="/login" />} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+        <VideoMontageBalloon />
+      </VideoMontageProvider>
     </BrowserRouter>
     </ErrorBoundary>
   )
