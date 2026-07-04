@@ -444,6 +444,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [thumbSize, setThumbSizeRaw] = useState(() => localStorage.getItem('br_thumb_size') || 'md')
   const setThumbSize = (v) => { setThumbSizeRaw(v); localStorage.setItem('br_thumb_size', v) }
   const [sortOrder, setSortOrder] = useState('modified')
+  const [sortDir, setSortDir] = useState('desc')
   const [navHistory, setNavHistory] = useState(() => {
     try {
       const saved = localStorage.getItem('br_nav_history')
@@ -1159,10 +1160,16 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
     if (mediaFilter === 'video') list = list.filter(f => isVideoFile(f))
     else if (mediaFilter === 'gif') list = list.filter(f => getExt(f.name) === '.gif')
     else if (mediaFilter === 'img') list = list.filter(f => !isVideoFile(f) && getExt(f.name) !== '.gif')
-    if (sortOrder === 'name') list = [...list].sort((a, b) => a.name.localeCompare(b.name))
-    else list = [...list].sort((a, b) => new Date(b.modifiedTime || 0) - new Date(a.modifiedTime || 0))
+    if (sortOrder === 'name') {
+      list = [...list].sort((a, b) => sortDir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name))
+    } else {
+      list = [...list].sort((a, b) => {
+        const diff = new Date(b.modifiedTime || 0) - new Date(a.modifiedTime || 0)
+        return sortDir === 'desc' ? diff : -diff
+      })
+    }
     return list
-  }, [allPhotos, similarTo, similarResults, globalResults, sortOrder, mediaFilter])
+  }, [allPhotos, similarTo, similarResults, globalResults, sortOrder, sortDir, mediaFilter])
 
   // ── Render ───────────────────────────────────────────────────────────────
   const rootFolders = treeChildren['root'] || []
@@ -1269,11 +1276,25 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                 </button>
               ))}
               <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
-              <button onClick={() => setSortOrder('name')} className={`thumb-size-btn${sortOrder === 'name' ? ' active' : ''}`} title="Ordina per nome">
-                <IconSortName />
+              <button
+                onClick={() => {
+                  if (sortOrder === 'name') setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+                  else { setSortOrder('name'); setSortDir('asc') }
+                }}
+                className={`thumb-size-btn${sortOrder === 'name' ? ' active' : ''}`}
+                title={sortOrder === 'name' ? (sortDir === 'asc' ? 'Ordina per nome (A→Z)' : 'Ordina per nome (Z→A)') : 'Ordina per nome'}
+              >
+                <IconSortName /> {sortOrder === 'name' && (sortDir === 'asc' ? '↑' : '↓')}
               </button>
-              <button onClick={() => setSortOrder('modified')} className={`thumb-size-btn${sortOrder === 'modified' ? ' active' : ''}`} title="Ordina per data modifica">
-                <IconSortDate />
+              <button
+                onClick={() => {
+                  if (sortOrder === 'modified') setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+                  else { setSortOrder('modified'); setSortDir('desc') }
+                }}
+                className={`thumb-size-btn${sortOrder === 'modified' ? ' active' : ''}`}
+                title={sortOrder === 'modified' ? (sortDir === 'desc' ? 'Ordina per data (più recenti prima)' : 'Ordina per data (più vecchie prima)') : 'Ordina per data modifica'}
+              >
+                <IconSortDate /> {sortOrder === 'modified' && (sortDir === 'desc' ? '↓' : '↑')}
               </button>
               <button onClick={() => setShowStats(true)} className="thumb-size-btn" title="Statistiche cartella">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
