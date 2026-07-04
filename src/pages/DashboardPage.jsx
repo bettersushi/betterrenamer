@@ -5,6 +5,7 @@ import { listFiles, listFilesRecursive, batchRenameFiles, getOrCreateFolder, mov
 import { saveSession, getSessions, clearSessions, downloadCSV } from '../logs'
 import QuickLookModal from '../components/QuickLookModal'
 import BatchOpsModal from '../components/BatchOpsModal'
+import RulesModal from '../components/RulesModal'
 import StatusModal from '../components/StatusModal'
 import PalettePicker from '../components/PalettePicker'
 import './DashboardPage.css'
@@ -42,6 +43,59 @@ function resolvePlaceholders(template, { folderName, parentName, nonnoName, file
     .replace(/{mese}/g, mese)
     .replace(/{giorno}/g, giorno)
     .replace(/{ext}/g, extName)
+}
+
+// config = { pattern, separator, startNumber, padding, customPrefix, customAddSeq, customSeqSeparator, recursive }
+async function buildRenamePreviewForConfig(accessToken, folder, config) {
+  const { pattern, separator, startNumber, padding, customPrefix, customAddSeq, customSeqSeparator, recursive } = config
+  let fileGroups
+  if (recursive) {
+    fileGroups = await listFilesRecursive(accessToken, folder.id, folder.name, true)
+  } else {
+    const data = await listFiles(accessToken, folder.id)
+    const nonFolderFiles = (data.files || []).filter(f => f.mimeType !== 'application/vnd.google-apps.folder' && f.mimeType !== 'application/vnd.google-apps.shortcut')
+    fileGroups = [{ files: nonFolderFiles, folderName: folder.name, folderId: folder.id }]
+  }
+
+  const template = pattern === 'custom-free' ? (customPrefix || '{nome}') : ''
+  const needsAncestors = template.includes('{parent}') || template.includes('{nonno}')
+  const ancestorsMap = {}
+  if (needsAncestors) {
+    const uniqueIds = [...new Set(fileGroups.map(g => g.folderId))]
+    await Promise.all(uniqueIds.map(async id => {
+      try { ancestorsMap[id] = await getFolderAncestors(accessToken, id, 2) } catch { ancestorsMap[id] = [] }
+    }))
+  }
+
+  const previewList = []
+  let globalIndex = 0
+  for (const group of fileGroups) {
+    const ancestors = ancestorsMap[group.folderId] || []
+    const parentName = ancestors[0]?.name || ''
+    const nonnoName = ancestors[1]?.name || ''
+    let groupIndex = 0
+    for (const file of group.files) {
+      const index = recursive ? groupIndex : globalIndex
+      const num = (startNumber + index).toString().padStart(padding, '0')
+      const ext = file.name.substring(file.name.lastIndexOf('.')) || ''
+      const extName = ext.slice(1) || 'file'
+      let newName = ''
+      if (pattern === 'folder-ext-seq') newName = `${group.folderName}${separator}${extName}${separator}${num}${ext}`
+      else if (pattern === 'seq-ext') newName = `${num}${separator}${extName}${ext}`
+      else if (pattern === 'folder-seq') newName = `${group.folderName}${separator}${num}${ext}`
+      else if (pattern === 'custom-free') {
+        const hasSeqToken = template.includes('{seq}')
+        const resolved = resolvePlaceholders(template, { folderName: group.folderName, parentName, nonnoName, file, num, ext, extName })
+        newName = hasSeqToken || !customAddSeq
+          ? `${resolved}${ext}`
+          : `${resolved}${customSeqSeparator}${num}${ext}`
+      }
+      previewList.push({ id: file.id, oldName: file.name, newName, folderName: group.folderName, folderId: group.folderId, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || null, skip: file.name === newName })
+      groupIndex++
+      globalIndex++
+    }
+  }
+  return previewList
 }
 
 const TAB_ID = crypto.randomUUID()
@@ -265,6 +319,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
   const [undoingEntries, setUndoingEntries] = useState(new Set())
 
   const [showBatchOps, setShowBatchOps] = useState(false)
+  const [showRules, setShowRules] = useState(false)
   const [showStatus, setShowStatus] = useState(false)
 
   const openLogs = () => { setLogSessions(getSessions()); setLogsOpen(true) }
@@ -310,6 +365,16 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
   const [customAddSeq, setCustomAddSeq] = useState(true)
   const [customSeqSeparator, setCustomSeqSeparator] = useState('-')
   const [customRecursive, setCustomRecursive] = useState(false)
+
+  const [rules, setRules] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('br_rename_rules') || '[]') } catch { return [] }
+  })
+  const persistRules = (next) => {
+    setRules(next)
+    localStorage.setItem('br_rename_rules', JSON.stringify(next))
+  }
+  const [rulesApplying, setRulesApplying] = useState(false)
+  const [rulesApplyMessage, setRulesApplyMessage] = useState('')
   const customPrefixRef = useRef(null)
 
   const insertPlaceholder = (token) => {
@@ -640,6 +705,52 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
     setCheckedFolders(new Set())
   }
 
+  const handleApplyRulesNow = useCallback(async () => {
+    if (rules.length === 0) return
+    setRulesApplying(true)
+    setRulesApplyMessage('')
+    let queuedCount = 0
+    let errorCount = 0
+    try {
+      for (const rule of rules) {
+        try {
+          const previewList = await buildRenamePreviewForConfig(
+            auth.accessToken,
+            { id: rule.folderId, name: rule.folderName },
+            { ...rule.patternConfig, recursive: rule.recursive }
+          )
+          const toRename = previewList.filter(p => !p.skip)
+          if (toRename.length === 0) continue
+          const job = {
+            id: ++jobIdCounter,
+            rootFolderName: rule.folderName,
+            rootFolderId: rule.folderId,
+            mode: 'custom',
+            preview: toRename,
+            skipCount: previewList.length - toRename.length,
+            status: 'pending',
+            progress: { current: 0, total: toRename.length, currentFile: '', phase: '' },
+            entries: [],
+          }
+          queueRef.current = [...queueRef.current, job]
+          setQueue([...queueRef.current])
+          queuedCount++
+        } catch (e) {
+          console.error(`Regola "${rule.name}" fallita:`, e)
+          errorCount++
+        }
+      }
+      startPending()
+      setRulesApplyMessage(
+        queuedCount === 0 && errorCount === 0
+          ? 'Nessun file da rinominare — tutte le regole sono già rispettate.'
+          : `${queuedCount} regola/e accodata/e${errorCount > 0 ? `, ${errorCount} fallita/e` : ''}.`
+      )
+    } finally {
+      setRulesApplying(false)
+    }
+  }, [rules, auth.accessToken, startPending])
+
   const reanalizeAndQueue = useCallback(async (jobId) => {
     const job = queueRef.current.find(j => j.id === jobId)
     if (!job) return
@@ -855,55 +966,10 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
           }
         }
       } else {
-        let fileGroups
-        if (pattern === 'custom-free' && customRecursive) {
-          fileGroups = await listFilesRecursive(auth.accessToken, currentFolder.id, currentFolder.name, true)
-        } else {
-          const nonFolderFiles = files.filter(f => f.mimeType !== 'application/vnd.google-apps.folder' && f.mimeType !== 'application/vnd.google-apps.shortcut')
-          fileGroups = [{ files: nonFolderFiles, folderName: currentFolder.name, folderId: currentFolder.id }]
-        }
-        // Fetch ancestors if template uses {parent} or {nonno}
-        const template = pattern === 'custom-free' ? (customPrefix || '{nome}') : ''
-        const needsAncestors = template.includes('{parent}') || template.includes('{nonno}')
-        const ancestorsMap = {}
-        if (needsAncestors) {
-          const uniqueIds = [...new Set(fileGroups.map(g => g.folderId))]
-          await Promise.all(uniqueIds.map(async id => {
-            try {
-              const anc = await getFolderAncestors(auth.accessToken, id, 2)
-              ancestorsMap[id] = anc
-            } catch { ancestorsMap[id] = [] }
-          }))
-        }
-
-        const previewList = []
-        let globalIndex = 0
-        for (const group of fileGroups) {
-          const ancestors = ancestorsMap[group.folderId] || []
-          const parentName = ancestors[0]?.name || ''
-          const nonnoName = ancestors[1]?.name || ''
-          let groupIndex = 0
-          for (const file of group.files) {
-            const index = pattern === 'custom-free' && customRecursive ? groupIndex : globalIndex
-            const num = (startNumber + index).toString().padStart(padding, '0')
-            const ext = file.name.substring(file.name.lastIndexOf('.')) || ''
-            const extName = ext.slice(1) || 'file'
-            let newName = ''
-            if (pattern === 'folder-ext-seq') newName = `${currentFolder.name}${separator}${extName}${separator}${num}${ext}`
-            else if (pattern === 'seq-ext') newName = `${num}${separator}${extName}${ext}`
-            else if (pattern === 'folder-seq') newName = `${currentFolder.name}${separator}${num}${ext}`
-            else if (pattern === 'custom-free') {
-              const hasSeqToken = template.includes('{seq}')
-              const resolved = resolvePlaceholders(template, { folderName: group.folderName, parentName, nonnoName, file, num, ext, extName })
-              newName = hasSeqToken || !customAddSeq
-                ? `${resolved}${ext}`
-                : `${resolved}${customSeqSeparator}${num}${ext}`
-            }
-            previewList.push({ id: file.id, oldName: file.name, newName, folderName: group.folderName, folderId: group.folderId, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || null, skip: file.name === newName })
-            groupIndex++
-            globalIndex++
-          }
-        }
+        const previewList = await buildRenamePreviewForConfig(auth.accessToken, currentFolder, {
+          pattern, separator, startNumber, padding, customPrefix, customAddSeq, customSeqSeparator,
+          recursive: pattern === 'custom-free' && customRecursive,
+        })
         setPreview(previewList)
       }
     } catch (err) {
@@ -959,6 +1025,10 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
             {isDark ? <IconSun /> : <IconMoon />}
           </button>
           <button onClick={() => setShowBatchOps(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Operazioni batch"><IconWand /></button>
+          <button onClick={() => setShowRules(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6 }} title="Regole di rinomina">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0H5a2 2 0 0 1-2-2v-4m6 6h10a2 2 0 0 0 2-2v-4"/></svg>
+            Regole
+          </button>
           <button onClick={() => setShowStatus(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Stato sistema">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           </button>
@@ -1409,6 +1479,17 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
             setQueue([...queueRef.current])
             setShowBatchOps(false)
           }}
+        />
+      )}
+      {showRules && (
+        <RulesModal
+          rules={rules}
+          accessToken={auth.accessToken}
+          onSave={persistRules}
+          onClose={() => { setShowRules(false); setRulesApplyMessage('') }}
+          onApplyNow={handleApplyRulesNow}
+          applying={rulesApplying}
+          applyMessage={rulesApplyMessage}
         />
       )}
       {/* Logs sidebar */}
