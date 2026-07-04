@@ -22,6 +22,12 @@ const SEARCH_QUERIES_KEY = 'betterrenamer_search_queries'
 const PHASH_CACHE_KEY = 'br_phash_cache'
 const GLOBAL_SIM_CAP = 2000
 const THUMB_SIZES = { sm: 72, md: 120, lg: 200, masonry: 0 }
+function computeMasonryCols() {
+  if (typeof window === 'undefined') return 4
+  if (window.innerWidth <= 800) return 2
+  if (window.innerWidth <= 1200) return 3
+  return 4
+}
 
 function getExt(name) {
   return name.includes('.') ? name.substring(name.lastIndexOf('.')).toLowerCase() : ''
@@ -1171,6 +1177,116 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
     return list
   }, [allPhotos, similarTo, similarResults, globalResults, sortOrder, sortDir, mediaFilter])
 
+  const [masonryCols, setMasonryCols] = useState(() => computeMasonryCols())
+  useEffect(() => {
+    const onResize = () => setMasonryCols(computeMasonryCols())
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  const masonryColumns = useMemo(() => {
+    const cols = Array.from({ length: masonryCols }, () => [])
+    results.forEach((photo, idx) => cols[idx % masonryCols].push({ photo, idx }))
+    return cols
+  }, [results, masonryCols])
+
+  const renderMasonryCard = (photo, idx) => (
+    <div
+      key={photo.id}
+      data-photo-id={photo.id}
+      className={`masonry-card${selectedIds.has(photo.id) ? ' selected' : ''}`}
+      onClick={() => { if (selectionMode) { if (!wasDragging.current) toggleSelection(photo.id) } else if (!renameMode) setSlideshowIdx(idx) }}
+      onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
+      draggable={canDragToFolders}
+      onDragStart={e => handleDragStart(e, photo, results, 1600)}
+      onDragEnd={handleDragEnd}
+    >
+      {photo.thumbnailLink ? (
+        <LazyPhoto
+          key={thumbTimestamps[photo.id] || photo.id}
+          src={getLargeThumbUrl(photo.thumbnailLink, 1000)}
+          alt={photo.name}
+          className="masonry-img"
+        />
+      ) : (
+        <div className="masonry-no-thumb">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="3" x2="21" y2="21"/></svg>
+        </div>
+      )}
+      {isVideoFile(photo) && (
+        <>
+          <div className="video-icon-badge" style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 4, padding: '2px 6px 2px 4px', color: 'white', pointerEvents: 'none' }}>
+            <IconVideoFile />
+            {photo.videoMediaMetadata?.durationMillis && (
+              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.2, lineHeight: 1 }}>{formatDuration(photo.videoMediaMetadata.durationMillis)}</span>
+            )}
+          </div>
+          <div className="masonry-video-hover">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
+            <span className="masonry-video-label">Play video</span>
+            <span className="masonry-video-meta">
+              {[formatDuration(photo.videoMediaMetadata?.durationMillis), formatSize(photo.size)].filter(Boolean).join(' · ')}
+            </span>
+          </div>
+        </>
+      )}
+      {similarTo && photo._dist !== undefined && photo._dist === 0 && (
+        <div className="search-similar-badge">identica</div>
+      )}
+      {!selectionMode && !renameMode && <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
+        <button className="thumb-overlay-btn" title="Vai alla cartella" onClick={() => handleFolderJump(photo)}><IconFolderJump /></button>
+        {photo.thumbnailLink && (
+          <button className="thumb-overlay-btn" title="Crop" onClick={() => setCropPhoto(photo)}><IconCrop /></button>
+        )}
+        {photo.thumbnailLink && (
+          <button className="thumb-overlay-btn" title="Enhance (AI upscale)" onClick={() => setEnhancePhoto(photo)}><IconEnhance /></button>
+        )}
+        {photo.thumbnailLink && (
+          <button className="thumb-overlay-btn" title="Ruota 90° sx" onClick={() => handleRotate(photo)}><IconRotateCCW /></button>
+        )}
+        <button className="thumb-overlay-btn" title="Altre azioni" onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setContextMenu({ photo, idx, x: r.left, y: r.bottom + 4 }) }}><IconDots /></button>
+      </div>}
+      {selectionMode && (
+        <div className={`selection-check${selectedIds.has(photo.id) ? ' checked' : ''}`} />
+      )}
+      {renameMode && (
+        <div className="rename-inline-overlay" onClick={e => e.stopPropagation()}>
+          <div className="rename-inline-row">
+            <input
+              className="rename-inline-input"
+              value={renameDrafts[photo.id] ?? getBaseName(photo.name)}
+              onChange={e => setRenameDrafts(d => ({ ...d, [photo.id]: e.target.value }))}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  const draft = renameDrafts[photo.id] ?? getBaseName(photo.name)
+                  const ext = getExt(photo.name)
+                  const newName = (draft.trim() || getBaseName(photo.name)) + ext
+                  if (newName !== photo.name) handleRename(photo, newName)
+                }
+                if (e.key === 'Escape') setRenameDrafts(d => ({ ...d, [photo.id]: getBaseName(photo.name) }))
+              }}
+              onClick={e => e.stopPropagation()}
+            />
+            <button
+              className="rename-inline-clear"
+              onMouseDown={e => { e.preventDefault(); setRenameDrafts(d => ({ ...d, [photo.id]: '' })); e.currentTarget.previousSibling.focus() }}
+              title="Svuota"
+            >✕</button>
+          </div>
+        </div>
+      )}
+      {(croppingIds.has(photo.id) || cropDoneIds.has(photo.id) || rotatingIds.has(photo.id) || rotateDoneIds.has(photo.id)) && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: (croppingIds.has(photo.id) || rotatingIds.has(photo.id)) ? 'rgba(0,0,0,0.55)' : 'rgba(16,185,129,0.7)', borderRadius: 8, pointerEvents: 'none', transition: 'background 0.3s' }}>
+          {(croppingIds.has(photo.id) || rotatingIds.has(photo.id)) ? (
+            <svg style={{ animation: 'spin 0.9s linear infinite' }} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+          ) : (
+            <span style={{ color: 'white', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 }}>✓ Salvato</span>
+          )}
+        </div>
+      )}
+    </div>
+  )
+
   // ── Render ───────────────────────────────────────────────────────────────
   const rootFolders = treeChildren['root'] || []
   const showSubfolderSidebar = currentSubfolders.length > 0 && globalResults === null && similarTo === null
@@ -1519,100 +1635,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
               )}
               {thumbSize === 'masonry' ? (
                 <div className="search-masonry">
-                  {results.map((photo, idx) => (
-                    <div
-                      key={photo.id}
-                      data-photo-id={photo.id}
-                      className={`masonry-card${selectedIds.has(photo.id) ? ' selected' : ''}`}
-                      onClick={() => { if (selectionMode) { if (!wasDragging.current) toggleSelection(photo.id) } else if (!renameMode) setSlideshowIdx(idx) }}
-                      onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
-                      draggable={canDragToFolders}
-                      onDragStart={e => handleDragStart(e, photo, results, 1600)}
-                      onDragEnd={handleDragEnd}
-                    >
-                      {photo.thumbnailLink ? (
-                        <LazyPhoto
-                          key={thumbTimestamps[photo.id] || photo.id}
-                          src={getLargeThumbUrl(photo.thumbnailLink, 1000)}
-                          alt={photo.name}
-                          className="masonry-img"
-                        />
-                      ) : (
-                        <div className="masonry-no-thumb">
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="3" x2="21" y2="21"/></svg>
-                        </div>
-                      )}
-                      {isVideoFile(photo) && (
-                        <>
-                          <div className="video-icon-badge" style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 4, padding: '2px 6px 2px 4px', color: 'white', pointerEvents: 'none' }}>
-                            <IconVideoFile />
-                            {photo.videoMediaMetadata?.durationMillis && (
-                              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.2, lineHeight: 1 }}>{formatDuration(photo.videoMediaMetadata.durationMillis)}</span>
-                            )}
-                          </div>
-                          <div className="masonry-video-hover">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
-                            <span className="masonry-video-label">Play video</span>
-                            <span className="masonry-video-meta">
-                              {[formatDuration(photo.videoMediaMetadata?.durationMillis), formatSize(photo.size)].filter(Boolean).join(' · ')}
-                            </span>
-                          </div>
-                        </>
-                      )}
-                      {similarTo && photo._dist !== undefined && photo._dist === 0 && (
-                        <div className="search-similar-badge">identica</div>
-                      )}
-                      {!selectionMode && !renameMode && <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
-                        <button className="thumb-overlay-btn" title="Vai alla cartella" onClick={() => handleFolderJump(photo)}><IconFolderJump /></button>
-                        {photo.thumbnailLink && (
-                          <button className="thumb-overlay-btn" title="Crop" onClick={() => setCropPhoto(photo)}><IconCrop /></button>
-                        )}
-                        {photo.thumbnailLink && (
-                          <button className="thumb-overlay-btn" title="Enhance (AI upscale)" onClick={() => setEnhancePhoto(photo)}><IconEnhance /></button>
-                        )}
-                        {photo.thumbnailLink && (
-                          <button className="thumb-overlay-btn" title="Ruota 90° sx" onClick={() => handleRotate(photo)}><IconRotateCCW /></button>
-                        )}
-                        <button className="thumb-overlay-btn" title="Altre azioni" onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setContextMenu({ photo, idx, x: r.left, y: r.bottom + 4 }) }}><IconDots /></button>
-                      </div>}
-                      {selectionMode && (
-                        <div className={`selection-check${selectedIds.has(photo.id) ? ' checked' : ''}`} />
-                      )}
-                      {renameMode && (
-                        <div className="rename-inline-overlay" onClick={e => e.stopPropagation()}>
-                          <div className="rename-inline-row">
-                            <input
-                              className="rename-inline-input"
-                              value={renameDrafts[photo.id] ?? getBaseName(photo.name)}
-                              onChange={e => setRenameDrafts(d => ({ ...d, [photo.id]: e.target.value }))}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') {
-                                  const draft = renameDrafts[photo.id] ?? getBaseName(photo.name)
-                                  const ext = getExt(photo.name)
-                                  const newName = (draft.trim() || getBaseName(photo.name)) + ext
-                                  if (newName !== photo.name) handleRename(photo, newName)
-                                }
-                                if (e.key === 'Escape') setRenameDrafts(d => ({ ...d, [photo.id]: getBaseName(photo.name) }))
-                              }}
-                              onClick={e => e.stopPropagation()}
-                            />
-                            <button
-                              className="rename-inline-clear"
-                              onMouseDown={e => { e.preventDefault(); setRenameDrafts(d => ({ ...d, [photo.id]: '' })); e.currentTarget.previousSibling.focus() }}
-                              title="Svuota"
-                            >✕</button>
-                          </div>
-                        </div>
-                      )}
-                      {(croppingIds.has(photo.id) || cropDoneIds.has(photo.id) || rotatingIds.has(photo.id) || rotateDoneIds.has(photo.id)) && (
-                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: (croppingIds.has(photo.id) || rotatingIds.has(photo.id)) ? 'rgba(0,0,0,0.55)' : 'rgba(16,185,129,0.7)', borderRadius: 8, pointerEvents: 'none', transition: 'background 0.3s' }}>
-                          {(croppingIds.has(photo.id) || rotatingIds.has(photo.id)) ? (
-                            <svg style={{ animation: 'spin 0.9s linear infinite' }} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-                          ) : (
-                            <span style={{ color: 'white', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 }}>✓ Salvato</span>
-                          )}
-                        </div>
-                      )}
+                  {masonryColumns.map((colItems, colIdx) => (
+                    <div key={colIdx} className="masonry-column">
+                      {colItems.map(({ photo, idx }) => renderMasonryCard(photo, idx))}
                     </div>
                   ))}
                 </div>
