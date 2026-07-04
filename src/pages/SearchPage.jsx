@@ -276,6 +276,12 @@ const IconDots = () => (
     <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
   </svg>
 )
+const IconRefresh = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
+    <polyline points="21 3 21 9 15 9"/>
+  </svg>
+)
 const IconChevronLeft = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="15 18 9 12 15 6"/>
@@ -636,6 +642,30 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }, [fetchFolder, treePhotos, treeChildren, pushView, setSearchParams])
+
+  const handleRefreshGrid = useCallback(async () => {
+    if (globalResults !== null) {
+      if (globalQuery.trim()) {
+        setGlobalLoading(true)
+        try {
+          const data = await searchFilesGlobal(auth.accessToken, globalQuery.trim())
+          setGlobalResults(data.files || [])
+        } catch (e) { console.error(e) }
+        finally { setGlobalLoading(false) }
+      }
+      return
+    }
+    if (similarTo) return // similarity results aren't tied to a single folder fetch
+    setLoading(true)
+    try {
+      const { subfolders, photos } = await fetchFolder(activeFolderId)
+      setTreeChildren(t => ({ ...t, [activeFolderId]: subfolders }))
+      setTreePhotos(t => ({ ...t, [activeFolderId]: photos }))
+      setAllPhotos(photos)
+      setCurrentSubfolders(subfolders)
+    } catch (e) { console.error(e) }
+    finally { setLoading(false) }
+  }, [globalResults, globalQuery, similarTo, activeFolderId, fetchFolder, auth.accessToken])
 
   const handleTreeToggle = useCallback(async (folder, siblingIds = []) => {
     const id = folder.id
@@ -1544,6 +1574,17 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                   </div>
                 )}
               </div>
+            )}
+            {!similarTo && (
+              <button
+                className="btn-secondary"
+                onClick={handleRefreshGrid}
+                disabled={loading || globalLoading}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '5px 10px' }}
+                title="Ricarica"
+              >
+                <span style={{ display: 'flex', animation: (loading || globalLoading) ? 'spin 0.9s linear infinite' : 'none' }}><IconRefresh /></span>
+              </button>
             )}
             {videoFiles.length >= 2 && (
               <button
