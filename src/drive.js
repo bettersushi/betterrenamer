@@ -131,20 +131,26 @@ export const moveFile = async (accessToken, fileId, newParentId, oldParentId) =>
 }
 
 export const renameFile = async (accessToken, fileId, newName) => {
-  const response = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name`,
-    {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ name: newName }),
-    }
-  );
+  const maxRetries = 3
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: newName }),
+      }
+    );
 
-  if (!response.ok) throw new Error('Failed to rename file');
-  return response.json();
+    if (response.ok) return response.json();
+
+    const isRateLimited = response.status === 403 || response.status === 429
+    if (!isRateLimited || attempt === maxRetries) throw new Error('Failed to rename file');
+    await new Promise(r => setTimeout(r, 1000 * 2 ** attempt));
+  }
 };
 
 export const getFolderAncestors = async (accessToken, startFolderId, maxLevels = 5) => {
@@ -255,27 +261,3 @@ export const listSubfolders = async (accessToken, parentId) => {
   return (await res.json()).files || []
 }
 
-export const batchRenameFiles = async (accessToken, files) => {
-  const results = [];
-
-  for (const file of files) {
-    try {
-      const result = await renameFile(accessToken, file.id, file.newName);
-      results.push({
-        success: true,
-        oldName: file.oldName,
-        newName: result.name,
-        message: 'Rinominato correttamente',
-      });
-    } catch (error) {
-      results.push({
-        success: false,
-        oldName: file.oldName,
-        newName: file.newName,
-        message: error.message,
-      });
-    }
-  }
-
-  return results;
-};

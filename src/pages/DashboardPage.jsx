@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import logoSrc from '../assets/logo-br.svg'
 import { useNavigate } from 'react-router-dom'
-import { listFiles, listFilesRecursive, batchRenameFiles, getOrCreateFolder, moveFile, renameFile, listSubfolders, patchFileMetadata, getFolderAncestors } from '../drive'
+import { listFiles, listFilesRecursive, getOrCreateFolder, moveFile, renameFile, listSubfolders, patchFileMetadata, getFolderAncestors } from '../drive'
 import { saveSession, getSessions, clearSessions, downloadCSV } from '../logs'
 import QuickLookModal from '../components/QuickLookModal'
 import BatchOpsModal from '../components/BatchOpsModal'
@@ -554,7 +554,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
       }
       updateJob(job.id, { progress: { current, total, currentFile: item.oldName, currentNewName: item.newName, phase: 'Rinomino' } })
       try {
-        await batchRenameFiles(auth.accessToken, [{ id: item.id, oldName: item.oldName, newName: item.newName }])
+        await renameFile(auth.accessToken, item.id, item.newName)
         entries.push({ type: 'rename', ...item, success: true })
       } catch (err) {
         entries.push({ type: 'rename', ...item, success: false, error: err.message })
