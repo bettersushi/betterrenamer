@@ -10,6 +10,7 @@ import DriveStatsModal from '../components/DriveStatsModal'
 import PhotoContextMenu from '../components/PhotoContextMenu'
 import FolderPickerModal from '../components/FolderPickerModal'
 import CropModal from '../components/CropModal'
+import BatchCropModal from '../components/BatchCropModal'
 import EnhanceModal from '../components/EnhanceModal'
 import VideoMontageModal from '../components/VideoMontageModal'
 import StatusModal from '../components/StatusModal'
@@ -401,6 +402,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [similarResults, setSimilarResults] = useState([])
   const [balloons, setBalloons] = useState([])
   const [cropPhoto, setCropPhoto] = useState(null)
+  const [batchCropPhotos, setBatchCropPhotos] = useState(null)
   const [enhancePhoto, setEnhancePhoto] = useState(null)
   const [scopePickerPhoto, setScopePickerPhoto] = useState(null)
   const [showStats, setShowStats] = useState(false)
@@ -1871,6 +1873,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
               <button className="bulk-btn" onClick={() => setBulkMoveActive(true)} title="Sposta in...">
                 <IconMoveBulk /> Sposta in...
               </button>
+              {selectedIds.size > 1 && (
+                <button className="bulk-btn" onClick={() => setBatchCropPhotos(results.filter(p => selectedIds.has(p.id)))} title="Crop multiplo">
+                  <IconCrop /> Crop multiplo
+                </button>
+              )}
               <button className="bulk-btn bulk-btn-danger" onClick={() => setBulkDeleteConfirm(true)} title="Elimina">
                 <IconTrash /> Elimina
               </button>
@@ -1925,6 +1932,31 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
               setAllPhotos(photos => photos.map(p => p.id === photoId ? { ...p, thumbnailLink: updatedMeta.thumbnailLink } : p))
               setThumbTimestamps(ts => ({ ...ts, [photoId]: Date.now() }))
             }
+          }}
+        />
+      )}
+
+      {batchCropPhotos && (
+        <BatchCropModal
+          photos={batchCropPhotos}
+          accessToken={auth.accessToken}
+          onClose={() => setBatchCropPhotos(null)}
+          onDone={(results) => {
+            setBatchCropPhotos(null)
+            const now = Date.now()
+            const metaById = {}
+            for (const r of results) {
+              if (r.updatedMeta?.thumbnailLink) metaById[r.photoId] = r.updatedMeta
+            }
+            if (Object.keys(metaById).length > 0) {
+              setAllPhotos(photos => photos.map(p => metaById[p.id] ? { ...p, thumbnailLink: metaById[p.id].thumbnailLink } : p))
+              setThumbTimestamps(ts => {
+                const next = { ...ts }
+                for (const id of Object.keys(metaById)) next[id] = now
+                return next
+              })
+            }
+            exitSelectionMode()
           }}
         />
       )}
