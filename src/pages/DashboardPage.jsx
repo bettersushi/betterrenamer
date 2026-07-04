@@ -57,6 +57,8 @@ async function buildRenamePreviewForConfig(accessToken, folder, config) {
     fileGroups = [{ files: nonFolderFiles, folderName: folder.name, folderId: folder.id }]
   }
 
+  if (pattern === 'legacy') return buildLegacyPreview(fileGroups)
+
   const template = pattern === 'custom-free' ? (customPrefix || '{nome}') : ''
   const needsAncestors = template.includes('{parent}') || template.includes('{nonno}')
   const ancestorsMap = {}

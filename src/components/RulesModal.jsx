@@ -2,6 +2,7 @@ import { useState } from 'react'
 import FolderPickerModal from './FolderPickerModal'
 
 const PATTERN_OPTIONS = [
+  { value: 'legacy', label: 'Legacy (cartella-counter, vid-/gif- solo su video/gif)' },
   { value: 'folder-ext-seq', label: 'Cartella + Estensione + Sequenza' },
   { value: 'seq-ext', label: 'Sequenza + Estensione' },
   { value: 'folder-seq', label: 'Cartella + Sequenza' },
@@ -15,7 +16,7 @@ function emptyDraft() {
     folderName: '',
     recursive: false,
     patternConfig: {
-      pattern: 'folder-ext-seq',
+      pattern: 'legacy',
       separator: '_',
       startNumber: 1,
       padding: 3,
@@ -117,7 +118,11 @@ export default function RulesModal({ rules, onSave, onClose, onApplyNow, applyin
                 </select>
               </div>
 
-              {pc.pattern === 'custom-free' ? (
+              {pc.pattern === 'legacy' ? (
+                <div className="pattern-info" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  Nome: cartella-counter.ext — ai video viene aggiunto il prefisso vid-, alle gif il prefisso gif-, agli altri file nessun prefisso. Il counter è calcolato automaticamente.
+                </div>
+              ) : pc.pattern === 'custom-free' ? (
                 <>
                   <div className="form-group">
                     <label>Template (placeholder: {'{cartella} {parent} {nonno} {nome} {seq} {data} {anno} {mese} {giorno} {ext}'})</label>
@@ -135,16 +140,18 @@ export default function RulesModal({ rules, onSave, onClose, onApplyNow, applyin
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div className="form-group">
-                  <label>Numero iniziale</label>
-                  <input type="number" value={pc.startNumber} onChange={e => setDraft(d => ({ ...d, patternConfig: { ...d.patternConfig, startNumber: parseInt(e.target.value) || 1 } }))} />
+              {pc.pattern !== 'legacy' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="form-group">
+                    <label>Numero iniziale</label>
+                    <input type="number" value={pc.startNumber} onChange={e => setDraft(d => ({ ...d, patternConfig: { ...d.patternConfig, startNumber: parseInt(e.target.value) || 1 } }))} />
+                  </div>
+                  <div className="form-group">
+                    <label>Cifre (padding)</label>
+                    <input type="number" value={pc.padding} onChange={e => setDraft(d => ({ ...d, patternConfig: { ...d.patternConfig, padding: parseInt(e.target.value) || 1 } }))} />
+                  </div>
                 </div>
-                <div className="form-group">
-                  <label>Cifre (padding)</label>
-                  <input type="number" value={pc.padding} onChange={e => setDraft(d => ({ ...d, patternConfig: { ...d.patternConfig, padding: parseInt(e.target.value) || 1 } }))} />
-                </div>
-              </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
