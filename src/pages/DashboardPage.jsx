@@ -145,6 +145,11 @@ function formatETA(ms) {
   const h = Math.floor(min / 60)
   return `${h}h ${min % 60}m`
 }
+function jobSubfolders(job) {
+  const source = job.preview && job.preview.length > 0 ? job.preview : job.entries
+  if (!source) return []
+  return [...new Set(source.map(p => p.folderName).filter(n => n && n !== job.rootFolderName))]
+}
 function baseFolderName(folderName) {
   return folderName.replace(/ (Vid|Gif)$/, '').replace(/^[-_*]+/, '')
 }
@@ -1480,6 +1485,14 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
                       )}
                     </div>
                   </div>
+                  {(() => {
+                    const subs = jobSubfolders(job)
+                    return subs.length > 0 && (
+                      <div style={{ fontSize: '8px', color: 'var(--text-muted)', opacity: 0.65, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {subs.slice(0, 8).join(', ')}{subs.length > 8 ? ` +${subs.length - 8} altre` : ''}
+                      </div>
+                    )
+                  })()}
 
                   {job.status === 'running' && (
                     <>

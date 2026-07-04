@@ -88,6 +88,7 @@ export default function LogsPage({ onLogout }) {
             const successCount = session.entries.filter(e => e.success).length
             const failCount = session.entries.length - successCount
             const isOpen = expanded === idx
+            const subfolders = [...new Set(session.entries.map(e => e.folderName).filter(n => n && n !== session.rootFolder))]
 
             return (
               <div key={idx} className="session-card">
@@ -95,16 +96,23 @@ export default function LogsPage({ onLogout }) {
                   onClick={() => setExpanded(isOpen ? null : idx)}
                   className={`session-header${isOpen ? ' open' : ''}`}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                    <strong>{session.rootFolder}</strong>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                      {new Date(session.date).toLocaleString('it-IT')}
-                    </span>
-                    <span className="badge-success">{successCount} ok</span>
-                    {failCount > 0 && <span className="badge-error">{failCount} errori</span>}
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      [{session.mode === 'legacy' ? 'Legacy' : 'Custom'}]
-                    </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                      <strong>{session.rootFolder}</strong>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                        {new Date(session.date).toLocaleString('it-IT')}
+                      </span>
+                      <span className="badge-success">{successCount} ok</span>
+                      {failCount > 0 && <span className="badge-error">{failCount} errori</span>}
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        [{session.mode === 'legacy' ? 'Legacy' : 'Custom'}]
+                      </span>
+                    </div>
+                    {subfolders.length > 0 && (
+                      <div style={{ fontSize: '8px', color: 'var(--text-muted)', opacity: 0.65, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '70vw' }}>
+                        {subfolders.slice(0, 8).join(', ')}{subfolders.length > 8 ? ` +${subfolders.length - 8} altre` : ''}
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
                     <button
