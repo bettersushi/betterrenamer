@@ -1460,7 +1460,17 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
                         </>
                       )}
                       {job.status === 'pending' && 'In partenza...'}
-                      {job.status === 'running' && `${job.progress.current} / ${job.progress.total}${job.progress.etaMs ? ` · ~${formatETA(job.progress.etaMs)}` : ''}`}
+                      {job.status === 'running' && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          {job.progress.current} / {job.progress.total}
+                          {job.progress.etaMs && (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <IconClock />
+                              {formatETA(job.progress.etaMs)}
+                            </span>
+                          )}
+                        </span>
+                      )}
                       {job.status === 'done' && (
                         <>
                           <span style={{ color: '#16a34a' }}>{successCount} ok</span>
@@ -1612,8 +1622,18 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
                           </div>
                         )}
                       </div>
-                      <span style={{ fontSize: '12px', color: '#3b82f6', flexShrink: 0 }}>
-                        {job.status === 'running' ? `${pct}%${job.progress.etaMs ? ` · ~${formatETA(job.progress.etaMs)}` : ''}` : '⏳'}
+                      <span style={{ fontSize: '12px', color: '#3b82f6', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        {job.status === 'running' ? (
+                          <>
+                            {pct}%
+                            {job.progress.etaMs && (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                <IconClock />
+                                {formatETA(job.progress.etaMs)}
+                              </span>
+                            )}
+                          </>
+                        ) : '⏳'}
                       </span>
                     </div>
                     {job.status === 'running' && (
