@@ -915,7 +915,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
       } catch {
         // silently ignore — hover tooltip is non-critical
       }
-    }, 400)
+    }, 69)
   }
   const handleFolderMove = (e) => {
     folderCursorRef.current = { x: e.clientX, y: e.clientY }

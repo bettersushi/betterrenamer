@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, Component } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
 import CallbackPage from './pages/CallbackPage'
 import DashboardPage from './pages/DashboardPage'
 import LogsPage from './pages/LogsPage'
 import SearchPage from './pages/SearchPage'
-import { VideoMontageProvider } from './context/VideoMontageContext'
+import { VideoMontageProvider, useVideoMontage } from './context/VideoMontageContext'
 import VideoMontageBalloon from './components/VideoMontageBalloon'
 import { refreshAccessToken } from './auth'
 import './App.css'
@@ -23,6 +23,16 @@ class ErrorBoundary extends Component {
     )
     return this.props.children
   }
+}
+
+function VideoMontageWizardGuard() {
+  const location = useLocation()
+  const { wizardOpen, closeWizard } = useVideoMontage()
+  useEffect(() => {
+    if (location.pathname !== '/search' && wizardOpen) closeWizard()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname])
+  return null
 }
 
 const PALETTES = {
@@ -110,6 +120,7 @@ function App() {
     <ErrorBoundary>
     <BrowserRouter>
       <VideoMontageProvider auth={auth} onTokenRefresh={handleTokenRefresh}>
+        <VideoMontageWizardGuard />
         <Routes>
           <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
           <Route path="/callback" element={<CallbackPage onLogin={handleLogin} />} />

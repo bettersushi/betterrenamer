@@ -1071,7 +1071,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
           setFolderTooltip({ items, x: tx, y: ty })
         }
       } catch { /* non-critical */ }
-    }, 900)
+    }, 69)
   }, [auth.accessToken])
 
   const handleFolderGridMove = useCallback((e) => {
