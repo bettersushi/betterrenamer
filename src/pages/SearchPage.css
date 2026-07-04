@@ -599,11 +599,12 @@
 }
 
 .subfolder-grid-item {
+  position: relative;
   height: 46px;
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 0 12px;
+  padding: 0 34px 0 12px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: color-mix(in srgb, var(--border) 30%, transparent);
@@ -614,6 +615,33 @@
   text-align: left;
   transition: background 0.1s, color 0.1s, border-color 0.15s, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
   overflow: hidden;
+}
+
+.subfolder-preview-trigger {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 34px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid transparent;
+  background: transparent;
+  cursor: default;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.subfolder-grid-item:hover .subfolder-preview-trigger {
+  opacity: 0.6;
+  border-left-color: var(--border);
+}
+
+.subfolder-preview-trigger:hover {
+  opacity: 1 !important;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
 .subfolder-grid-item:hover {

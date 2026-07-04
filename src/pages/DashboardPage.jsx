@@ -1146,21 +1146,32 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
                         background: isChecked ? 'color-mix(in srgb, var(--primary) 8%, transparent)' : isSelected ? '#eff6ff' : undefined,
                         borderLeft: isChecked ? '3px solid var(--primary)' : isSelected ? '3px solid #3b82f6' : '3px solid transparent',
                       }}
-                      onMouseEnter={isFolder ? (e) => handleFolderEnter(e, file) : (e) => handleThumbEnter(e, file)}
-                      onMouseMove={isFolder ? handleFolderMove : handleThumbMove}
-                      onMouseLeave={isFolder ? handleFolderLeave : handleThumbLeave}
+                      onMouseEnter={!isFolder ? (e) => handleThumbEnter(e, file) : undefined}
+                      onMouseMove={!isFolder ? handleThumbMove : undefined}
+                      onMouseLeave={!isFolder ? handleThumbLeave : undefined}
                     >
                       {mode === 'legacy' && isFolder && (
-                        <div style={{ paddingLeft: '10px', display: 'flex', alignItems: 'center' }} onClick={e => toggleFolder(file.id, e)}>
+                        <div style={{ padding: '13px', display: 'flex', alignItems: 'center' }} onClick={e => toggleFolder(file.id, e)}>
                           <CbDot checked={isChecked} onChange={e => toggleFolder(file.id, e)} />
                         </div>
                       )}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, padding: '8px 10px', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, padding: isFolder ? (mode === 'legacy' ? '8px 32px 8px 0' : '8px 32px 8px 10px') : '8px 10px', minWidth: 0 }}>
                         <span className="file-icon" style={{ color: isFolder ? '#f59e0b' : '#6b7280' }}>{isFolder ? <IconFolder /> : <IconFile />}</span>
                         <span className="file-name">{file.name}</span>
                       </div>
                       {!isFolder && (
                         <div className="file-preview-col" onClick={e => e.stopPropagation()}>
+                          <IconEye />
+                        </div>
+                      )}
+                      {isFolder && (
+                        <div
+                          className="folder-preview-trigger"
+                          onClick={e => e.stopPropagation()}
+                          onMouseEnter={(e) => handleFolderEnter(e, file)}
+                          onMouseMove={handleFolderMove}
+                          onMouseLeave={handleFolderLeave}
+                        >
                           <IconEye />
                         </div>
                       )}

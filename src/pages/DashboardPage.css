@@ -59,6 +59,7 @@
 }
 
 .file-item {
+  position: relative;
   display: flex;
   align-items: stretch;
   border-bottom: 1px solid var(--border);
@@ -325,6 +326,33 @@
 
 .file-item:hover .file-preview-col {
   opacity: 0.5;
+}
+
+.folder-preview-trigger {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid transparent;
+  background: transparent;
+  color: #6b7280;
+  cursor: default;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.file-item.folder:hover .folder-preview-trigger {
+  opacity: 0.6;
+  border-left-color: var(--border);
+}
+
+.folder-preview-trigger:hover {
+  opacity: 1 !important;
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 .btn-avvia-tutto {
