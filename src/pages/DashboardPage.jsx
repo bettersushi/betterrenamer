@@ -137,7 +137,7 @@ function isVideoFile(name, mimeType) {
   return VIDEO_EXTENSIONS.has(getExt(name))
 }
 function baseFolderName(folderName) {
-  return folderName.replace(/ (Vid|Gif)$/, '')
+  return folderName.replace(/ (Vid|Gif)$/, '').replace(/^[-_*]+/, '')
 }
 function generateLegacyName(folderName, fileName, mimeType, counter) {
   const sanitized = baseFolderName(folderName).toLowerCase().replace(/[^a-z0-9]/g, '-')
