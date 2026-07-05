@@ -179,15 +179,6 @@
   margin-top: 4px;
 }
 
-.recent-folders-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 8px;
-}
-
 .recent-folders-tags {
   display: flex;
   flex-wrap: wrap;
@@ -195,23 +186,34 @@
 }
 
 .recent-tag {
-  font-size: 12px;
-  padding: 3px 10px;
-  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 8px;
+  border-radius: 16px;
   border: 1px solid var(--border);
-  background: transparent;
+  background: var(--surface);
   color: var(--text-secondary);
+  font-size: 13px;
+  font-family: inherit;
   cursor: pointer;
+  max-width: 130px;
+  overflow: hidden;
   white-space: nowrap;
-  max-width: 160px;
+  transition: border-color .12s, color .12s, background .12s;
+  flex-shrink: 0;
+}
+
+.recent-tag span {
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
 }
 
 .recent-tag:hover {
   border-color: var(--primary);
   color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
 }
 
 .live-shimmer {

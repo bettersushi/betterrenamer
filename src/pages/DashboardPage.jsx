@@ -745,7 +745,6 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
           </div>
           {recentFolders.length > 0 && (
             <div className="recent-folders">
-              <div className="recent-folders-label">Recenti</div>
               <div className="recent-folders-tags">
                 {recentFolders.map(f => (
                   <button
@@ -754,7 +753,8 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
                     onClick={() => { setFolderPath([{ id: 'root', name: 'My Drive' }, f]); loadFolder(f.id); setCheckedFolders(new Set()) }}
                     title={f.name}
                   >
-                    {f.name}
+                    <IconFolder />
+                    <span>{f.name}</span>
                   </button>
                 ))}
               </div>

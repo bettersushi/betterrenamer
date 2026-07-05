@@ -4,31 +4,31 @@ import { AnimatePresence, motion } from 'framer-motion'
 import logoRenamer from '../assets/logo-br.svg'
 import logoSearch from '../assets/logo-bs.svg'
 
-// Duotone icon: shown while on Dashboard, toggles to Search (magnifier over a photo)
+// Flat outline icon: shown while on Dashboard, toggles to Search (magnifying glass)
 function IconToSearch() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-      <rect x="2.5" y="4" width="14" height="14" rx="3" fill="var(--primary)" opacity="0.35"/>
-      <circle cx="15.5" cy="15.5" r="6" fill="none" stroke="var(--primary)" strokeWidth="2"/>
-      <line x1="19.8" y1="19.8" x2="22.5" y2="22.5" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round"/>
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7"/>
+      <line x1="21" y1="21" x2="16.2" y2="16.2"/>
     </svg>
   )
 }
 
-// Duotone icon: shown while on Search, toggles back to Dashboard (folder/tag)
+// Flat outline icon: shown while on Search, toggles back to Dashboard (folder)
 function IconToDashboard() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" fill="var(--primary)" opacity="0.35"/>
-      <path d="M8 12h8M8 16h5" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round"/>
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
     </svg>
   )
 }
 
 const BRANDS = {
-  dashboard: { logo: logoRenamer, title: 'BetterRenamer', subtitle: 'Batch rename per Google Drive' },
-  search: { logo: logoSearch, title: 'BetterSearch', subtitle: 'Ricerca foto su Google Drive' },
+  dashboard: { logo: logoRenamer, title: 'BetterRenamer' },
+  search: { logo: logoSearch, title: 'BetterSearch' },
 }
+
+const titleStyle = { fontSize: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }
 
 export default function AppHeaderBrand() {
   const location = useLocation()
@@ -50,8 +50,13 @@ export default function AppHeaderBrand() {
   const brand = BRANDS[key]
 
   return (
-    <div style={{ position: 'fixed', top: 12, left: 24, zIndex: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
-      <div style={{ position: 'relative', overflow: 'hidden', height: 40, width: 230, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+    <div style={{ position: 'fixed', top: 12, left: 24, zIndex: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center' }}>
+        {/* Ghost sizer: in-flow, invisible, sets the container's intrinsic width/height to match the current brand's content exactly */}
+        <h1 style={{ ...titleStyle, visibility: 'hidden' }} aria-hidden="true">
+          <img src={brand.logo} alt="" style={{ height: '24px', width: 'auto' }} />
+          {brand.title}
+        </h1>
         <AnimatePresence mode="sync" custom={direction} initial={false}>
           <motion.div
             key={key}
@@ -62,18 +67,17 @@ export default function AppHeaderBrand() {
             transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
             style={{ position: 'absolute', left: 0, top: 0 }}
           >
-            <h1 style={{ fontSize: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 style={titleStyle}>
               <img src={brand.logo} alt="" style={{ height: '24px', width: 'auto' }} />
               {brand.title}
             </h1>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>{brand.subtitle}</p>
           </motion.div>
         </AnimatePresence>
       </div>
       <button
         onClick={() => navigate(isSearch ? '/' : '/search')}
         className="btn-secondary"
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0, flexShrink: 0 }}
         title={isSearch ? 'Torna a BetterRenamer' : 'Ricerca foto'}
       >
         {isSearch ? <IconToDashboard /> : <IconToSearch />}
