@@ -4,36 +4,14 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #0f0f14;
   padding: 20px;
 }
 
-.login-theme-toggle {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  width: 38px;
-  height: 38px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(6px);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.login-theme-toggle:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
 .login-card {
-  background: var(--surface);
+  background: #17161f;
   border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
   width: 100%;
   max-width: 420px;
   overflow: hidden;
@@ -83,6 +61,6 @@
 
 .login-footer {
   padding: 20px 30px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid #2a2835;
   text-align: center;
 }
