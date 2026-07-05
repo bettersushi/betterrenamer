@@ -159,11 +159,10 @@ const IconX = () => (
     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
   </svg>
 )
-const IconGridSm = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-    <rect x="2" y="2" width="4" height="4" rx="0.5"/><rect x="8" y="2" width="4" height="4" rx="0.5"/><rect x="14" y="2" width="4" height="4" rx="0.5"/><rect x="20" y="2" width="2" height="4" rx="0.5"/>
-    <rect x="2" y="8" width="4" height="4" rx="0.5"/><rect x="8" y="8" width="4" height="4" rx="0.5"/><rect x="14" y="8" width="4" height="4" rx="0.5"/><rect x="20" y="8" width="2" height="4" rx="0.5"/>
-    <rect x="2" y="14" width="4" height="4" rx="0.5"/><rect x="8" y="14" width="4" height="4" rx="0.5"/><rect x="14" y="14" width="4" height="4" rx="0.5"/><rect x="20" y="14" width="2" height="4" rx="0.5"/>
+const IconList = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+    <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
   </svg>
 )
 const IconGridMd = () => (
@@ -308,11 +307,21 @@ const IconSpinner = () => (
 )
 
 const GRID_MODES = [
-  { key: 'sm', icon: IconGridSm, label: 'Piccolo' },
+  { key: 'list', icon: IconList, label: 'Vista elenco' },
   { key: 'md', icon: IconGridMd, label: 'Medio' },
   { key: 'lg', icon: IconGridLg, label: 'Grande' },
   { key: 'masonry', icon: IconMasonry, label: 'Proporzioni originali' },
 ]
+
+const LIST_COLUMNS = [
+  { key: 'thumb', label: '', minWidth: 36, resizable: false, sortable: false, defaultWidth: 36 },
+  { key: 'name', label: 'Nome', minWidth: 120, resizable: true, sortable: true, sortKey: 'name', alwaysVisible: true },
+  { key: 'size', label: 'Dimensione', minWidth: 70, resizable: true, sortable: true, sortKey: 'size', defaultWidth: 90 },
+  { key: 'ext', label: 'Estensione', minWidth: 60, resizable: true, sortable: true, sortKey: 'extension', defaultWidth: 90 },
+  { key: 'date', label: 'Data modifica', minWidth: 90, resizable: true, sortable: true, sortKey: 'modified', defaultWidth: 130 },
+]
+const LIST_COLUMNS_VISIBLE_KEY = 'br_list_columns_visible'
+const LIST_COLUMNS_WIDTH_KEY = 'br_list_columns_width'
 
 // ── Tree Node ────────────────────────────────────────────────────────────────
 function TreeNode({ folder, depth, expanded, loading, children, activeId, onToggle, onSelect }) {
@@ -435,6 +444,53 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const gridRef = useRef(null)
   const [thumbSize, setThumbSizeRaw] = useState(() => localStorage.getItem('br_thumb_size') || 'md')
   const setThumbSize = (v) => { setThumbSizeRaw(v); localStorage.setItem('br_thumb_size', v) }
+
+  const [listColumnsVisible, setListColumnsVisible] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LIST_COLUMNS_VISIBLE_KEY))
+      if (saved && typeof saved === 'object') return { thumb: true, size: true, ext: true, date: true, ...saved }
+    } catch {}
+    return { thumb: true, size: true, ext: true, date: true }
+  })
+  const toggleListColumn = (key) => {
+    setListColumnsVisible(v => {
+      const next = { ...v, [key]: !v[key] }
+      localStorage.setItem(LIST_COLUMNS_VISIBLE_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+  const [listColumnsWidth, setListColumnsWidth] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LIST_COLUMNS_WIDTH_KEY))
+      if (saved && typeof saved === 'object') return saved
+    } catch {}
+    return {}
+  })
+  const columnWidth = (col) => listColumnsWidth[col.key] || col.defaultWidth || col.minWidth
+  const resizingColRef = useRef(null)
+  const [showColumnMenu, setShowColumnMenu] = useState(false)
+  const columnMenuHoverTimer = useRef(null)
+
+  const handleColumnResizeStart = useCallback((e, col) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startWidth = columnWidth(col)
+    resizingColRef.current = { key: col.key, startX, startWidth, minWidth: col.minWidth }
+    const onMove = (ev) => {
+      const r = resizingColRef.current
+      if (!r) return
+      const newWidth = Math.max(r.minWidth, r.startWidth + (ev.clientX - r.startX))
+      setListColumnsWidth(w => ({ ...w, [r.key]: newWidth }))
+    }
+    const onUp = () => {
+      resizingColRef.current = null
+      setListColumnsWidth(w => { localStorage.setItem(LIST_COLUMNS_WIDTH_KEY, JSON.stringify(w)); return w })
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [listColumnsWidth])
 
   const exitSelectionMode = useCallback(() => {
     setSelectionMode(false)
@@ -977,6 +1033,16 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
     else if (mediaFilter === 'img') list = list.filter(f => !isVideoFile(f) && getExt(f.name) !== '.gif')
     if (sortOrder === 'name') {
       list = [...list].sort((a, b) => sortDir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name))
+    } else if (sortOrder === 'extension') {
+      list = [...list].sort((a, b) => {
+        const diff = getExt(a.name).localeCompare(getExt(b.name))
+        return sortDir === 'asc' ? diff : -diff
+      })
+    } else if (sortOrder === 'size') {
+      list = [...list].sort((a, b) => {
+        const diff = Number(a.size || 0) - Number(b.size || 0)
+        return sortDir === 'asc' ? diff : -diff
+      })
     } else {
       list = [...list].sort((a, b) => {
         const diff = new Date(b.modifiedTime || 0) - new Date(a.modifiedTime || 0)
@@ -1184,31 +1250,67 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                 {loading || globalLoading ? 'Caricamento...' : `${results.length} foto`}
               </span>
               {GRID_MODES.map(({ key, icon: Icon, label }) => (
-                <button key={key} onClick={() => setThumbSize(key)} className={`thumb-size-btn${thumbSize === key ? ' active' : ''}`} title={label}>
-                  <Icon />
-                </button>
+                <div
+                  key={key}
+                  style={{ position: 'relative' }}
+                  onMouseEnter={key === 'list' ? () => {
+                    columnMenuHoverTimer.current = setTimeout(() => setShowColumnMenu(true), 1360)
+                  } : undefined}
+                  onMouseLeave={key === 'list' ? () => {
+                    clearTimeout(columnMenuHoverTimer.current)
+                    setShowColumnMenu(false)
+                  } : undefined}
+                >
+                  <button
+                    onClick={() => setThumbSize(key)}
+                    className={`thumb-size-btn${thumbSize === key ? ' active' : ''}`}
+                    title={label}
+                  >
+                    <Icon />
+                  </button>
+                  {key === 'list' && showColumnMenu && (
+                    <div
+                      style={{
+                        position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 50,
+                        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
+                        boxShadow: '0 8px 28px rgba(0,0,0,0.22)', padding: '6px', minWidth: 170,
+                      }}
+                    >
+                      {LIST_COLUMNS.filter(c => !c.alwaysVisible && c.key !== 'thumb').map(c => (
+                        <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', fontSize: 12.5, color: 'var(--text-primary)', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={!!listColumnsVisible[c.key]} onChange={() => toggleListColumn(c.key)} />
+                          {c.label}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
               ))}
               <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
-              <button
-                onClick={() => {
-                  if (sortOrder === 'name') setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-                  else { setSortOrder('name'); setSortDir('asc') }
-                }}
-                className={`thumb-size-btn${sortOrder === 'name' ? ' active' : ''}`}
-                title={sortOrder === 'name' ? (sortDir === 'asc' ? 'Ordina per nome (A→Z)' : 'Ordina per nome (Z→A)') : 'Ordina per nome'}
-              >
-                <IconSortName /> {sortOrder === 'name' && (sortDir === 'asc' ? '↑' : '↓')}
-              </button>
-              <button
-                onClick={() => {
-                  if (sortOrder === 'modified') setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-                  else { setSortOrder('modified'); setSortDir('desc') }
-                }}
-                className={`thumb-size-btn${sortOrder === 'modified' ? ' active' : ''}`}
-                title={sortOrder === 'modified' ? (sortDir === 'desc' ? 'Ordina per data (più recenti prima)' : 'Ordina per data (più vecchie prima)') : 'Ordina per data modifica'}
-              >
-                <IconSortDate /> {sortOrder === 'modified' && (sortDir === 'desc' ? '↓' : '↑')}
-              </button>
+              {thumbSize !== 'list' && (
+                <>
+                  <button
+                    onClick={() => {
+                      if (sortOrder === 'name') setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+                      else { setSortOrder('name'); setSortDir('asc') }
+                    }}
+                    className={`thumb-size-btn${sortOrder === 'name' ? ' active' : ''}`}
+                    title={sortOrder === 'name' ? (sortDir === 'asc' ? 'Ordina per nome (A→Z)' : 'Ordina per nome (Z→A)') : 'Ordina per nome'}
+                  >
+                    <IconSortName /> {sortOrder === 'name' && (sortDir === 'asc' ? '↑' : '↓')}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (sortOrder === 'modified') setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+                      else { setSortOrder('modified'); setSortDir('desc') }
+                    }}
+                    className={`thumb-size-btn${sortOrder === 'modified' ? ' active' : ''}`}
+                    title={sortOrder === 'modified' ? (sortDir === 'desc' ? 'Ordina per data (più recenti prima)' : 'Ordina per data (più vecchie prima)') : 'Ordina per data modifica'}
+                  >
+                    <IconSortDate /> {sortOrder === 'modified' && (sortDir === 'desc' ? '↓' : '↑')}
+                  </button>
+                </>
+              )}
               <button onClick={() => setShowStats(true)} className="thumb-size-btn" title="Statistiche cartella">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
@@ -1408,15 +1510,17 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
           {/* Grid */}
           <div className="content-area">
             {showSubfolderSidebar && showSubfolders && (
-              <motion.div key={activeFolderId} className="subfolder-grid" variants={staggerContainerFast} initial="hidden" animate="visible">
+              <motion.div key={activeFolderId} className={thumbSize === 'list' ? 'subfolder-list' : 'subfolder-grid'} variants={staggerContainerFast} initial="hidden" animate="visible">
                 {currentSubfolders.map(f => (
                   <motion.div
                     key={f.id}
                     variants={slideFadeItem}
                     role="button"
                     tabIndex={0}
-                    className={`subfolder-grid-item${dragOverFolder === f.id ? ' drop-target' : ''}`}
-                    style={f.folderColorRgb ? { borderColor: f.folderColorRgb } : undefined}
+                    className={thumbSize === 'list'
+                      ? `list-row list-row-folder${dragOverFolder === f.id ? ' drop-target' : ''}`
+                      : `subfolder-grid-item${dragOverFolder === f.id ? ' drop-target' : ''}`}
+                    style={thumbSize !== 'list' && f.folderColorRgb ? { borderColor: f.folderColorRgb } : undefined}
                     onClick={() => {
                       activeFolderRef.current = null
                       clearTimeout(folderHoverTimer.current)
@@ -1433,18 +1537,49 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                     onDrop={e => { e.preventDefault(); handleDropOnFolder(f, e.dataTransfer.getData('photoId') || null, e.dataTransfer.getData('folderId') || null) }}
                     onContextMenu={e => { e.preventDefault(); setFolderTooltip(null); setFolderContextMenu({ folder: f, x: e.clientX, y: e.clientY }) }}
                   >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill={f.folderColorRgb || 'none'} stroke={f.folderColorRgb || 'currentColor'} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: f.folderColorRgb ? 1 : 0.6 }}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
-                    <span>{f.name}</span>
-                    <div
-                      className="subfolder-preview-trigger"
-                      onClick={e => { e.stopPropagation(); setFolderTooltipMode(m => m === 'grid' ? 'list' : 'grid') }}
-                      onMouseDown={e => e.stopPropagation()}
-                      onMouseEnter={e => handleFolderGridEnter(e, f)}
-                      onMouseMove={handleFolderGridMove}
-                      onMouseLeave={handleFolderGridLeave}
-                    >
-                      <IconEye />
-                    </div>
+                    {thumbSize === 'list' ? (
+                      <>
+                        <div className="list-cell list-cell-thumb">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill={f.folderColorRgb || 'none'} stroke={f.folderColorRgb || 'currentColor'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: f.folderColorRgb ? 1 : 0.6 }}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+                        </div>
+                        <div className="list-cell list-cell-name" style={{ width: columnWidth(LIST_COLUMNS[1]) }}>{f.name}</div>
+                        {listColumnsVisible.size && (
+                          <div className="list-cell" style={{ width: columnWidth(LIST_COLUMNS[2]) }}>
+                            {typeof f._fileCount === 'number' ? `${f._fileCount} file` : '—'}
+                          </div>
+                        )}
+                        {listColumnsVisible.ext && (
+                          <div className="list-cell" style={{ width: columnWidth(LIST_COLUMNS[3]) }} />
+                        )}
+                        {listColumnsVisible.date && (
+                          <div className="list-cell list-cell-date" style={{ width: columnWidth(LIST_COLUMNS[4]) }}>
+                            {f.modifiedTime ? new Date(f.modifiedTime).toLocaleDateString() : ''}
+                          </div>
+                        )}
+                        <button
+                          className="list-row-actions"
+                          onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setFolderContextMenu({ folder: f, x: r.left, y: r.bottom + 4 }) }}
+                          title="Altre azioni"
+                        >
+                          <IconDots />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill={f.folderColorRgb || 'none'} stroke={f.folderColorRgb || 'currentColor'} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: f.folderColorRgb ? 1 : 0.6 }}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+                        <span>{f.name}</span>
+                        <div
+                          className="subfolder-preview-trigger"
+                          onClick={e => { e.stopPropagation(); setFolderTooltipMode(m => m === 'grid' ? 'list' : 'grid') }}
+                          onMouseDown={e => e.stopPropagation()}
+                          onMouseEnter={e => handleFolderGridEnter(e, f)}
+                          onMouseMove={handleFolderGridMove}
+                          onMouseLeave={handleFolderGridLeave}
+                        >
+                          <IconEye />
+                        </div>
+                      </>
+                    )}
                   </motion.div>
                 ))}
               </motion.div>
@@ -1503,6 +1638,123 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                   {masonryColumns.map((colItems, colIdx) => (
                     <div key={colIdx} className="masonry-column">
                       {colItems.map(({ photo, idx }) => renderMasonryCard(photo, idx))}
+                    </div>
+                  ))}
+                </div>
+              ) : thumbSize === 'list' ? (
+                <div className="list-view">
+                  <div className="list-header">
+                    <div className="list-cell list-cell-thumb" />
+                    <div
+                      className="list-cell list-cell-name list-header-cell"
+                      style={{ width: columnWidth(LIST_COLUMNS[1]) }}
+                      onClick={() => { if (sortOrder === 'name') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortOrder('name'); setSortDir('asc') } }}
+                    >
+                      Nome {sortOrder === 'name' && (sortDir === 'asc' ? '↑' : '↓')}
+                    </div>
+                    {listColumnsVisible.size && (
+                      <div
+                        className="list-cell list-header-cell"
+                        style={{ width: columnWidth(LIST_COLUMNS[2]), position: 'relative' }}
+                        onClick={() => { if (sortOrder === 'size') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortOrder('size'); setSortDir('asc') } }}
+                      >
+                        Dimensione {sortOrder === 'size' && (sortDir === 'asc' ? '↑' : '↓')}
+                        <div className="list-col-resize" onMouseDown={e => { e.stopPropagation(); handleColumnResizeStart(e, LIST_COLUMNS[2]) }} />
+                      </div>
+                    )}
+                    {listColumnsVisible.ext && (
+                      <div
+                        className="list-cell list-header-cell"
+                        style={{ width: columnWidth(LIST_COLUMNS[3]), position: 'relative' }}
+                        onClick={() => { if (sortOrder === 'extension') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortOrder('extension'); setSortDir('asc') } }}
+                      >
+                        Estensione {sortOrder === 'extension' && (sortDir === 'asc' ? '↑' : '↓')}
+                        <div className="list-col-resize" onMouseDown={e => { e.stopPropagation(); handleColumnResizeStart(e, LIST_COLUMNS[3]) }} />
+                      </div>
+                    )}
+                    {listColumnsVisible.date && (
+                      <div
+                        className="list-cell list-cell-date list-header-cell"
+                        style={{ width: columnWidth(LIST_COLUMNS[4]), position: 'relative' }}
+                        onClick={() => { if (sortOrder === 'modified') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortOrder('modified'); setSortDir('desc') } }}
+                      >
+                        Data modifica {sortOrder === 'modified' && (sortDir === 'desc' ? '↓' : '↑')}
+                        <div className="list-col-resize" onMouseDown={e => { e.stopPropagation(); handleColumnResizeStart(e, LIST_COLUMNS[4]) }} />
+                      </div>
+                    )}
+                    <div className="list-row-actions-spacer" />
+                  </div>
+                  {results.map((photo, idx) => (
+                    <div
+                      key={photo.id}
+                      data-photo-id={photo.id}
+                      className={`list-row${selectedIds.has(photo.id) ? ' selected' : ''}`}
+                      onClick={() => { if (selectionMode) { if (!wasDragging.current) toggleSelection(photo.id) } else if (!renameMode) setSlideshowIdx(idx) }}
+                      onContextMenu={e => { e.preventDefault(); setContextMenu({ photo, idx, x: e.clientX, y: e.clientY }) }}
+                      draggable={canDragToFolders}
+                      onDragStart={e => handleDragStart(e, photo, results, 144)}
+                      onDragEnd={() => setDragOverFolder(null)}
+                    >
+                      <div className="list-cell list-cell-thumb">
+                        {photo.thumbnailLink ? (
+                          <LazyPhoto
+                            key={thumbTimestamps[photo.id] || photo.id}
+                            src={getLargeThumbUrl(photo.thumbnailLink, 72)}
+                            alt={photo.name}
+                            className="list-thumb-img"
+                          />
+                        ) : (
+                          <div className="list-thumb-empty">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.3 }}><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="3" x2="21" y2="21"/></svg>
+                          </div>
+                        )}
+                        {isVideoFile(photo) && (
+                          <div className="list-video-badge"><IconVideoFile /></div>
+                        )}
+                      </div>
+                      {renameMode ? (
+                        <div className="list-cell list-cell-name" style={{ width: columnWidth(LIST_COLUMNS[1]) }} onClick={e => e.stopPropagation()}>
+                          <input
+                            className="rename-inline-input"
+                            value={renameDrafts[photo.id] ?? getBaseName(photo.name)}
+                            onChange={e => setRenameDrafts(d => ({ ...d, [photo.id]: e.target.value }))}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                const draft = renameDrafts[photo.id] ?? getBaseName(photo.name)
+                                const ext = getExt(photo.name)
+                                const newName = (draft.trim() || getBaseName(photo.name)) + ext
+                                if (newName !== photo.name) handleRename(photo, newName)
+                              }
+                              if (e.key === 'Escape') setRenameDrafts(d => ({ ...d, [photo.id]: getBaseName(photo.name) }))
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="list-cell list-cell-name" style={{ width: columnWidth(LIST_COLUMNS[1]) }} title={photo.name}>{photo.name}</div>
+                      )}
+                      {listColumnsVisible.size && (
+                        <div className="list-cell" style={{ width: columnWidth(LIST_COLUMNS[2]) }}>{formatSize(photo.size) || ''}</div>
+                      )}
+                      {listColumnsVisible.ext && (
+                        <div className="list-cell" style={{ width: columnWidth(LIST_COLUMNS[3]) }}>{getExt(photo.name).replace('.', '').toUpperCase()}</div>
+                      )}
+                      {listColumnsVisible.date && (
+                        <div className="list-cell list-cell-date" style={{ width: columnWidth(LIST_COLUMNS[4]) }}>
+                          {photo.modifiedTime ? new Date(photo.modifiedTime).toLocaleDateString() : ''}
+                        </div>
+                      )}
+                      {selectionMode && (
+                        <div className={`selection-check${selectedIds.has(photo.id) ? ' checked' : ''}`} />
+                      )}
+                      {!selectionMode && !renameMode && (
+                        <button
+                          className="list-row-actions"
+                          onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setContextMenu({ photo, idx, x: r.left, y: r.bottom + 4 }) }}
+                          title="Altre azioni"
+                        >
+                          <IconDots />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>

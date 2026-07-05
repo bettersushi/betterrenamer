@@ -840,3 +840,180 @@
   color: white;
   background: rgba(255,255,255,0.08);
 }
+
+/* ── List view ──────────────────────────────────────────────────────────── */
+.list-view {
+  display: flex;
+  flex-direction: column;
+}
+
+.list-header {
+  display: flex;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.list-header-cell {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.list-header-cell:hover {
+  color: var(--text-primary);
+}
+
+.list-col-resize {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 3;
+}
+
+.list-row-actions-spacer {
+  width: 32px;
+  flex-shrink: 0;
+}
+
+.subfolder-list {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 6px;
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.1s;
+}
+
+.list-row:hover,
+.list-row-folder:hover {
+  background: color-mix(in srgb, var(--border) 40%, transparent);
+}
+
+.list-row.selected {
+  background: color-mix(in srgb, var(--primary) 11%, transparent);
+}
+
+.list-row-folder {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  position: relative;
+}
+
+.list-cell {
+  padding: 0 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.list-cell-thumb {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 0;
+}
+
+.list-cell-name {
+  color: var(--text-primary);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.list-cell-date {
+  text-align: right;
+  margin-left: auto;
+}
+
+.list-thumb-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 3px;
+  object-fit: cover;
+  display: block;
+}
+
+.list-thumb-empty {
+  width: 36px;
+  height: 36px;
+  border-radius: 3px;
+  background: var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.list-video-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  background: rgba(0,0,0,0.65);
+  color: white;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  padding: 1px;
+}
+
+.list-row-actions {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translate(6px, -50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.62);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s, background 0.12s;
+  flex-shrink: 0;
+}
+
+.list-row:hover .list-row-actions,
+.list-row-folder:hover .list-row-actions {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+.list-row-actions:hover {
+  background: rgba(0,0,0,0.88);
+}
