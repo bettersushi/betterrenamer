@@ -81,6 +81,7 @@ const Spinner = () => (
 
 function FilePreview({ file, token }) {
   const [ready, setReady] = useState(false)
+  const [realAspectRatio, setRealAspectRatio] = useState(null)
   const thumb = file.thumbnailLink || null
 
   if (!token) {
@@ -97,7 +98,7 @@ function FilePreview({ file, token }) {
   if (isVideo(file)) {
     const vw = file.videoMediaMetadata?.width
     const vh = file.videoMediaMetadata?.height
-    const aspectRatio = vw && vh ? `${vw} / ${vh}` : undefined
+    const aspectRatio = realAspectRatio || (vw && vh ? `${vw} / ${vh}` : undefined)
     return (
       <div style={{
         position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%',
@@ -118,6 +119,7 @@ function FilePreview({ file, token }) {
             poster={thumb}
             autoPlay
             onCanPlay={() => setReady(true)}
+            onAspectRatio={setRealAspectRatio}
             style={{
               maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, background: '#111',
               display: ready ? 'block' : 'none', position: 'relative', zIndex: 1,
