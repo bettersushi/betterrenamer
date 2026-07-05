@@ -106,7 +106,7 @@ function FilePreview({ file, token }) {
           <img
             src={thumb}
             alt=""
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(6px)', transform: 'scale(1.02)', borderRadius: 8 }}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(2px)', transform: 'scale(1.02)', borderRadius: 8 }}
           />
         )}
         {!ready && <div style={{ position: 'relative', zIndex: 1 }}><Spinner /></div>}
