@@ -872,6 +872,10 @@
   overflow: visible;
 }
 
+.list-header .list-header-cell {
+  padding-right: 14px;
+}
+
 .list-header-cell {
   cursor: pointer;
   user-select: none;
@@ -982,6 +986,10 @@
   align-self: stretch;
 }
 
+.subfolder-list .list-cell-thumb {
+  margin-right: 0px;
+}
+
 .list-cell-name {
   color: var(--text-primary);
   flex: 1 1 auto;
@@ -1036,7 +1044,7 @@
 .list-row-actions-cell {
   width: 0;
   flex-shrink: 0;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   align-items: center;
   justify-content: center;

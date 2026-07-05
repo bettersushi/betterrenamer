@@ -471,6 +471,23 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [showColumnMenu, setShowColumnMenu] = useState(false)
   const columnMenuHoverTimer = useRef(null)
 
+  const [folderFileCounts, setFolderFileCounts] = useState({})
+  const fetchedFolderCountIds = useRef(new Set())
+  useEffect(() => {
+    if (thumbSize !== 'list') return
+    const toFetch = currentSubfolders.filter(f => !fetchedFolderCountIds.current.has(f.id))
+    toFetch.forEach(f => fetchedFolderCountIds.current.add(f.id))
+    toFetch.forEach(async (f) => {
+      try {
+        const data = await listFiles(auth.accessToken, f.id)
+        const count = (data.files || []).filter(x => x.mimeType !== 'application/vnd.google-apps.folder').length
+        setFolderFileCounts(c => ({ ...c, [f.id]: count }))
+      } catch {
+        setFolderFileCounts(c => ({ ...c, [f.id]: null }))
+      }
+    })
+  }, [thumbSize, currentSubfolders, auth.accessToken])
+
   const handleColumnResizeStart = useCallback((e, col) => {
     e.preventDefault()
     const startX = e.clientX
@@ -1548,7 +1565,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                         <div className="list-cell list-cell-name" style={{ width: columnWidth(LIST_COLUMNS[1]) }}>{f.name}</div>
                         {listColumnsVisible.size && (
                           <div className="list-cell list-cell-size" style={{ width: columnWidth(LIST_COLUMNS[2]) }}>
-                            {typeof f._fileCount === 'number' ? `${f._fileCount} file` : '—'}
+                            {typeof folderFileCounts[f.id] === 'number' ? `${folderFileCounts[f.id]} file` : '—'}
                           </div>
                         )}
                         {listColumnsVisible.ext && (
