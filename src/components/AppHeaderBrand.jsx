@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import logoRenamer from '../assets/logo-br.svg'
 import logoSearch from '../assets/logo-bs.svg'
+import ObliqueDivider from './ObliqueDivider'
 
 // Flat outline icon: shown while on Dashboard, toggles to Search (magnifying glass)
 function IconToSearch() {
@@ -28,6 +29,10 @@ const BRANDS = {
   search: { logo: logoSearch, title: 'BetterSearch' },
 }
 
+// Fixed sizer always renders the wider of the two titles, so the logo area
+// never resizes when toggling between Dashboard and Search.
+const WIDER_BRAND = BRANDS.dashboard.title.length >= BRANDS.search.title.length ? BRANDS.dashboard : BRANDS.search
+
 const titleStyle = { fontSize: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }
 
 export default function AppHeaderBrand() {
@@ -50,12 +55,12 @@ export default function AppHeaderBrand() {
   const brand = BRANDS[key]
 
   return (
-    <div style={{ position: 'fixed', top: 12, left: 24, zIndex: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div style={{ position: 'fixed', top: 12, left: 24, zIndex: 20, display: 'flex', alignItems: 'center' }}>
       <div style={{ position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center' }}>
-        {/* Ghost sizer: in-flow, invisible, sets the container's intrinsic width/height to match the current brand's content exactly */}
+        {/* Fixed sizer: in-flow, invisible, always the wider title so the logo area never resizes between the two states */}
         <h1 style={{ ...titleStyle, visibility: 'hidden' }} aria-hidden="true">
-          <img src={brand.logo} alt="" style={{ height: '24px', width: 'auto' }} />
-          {brand.title}
+          <img src={WIDER_BRAND.logo} alt="" style={{ height: '24px', width: 'auto' }} />
+          {WIDER_BRAND.title}
         </h1>
         <AnimatePresence mode="sync" custom={direction} initial={false}>
           <motion.div
@@ -74,6 +79,7 @@ export default function AppHeaderBrand() {
           </motion.div>
         </AnimatePresence>
       </div>
+      <ObliqueDivider height={28} style={{ marginLeft: 12, marginRight: 16 }} />
       <button
         onClick={() => navigate(isSearch ? '/' : '/search')}
         className="btn-secondary"

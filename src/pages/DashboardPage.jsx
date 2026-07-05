@@ -8,6 +8,7 @@ import RulesModal from '../components/RulesModal'
 import StatusModal from '../components/StatusModal'
 import PalettePicker from '../components/PalettePicker'
 import UserMenu from '../components/UserMenu'
+import ObliqueDivider from '../components/ObliqueDivider'
 import { useRenameQueue } from '../context/RenameQueueContext'
 import { getExt, isVideoFile, buildLegacyPreview, formatETA } from '../renameQueueEngine'
 import './DashboardPage.css'
@@ -617,10 +618,11 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
       {/* Header */}
       <div className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0, justifyContent: 'flex-end' }}>
         <div className="header-actions">
+          <button onClick={openLogs} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><IconList /> Logs</button>
+          <ObliqueDivider />
           <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Tema">
             {isDark ? <IconSun /> : <IconMoon />}
           </button>
-          <button onClick={openLogs} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: 16 }}><IconList /> Logs</button>
           <PalettePicker colorScheme={colorScheme} onChangeScheme={onChangeScheme} isDark={isDark} />
           <button onClick={() => setShowStatus(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Stato sistema">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
