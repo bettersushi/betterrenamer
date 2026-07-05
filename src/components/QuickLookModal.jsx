@@ -118,7 +118,11 @@ function FilePreview({ file, token }) {
             poster={thumb}
             autoPlay
             onCanPlay={() => setReady(true)}
-            style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, background: '#111', display: ready ? 'block' : 'none', position: 'relative', zIndex: 1 }}
+            style={{
+              maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, background: '#111',
+              display: ready ? 'block' : 'none', position: 'relative', zIndex: 1,
+              ...(aspectRatio ? { aspectRatio } : {}),
+            }}
           />
         </Suspense>
       </div>
