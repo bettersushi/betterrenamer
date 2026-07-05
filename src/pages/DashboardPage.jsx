@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { staggerContainer, fadeItem } from '../motionVariants'
 import { listFiles, listFilesRecursive, renameFile, getFolderAncestors } from '../drive'
 import { getSessions, clearSessions, downloadCSV } from '../logs'
 import QuickLookModal from '../components/QuickLookModal'
@@ -608,7 +610,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
   )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+    <motion.div variants={staggerContainer} initial="hidden" animate="visible" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       {lockedByOther && (
         <div style={{ background: '#f59e0b', color: '#000', fontSize: 12, fontWeight: 600, padding: '6px 20px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           ⚠️ Un'altra finestra sta eseguendo un task. I nuovi job verranno messi in attesa fino al termine.
@@ -616,7 +618,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
         </div>
       )}
       {/* Header */}
-      <div className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0, justifyContent: 'flex-end' }}>
+      <motion.div variants={fadeItem} className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0, justifyContent: 'flex-end' }}>
         <div className="header-actions">
           <button onClick={openLogs} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><IconList /> Logs</button>
           <ObliqueDivider />
@@ -629,13 +631,13 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
           </button>
           <UserMenu email={auth.email} avatarUrl={auth.picture} onLogout={handleLogout} />
         </div>
-      </div>
+      </motion.div>
 
       {/* Main content: sidebar + pannello destro */}
       <div className="tool-body">
 
         {/* Sidebar browser */}
-        <div className="sidebar">
+        <motion.div variants={fadeItem} className="sidebar">
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <div className="breadcrumb" style={{ fontSize: '12px', margin: 0, flex: 1, minWidth: 0 }}>
               {folderPath.map((folder, idx) => (
@@ -762,10 +764,10 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
               </div>
             </div>
           )}
-        </div>
+        </motion.div>
 
         {/* Pannello destro: Modalità + Preview + Strumenti */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <motion.div variants={fadeItem} style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
           {/* Modalità */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: '0 0 auto', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px' }}>
@@ -969,7 +971,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
               </button>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {showStatus && <StatusModal auth={auth} onClose={() => setShowStatus(false)} />}
@@ -1255,6 +1257,6 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
       {quickLookOpen && (
         <QuickLookModal files={selectedFiles} onClose={() => setQuickLookOpen(false)} />
       )}
-    </div>
+    </motion.div>
   )
 }

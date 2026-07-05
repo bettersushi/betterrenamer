@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { staggerContainer, fadeItem } from '../motionVariants'
 import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata, patchFileMetadata, trashFile, restoreFile, copyFile, moveFile, renameFile, createFolder } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
 import PalettePicker from '../components/PalettePicker'
@@ -1210,9 +1212,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const canDragToFolders = globalResults === null && similarTo === null
 
   return (
-    <div className="search-page-bg">
+    <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="search-page-bg">
       {/* Header */}
-      <div className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0, justifyContent: 'flex-end' }}>
+      <motion.div variants={fadeItem} className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0, justifyContent: 'flex-end' }}>
         <div className="header-actions">
           <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Tema">
             {isDark ? <IconSun /> : <IconMoon />}
@@ -1223,13 +1225,13 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
           </button>
           <UserMenu email={auth.email} avatarUrl={auth.picture} onLogout={onLogout} />
         </div>
-      </div>
+      </motion.div>
 
       {/* Body */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
 
         {/* Sidebar — tree */}
-        <div className="search-sidebar">
+        <motion.div variants={fadeItem} className="search-sidebar">
           <div className="tree-list">
             {/* Tree root label */}
             <div
@@ -1263,10 +1265,10 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
               <div style={{ padding: '10px 16px', fontSize: '12px', color: 'var(--text-muted)' }}>Caricamento...</div>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* Main */}
-        <div className="search-main">
+        <motion.div variants={fadeItem} className="search-main">
           {/* Search bar + toolbar */}
           <div className="search-bar-row">
             <div style={{ position: 'relative', width: '38%', flexShrink: 0 }}>
@@ -1655,7 +1657,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
             </div>
           )}
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Slideshow */}
@@ -1994,7 +1996,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
           </div>
         )
       })()}
-    </div>
+    </motion.div>
   )
 }
 
