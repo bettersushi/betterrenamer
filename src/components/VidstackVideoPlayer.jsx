@@ -3,12 +3,14 @@ import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/l
 import '@vidstack/react/player/styles/default/theme.css'
 import '@vidstack/react/player/styles/default/layouts/video.css'
 
-export default function VidstackVideoPlayer({ src, poster, autoPlay, onCanPlay, style }) {
+export default function VidstackVideoPlayer({ src, type = 'video/mp4', poster, autoPlay, onCanPlay, style }) {
   return (
     <MediaPlayer
-      src={src}
+      src={{ src, type }}
       poster={poster}
       autoPlay={autoPlay}
+      load="eager"
+      posterLoad="eager"
       playsInline
       crossOrigin
       onCanPlay={onCanPlay}

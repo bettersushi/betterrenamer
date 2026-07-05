@@ -114,6 +114,7 @@ function FilePreview({ file, token }) {
         <Suspense fallback={null}>
           <VidstackVideoPlayer
             src={vidSrc(file, token)}
+            type={file.mimeType && file.mimeType.includes('video') ? file.mimeType : 'video/mp4'}
             poster={thumb}
             autoPlay
             onCanPlay={() => setReady(true)}
