@@ -14,7 +14,7 @@ export const fadeItem = {
 // Lighter stagger for small in-page item collections (e.g. subfolder grid tiles)
 export const staggerContainerFast = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.05, delayChildren: 0 } },
+  visible: { transition: { staggerChildren: 0.02, delayChildren: 0 } },
 }
 
 // Slide-in from the left + fade, used for folder tiles in the subfolder grid
