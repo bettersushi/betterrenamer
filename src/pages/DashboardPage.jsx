@@ -1764,14 +1764,22 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
           <img src={`${thumbTooltip.url}`} style={{ width: '100%', borderRadius: '4px', display: 'block' }} alt="" />
         </div>
       )}
-      {folderTooltip?.items && (
-        folderTooltipMode === 'grid' ? (
+      {folderTooltip?.items && (() => {
+        const margin = 8
+        const isGrid = folderTooltipMode === 'grid'
+        const w = isGrid ? 414 : 300
+        const rows = isGrid ? Math.ceil(folderTooltip.items.length / 4) : folderTooltip.items.length
+        const h = isGrid ? (rows * 96 + (rows - 1) * 6 + 12) : Math.min(rows * 64 + 12, window.innerHeight - margin * 2)
+        const left = Math.min(Math.max(margin, folderTooltip.x), window.innerWidth - w - margin)
+        const top = Math.min(Math.max(margin, folderTooltip.y), window.innerHeight - h - margin)
+        return isGrid ? (
           <div style={{
-            position: 'fixed', left: folderTooltip.x, top: folderTooltip.y,
+            position: 'fixed', left, top,
             zIndex: 2000, pointerEvents: 'none',
             background: 'var(--surface)', border: '1px solid var(--border)',
             borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
             padding: '6px', display: 'grid', gridTemplateColumns: 'repeat(4, 96px)', gap: '6px',
+            maxHeight: `calc(100vh - ${margin * 2}px)`, overflow: 'hidden',
           }}>
             {folderTooltip.items.map((item, i) => (
               item.thumb
@@ -1781,11 +1789,12 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
           </div>
         ) : (
           <div style={{
-            position: 'fixed', left: folderTooltip.x, top: folderTooltip.y,
+            position: 'fixed', left, top,
             zIndex: 2000, pointerEvents: 'none',
             background: 'var(--surface)', border: '1px solid var(--border)',
             borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
             padding: '6px', minWidth: '220px', maxWidth: '300px',
+            maxHeight: `calc(100vh - ${margin * 2}px)`, overflow: 'hidden',
           }}>
             {folderTooltip.items.map((item, i) => (
               <div key={i} style={{
@@ -1802,7 +1811,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
             ))}
           </div>
         )
-      )}
+      })()}
 
       {quickLookOpen && (
         <QuickLookModal files={selectedFiles} onClose={() => setQuickLookOpen(false)} />
