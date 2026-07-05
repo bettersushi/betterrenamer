@@ -316,9 +316,9 @@ const GRID_MODES = [
 const LIST_COLUMNS = [
   { key: 'thumb', label: '', minWidth: 36, resizable: false, sortable: false, defaultWidth: 36 },
   { key: 'name', label: 'Nome', minWidth: 120, resizable: true, sortable: true, sortKey: 'name', alwaysVisible: true },
-  { key: 'size', label: 'Dimensione', minWidth: 70, resizable: true, sortable: true, sortKey: 'size', defaultWidth: 90 },
-  { key: 'ext', label: 'Estensione', minWidth: 60, resizable: true, sortable: true, sortKey: 'extension', defaultWidth: 90 },
-  { key: 'date', label: 'Data modifica', minWidth: 90, resizable: true, sortable: true, sortKey: 'modified', defaultWidth: 130 },
+  { key: 'size', label: 'Dimensione', minWidth: 70, resizable: true, sortable: true, sortKey: 'size', defaultWidth: 70 },
+  { key: 'ext', label: 'Estensione', minWidth: 60, resizable: true, sortable: true, sortKey: 'extension', defaultWidth: 60 },
+  { key: 'date', label: 'Data modifica', minWidth: 90, resizable: true, sortable: true, sortKey: 'modified', defaultWidth: 90 },
 ]
 const LIST_COLUMNS_VISIBLE_KEY = 'br_list_columns_visible'
 const LIST_COLUMNS_WIDTH_KEY = 'br_list_columns_width'
@@ -1547,12 +1547,12 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                         </div>
                         <div className="list-cell list-cell-name" style={{ width: columnWidth(LIST_COLUMNS[1]) }}>{f.name}</div>
                         {listColumnsVisible.size && (
-                          <div className="list-cell" style={{ width: columnWidth(LIST_COLUMNS[2]) }}>
+                          <div className="list-cell list-cell-size" style={{ width: columnWidth(LIST_COLUMNS[2]) }}>
                             {typeof f._fileCount === 'number' ? `${f._fileCount} file` : '—'}
                           </div>
                         )}
                         {listColumnsVisible.ext && (
-                          <div className="list-cell" style={{ width: columnWidth(LIST_COLUMNS[3]) }} />
+                          <div className="list-cell list-cell-ext" style={{ width: columnWidth(LIST_COLUMNS[3]) }} />
                         )}
                         {listColumnsVisible.date && (
                           <div className="list-cell list-cell-date" style={{ width: columnWidth(LIST_COLUMNS[4]) }}>
@@ -1661,7 +1661,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                     </div>
                     {listColumnsVisible.size && (
                       <div
-                        className="list-cell list-header-cell"
+                        className="list-cell list-cell-size list-header-cell"
                         style={{ width: columnWidth(LIST_COLUMNS[2]), position: 'relative' }}
                         onClick={() => { if (sortOrder === 'size') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortOrder('size'); setSortDir('asc') } }}
                       >
@@ -1671,7 +1671,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                     )}
                     {listColumnsVisible.ext && (
                       <div
-                        className="list-cell list-header-cell"
+                        className="list-cell list-cell-ext list-header-cell"
                         style={{ width: columnWidth(LIST_COLUMNS[3]), position: 'relative' }}
                         onClick={() => { if (sortOrder === 'extension') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortOrder('extension'); setSortDir('asc') } }}
                       >
@@ -1739,10 +1739,10 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                         <div className="list-cell list-cell-name" style={{ width: columnWidth(LIST_COLUMNS[1]) }} title={photo.name}>{photo.name}</div>
                       )}
                       {listColumnsVisible.size && (
-                        <div className="list-cell" style={{ width: columnWidth(LIST_COLUMNS[2]) }}>{formatSize(photo.size) || ''}</div>
+                        <div className="list-cell list-cell-size" style={{ width: columnWidth(LIST_COLUMNS[2]) }}>{formatSize(photo.size) || ''}</div>
                       )}
                       {listColumnsVisible.ext && (
-                        <div className="list-cell" style={{ width: columnWidth(LIST_COLUMNS[3]) }}>{getExt(photo.name).replace('.', '').toUpperCase()}</div>
+                        <div className="list-cell list-cell-ext" style={{ width: columnWidth(LIST_COLUMNS[3]) }}>{getExt(photo.name).replace('.', '').toUpperCase()}</div>
                       )}
                       {listColumnsVisible.date && (
                         <div className="list-cell list-cell-date" style={{ width: columnWidth(LIST_COLUMNS[4]) }}>

@@ -213,7 +213,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
-  padding: 20px 20px 16px;
+  padding: 5px 10px 16px;
   box-sizing: border-box;
 }
 
@@ -977,6 +977,11 @@
   margin-right: 10px;
 }
 
+.list-header .list-cell-thumb {
+  height: auto;
+  align-self: stretch;
+}
+
 .list-cell-name {
   color: var(--text-primary);
   flex: 1 1 auto;
@@ -986,6 +991,16 @@
 .list-cell-date {
   text-align: right;
   margin-left: auto;
+}
+
+.list-cell-size,
+.list-cell-ext {
+  text-align: center;
+}
+
+.list-header-cell.list-cell-size,
+.list-header-cell.list-cell-ext {
+  justify-content: center;
 }
 
 .list-thumb-img {
