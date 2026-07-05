@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import logoSrc from '../assets/logo-bs.svg'
 import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata, patchFileMetadata, trashFile, restoreFile, copyFile, moveFile, renameFile, createFolder } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
 import PalettePicker from '../components/PalettePicker'
+import UserMenu from '../components/UserMenu'
 import ScopePickerModal from '../components/ScopePickerModal'
 import DriveStatsModal from '../components/DriveStatsModal'
 import PhotoContextMenu from '../components/PhotoContextMenu'
@@ -1212,32 +1212,16 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   return (
     <div className="search-page-bg">
       {/* Header */}
-      <div className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button onClick={() => navigate('/')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Torna a BetterRenamer">
-            <IconChevronLeft />
-          </button>
-          <div>
-            <h1 style={{ fontSize: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <img src={logoSrc} alt="" style={{ height: '24px', width: 'auto' }} />
-              BetterSearch
-            </h1>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Ricerca foto su Google Drive</p>
-          </div>
-        </div>
+      <div className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0, justifyContent: 'flex-end' }}>
         <div className="header-actions">
-          <div className="user-info">
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Autenticato come</div>
-            <div style={{ fontWeight: 600, fontSize: '13px' }}>{auth.email}</div>
-          </div>
-          <PalettePicker colorScheme={colorScheme} onChangeScheme={onChangeScheme} isDark={isDark} />
           <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Tema">
             {isDark ? <IconSun /> : <IconMoon />}
           </button>
+          <PalettePicker colorScheme={colorScheme} onChangeScheme={onChangeScheme} isDark={isDark} />
           <button onClick={() => setShowStatus(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Stato sistema">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           </button>
-          <button onClick={onLogout} className="btn-secondary">Logout</button>
+          <UserMenu email={auth.email} onLogout={onLogout} />
         </div>
       </div>
 

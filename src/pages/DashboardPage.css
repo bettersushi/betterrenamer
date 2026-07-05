@@ -136,6 +136,18 @@
   }
 }
 
+.legacy-checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px 16px;
+}
+
+@media (max-width: 600px) {
+  .legacy-checkbox-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .nav-icon-btn {
   display: flex;
   align-items: center;

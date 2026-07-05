@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import logoSrc from '../assets/logo-br.svg'
 import { useNavigate } from 'react-router-dom'
 import { listFiles, listFilesRecursive, renameFile, getFolderAncestors } from '../drive'
 import { getSessions, clearSessions, downloadCSV } from '../logs'
@@ -8,6 +7,7 @@ import BatchOpsModal from '../components/BatchOpsModal'
 import RulesModal from '../components/RulesModal'
 import StatusModal from '../components/StatusModal'
 import PalettePicker from '../components/PalettePicker'
+import UserMenu from '../components/UserMenu'
 import { useRenameQueue } from '../context/RenameQueueContext'
 import { getExt, isVideoFile, buildLegacyPreview, formatETA } from '../renameQueueEngine'
 import './DashboardPage.css'
@@ -615,35 +615,17 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
         </div>
       )}
       {/* Header */}
-      <div className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div>
-            <h1 style={{ fontSize: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <img src={logoSrc} alt="" style={{ height: '24px', width: 'auto' }} />
-              BetterRenamer
-            </h1>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Batch rename per Google Drive</p>
-          </div>
-          <button onClick={() => navigate('/search')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0, marginLeft: 4 }} title="Ricerca foto"><IconSearch /></button>
-        </div>
+      <div className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0, justifyContent: 'flex-end' }}>
         <div className="header-actions">
-          <div className="user-info">
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Autenticato come</div>
-            <div style={{ fontWeight: 600, fontSize: '13px' }}>{auth.email}</div>
-          </div>
-          <PalettePicker colorScheme={colorScheme} onChangeScheme={onChangeScheme} isDark={isDark} />
           <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Tema">
             {isDark ? <IconSun /> : <IconMoon />}
           </button>
-          <button onClick={() => setShowBatchOps(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Operazioni batch"><IconWand /></button>
-          <button onClick={() => setShowRules(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Regole di rinomina">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0H5a2 2 0 0 1-2-2v-4m6 6h10a2 2 0 0 0 2-2v-4"/></svg>
-          </button>
+          <button onClick={openLogs} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: 16 }}><IconList /> Logs</button>
+          <PalettePicker colorScheme={colorScheme} onChangeScheme={onChangeScheme} isDark={isDark} />
           <button onClick={() => setShowStatus(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Stato sistema">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           </button>
-          <button onClick={openLogs} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><IconList /> Logs</button>
-          <button onClick={handleLogout} className="btn-secondary">Logout</button>
+          <UserMenu email={auth.email} onLogout={handleLogout} />
         </div>
       </div>
 
@@ -780,12 +762,12 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
           )}
         </div>
 
-        {/* Pannello destro: Config + Preview */}
+        {/* Pannello destro: Modalità + Preview + Strumenti */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-          {/* Config */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div className="form-group">
+          {/* Modalità */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: '0 0 auto', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px' }}>
+            <div className="form-group" style={{ marginBottom: 10 }}>
               <label>Modalità</label>
               <select value={mode} onChange={(e) => { setMode(e.target.value); setPreview([]) }}>
                 <option value="legacy">Legacy (cartella-counter)</option>
@@ -795,22 +777,24 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
 
             {mode === 'legacy' && (
               <>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
-                  <CbDot id="moveOnly" checked={moveOnly} onChange={(e) => { setMoveOnly(e.target.checked); setPreview([]) }} />
-                  <span style={{ fontSize: '13px' }}>Solo sposta video/gif (senza rinominare)</span>
-                </label>
-                {!moveOnly && (
-                  <>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
-                      <CbDot id="includeRoot" checked={includeRoot} onChange={(e) => { setIncludeRoot(e.target.checked); setPreview([]) }} />
-                      <span style={{ fontSize: '13px' }}>Includi file nella cartella selezionata</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
-                      <CbDot id="organizeMedia" checked={organizeMedia} onChange={(e) => setOrganizeMedia(e.target.checked)} />
-                      <span style={{ fontSize: '13px' }}>Sposta video/gif in sottocartelle</span>
-                    </label>
-                  </>
-                )}
+                <div className="legacy-checkbox-grid">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
+                    <CbDot id="moveOnly" checked={moveOnly} onChange={(e) => { setMoveOnly(e.target.checked); setPreview([]) }} />
+                    <span style={{ fontSize: '13px' }}>Solo sposta video/gif (senza rinominare)</span>
+                  </label>
+                  {!moveOnly && (
+                    <>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
+                        <CbDot id="includeRoot" checked={includeRoot} onChange={(e) => { setIncludeRoot(e.target.checked); setPreview([]) }} />
+                        <span style={{ fontSize: '13px' }}>Includi file nella cartella selezionata</span>
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
+                        <CbDot id="organizeMedia" checked={organizeMedia} onChange={(e) => setOrganizeMedia(e.target.checked)} />
+                        <span style={{ fontSize: '13px' }}>Sposta video/gif in sottocartelle</span>
+                      </label>
+                    </>
+                  )}
+                </div>
                 <div className="pattern-info">
                   {moveOnly
                     ? 'Sposta video/gif nelle sottocartelle · Prefissi: vid- gif- · Ricorsivo'
@@ -907,15 +891,15 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
           </div>
 
           {/* Preview */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: 0 }}>
-            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: 0, border: '1px solid var(--border)', borderRadius: '10px', padding: '14px' }}>
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, flexShrink: 0 }}>
               Preview
               {preview.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', fontWeight: 400, color: 'var(--text-muted)' }}>{preview.length} file · {previewFolder?.name}</span>}
             </h3>
 
-            {previewError && <div className="error-message" style={{ fontSize: '12px' }}>{previewError}</div>}
+            {previewError && <div className="error-message" style={{ fontSize: '12px', flexShrink: 0 }}>{previewError}</div>}
 
-            <div style={{ overflowY: 'auto', maxHeight: '320px', border: '1px dashed var(--border)', borderRadius: '8px' }}>
+            <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, border: '1px dashed var(--border)', borderRadius: '8px' }}>
               {preview.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '30px 20px', color: 'var(--text-muted)', fontSize: '13px' }}>
                   {previewLoading ? 'Analisi cartelle in corso...' : 'Genera una preview per vedere i file che verranno rinominati.'}
@@ -955,10 +939,33 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
             </div>
 
             {preview.length > 0 && (
-              <button onClick={handleAddToQueue} className="btn-primary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <button onClick={handleAddToQueue} className="btn-primary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexShrink: 0 }}>
                 <IconPlus /> Aggiungi alla coda ({preview.length} file)
               </button>
             )}
+          </div>
+
+          {/* Strumenti */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: '0 0 auto', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px' }}>
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Strumenti</h3>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setShowBatchOps(true)}
+                className="btn-secondary"
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '16px 10px' }}
+              >
+                <IconWand />
+                Operazioni batch
+              </button>
+              <button
+                onClick={() => setShowRules(true)}
+                className="btn-secondary"
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '16px 10px' }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0H5a2 2 0 0 1-2-2v-4m6 6h10a2 2 0 0 0 2-2v-4"/></svg>
+                Regole
+              </button>
+            </div>
           </div>
         </div>
       </div>

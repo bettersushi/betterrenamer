@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, Component } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import LoginPage from './pages/LoginPage'
 import CallbackPage from './pages/CallbackPage'
 import DashboardPage from './pages/DashboardPage'
@@ -11,6 +12,7 @@ import { RenameQueueProvider } from './context/RenameQueueContext'
 import RenameQueuePanel from './components/RenameQueuePanel'
 import { SimilarityProvider } from './context/SimilarityContext'
 import SimilarityBalloonStack from './components/SimilarityBalloonStack'
+import AppHeaderBrand from './components/AppHeaderBrand'
 import { refreshAccessToken } from './auth'
 import './App.css'
 
@@ -37,6 +39,36 @@ function VideoMontageWizardGuard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname])
   return null
+}
+
+function PageFade({ children }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
+      style={{ height: '100%' }}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+function AnimatedRoutes({ auth, handleLogin, handleLogout, isDark, setIsDark, colorScheme, handleScheme, handleTokenRefresh }) {
+  const location = useLocation()
+  return (
+    <AnimatePresence mode="sync">
+      <Routes location={location} key={location.pathname}>
+        <Route path="/login" element={<PageFade><LoginPage onLogin={handleLogin} /></PageFade>} />
+        <Route path="/callback" element={<PageFade><CallbackPage onLogin={handleLogin} /></PageFade>} />
+        <Route path="/" element={auth ? <PageFade><DashboardPage auth={auth} onLogout={handleLogout} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} colorScheme={colorScheme} onChangeScheme={handleScheme} onTokenRefresh={handleTokenRefresh} /></PageFade> : <Navigate to="/login" />} />
+        <Route path="/logs" element={auth ? <PageFade><LogsPage onLogout={handleLogout} /></PageFade> : <Navigate to="/login" />} />
+        <Route path="/search" element={auth ? <PageFade><SearchPage auth={auth} onLogout={handleLogout} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} colorScheme={colorScheme} onChangeScheme={handleScheme} onTokenRefresh={handleTokenRefresh} /></PageFade> : <Navigate to="/login" />} />
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </AnimatePresence>
+  )
 }
 
 const PALETTES = {
@@ -127,14 +159,17 @@ function App() {
       <RenameQueueProvider auth={auth}>
       <SimilarityProvider auth={auth}>
         <VideoMontageWizardGuard />
-        <Routes>
-          <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
-          <Route path="/callback" element={<CallbackPage onLogin={handleLogin} />} />
-          <Route path="/" element={auth ? <DashboardPage auth={auth} onLogout={handleLogout} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} colorScheme={colorScheme} onChangeScheme={handleScheme} onTokenRefresh={handleTokenRefresh} /> : <Navigate to="/login" />} />
-          <Route path="/logs" element={auth ? <LogsPage onLogout={handleLogout} /> : <Navigate to="/login" />} />
-          <Route path="/search" element={auth ? <SearchPage auth={auth} onLogout={handleLogout} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} colorScheme={colorScheme} onChangeScheme={handleScheme} onTokenRefresh={handleTokenRefresh} /> : <Navigate to="/login" />} />
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
+        <AppHeaderBrand />
+        <AnimatedRoutes
+          auth={auth}
+          handleLogin={handleLogin}
+          handleLogout={handleLogout}
+          isDark={isDark}
+          setIsDark={setIsDark}
+          colorScheme={colorScheme}
+          handleScheme={handleScheme}
+          handleTokenRefresh={handleTokenRefresh}
+        />
         <VideoMontageBalloon />
         <RenameQueuePanel />
         <SimilarityBalloonStack />
