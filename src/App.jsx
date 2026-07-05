@@ -9,6 +9,8 @@ import { VideoMontageProvider, useVideoMontage } from './context/VideoMontageCon
 import VideoMontageBalloon from './components/VideoMontageBalloon'
 import { RenameQueueProvider } from './context/RenameQueueContext'
 import RenameQueuePanel from './components/RenameQueuePanel'
+import { SimilarityProvider } from './context/SimilarityContext'
+import SimilarityBalloonStack from './components/SimilarityBalloonStack'
 import { refreshAccessToken } from './auth'
 import './App.css'
 
@@ -123,6 +125,7 @@ function App() {
     <BrowserRouter>
       <VideoMontageProvider auth={auth} onTokenRefresh={handleTokenRefresh}>
       <RenameQueueProvider auth={auth}>
+      <SimilarityProvider auth={auth}>
         <VideoMontageWizardGuard />
         <Routes>
           <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
@@ -134,6 +137,8 @@ function App() {
         </Routes>
         <VideoMontageBalloon />
         <RenameQueuePanel />
+        <SimilarityBalloonStack />
+      </SimilarityProvider>
       </RenameQueueProvider>
       </VideoMontageProvider>
     </BrowserRouter>

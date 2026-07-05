@@ -4,7 +4,6 @@ import logoSrc from '../assets/logo-bs.svg'
 import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata, patchFileMetadata, trashFile, restoreFile, copyFile, moveFile, renameFile, createFolder } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
 import PalettePicker from '../components/PalettePicker'
-import SimilarityBalloon from '../components/SimilarityBalloon'
 import ScopePickerModal from '../components/ScopePickerModal'
 import DriveStatsModal from '../components/DriveStatsModal'
 import PhotoContextMenu from '../components/PhotoContextMenu'
@@ -14,14 +13,13 @@ import BatchCropModal from '../components/BatchCropModal'
 import EnhanceModal from '../components/EnhanceModal'
 import VideoMontageModal from '../components/VideoMontageModal'
 import { useVideoMontage } from '../context/VideoMontageContext'
+import { useSimilarity } from '../context/SimilarityContext'
+
 import StatusModal from '../components/StatusModal'
+import { MEDIA_EXTENSIONS, VIDEO_EXTENSIONS, getExt, isMediaFile, isVideoFile } from '../mediaTypes'
 import './SearchPage.css'
 
-const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
-const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
 const SEARCH_QUERIES_KEY = 'betterrenamer_search_queries'
-const PHASH_CACHE_KEY = 'br_phash_cache'
-const GLOBAL_SIM_CAP = 2000
 const THUMB_SIZES = { sm: 72, md: 120, lg: 200, masonry: 0 }
 function computeMasonryCols() {
   if (typeof window === 'undefined') return 4
@@ -30,23 +28,9 @@ function computeMasonryCols() {
   return 4
 }
 
-function getExt(name) {
-  return name.includes('.') ? name.substring(name.lastIndexOf('.')).toLowerCase() : ''
-}
 function getBaseName(name) {
   const ext = getExt(name)
   return ext ? name.slice(0, -ext.length) : name
-}
-function isMediaFile(f) {
-  if (f.mimeType === 'application/vnd.google-apps.shortcut') return false
-  const ext = getExt(f.name)
-  if (MEDIA_EXTENSIONS.has(ext)) return true
-  if (f.mimeType && ['image/', 'video/'].some(m => f.mimeType.startsWith(m))) return true
-  return false
-}
-function isVideoFile(f) {
-  if (f.mimeType && f.mimeType.includes('video')) return true
-  return VIDEO_EXTENSIONS.has(getExt(f.name))
 }
 
 function RenameModal({ photo, onClose, onConfirm }) {
@@ -104,31 +88,6 @@ function SubfolderSidebar({ folders, onSelect }) {
       ))}
     </div>
   )
-}
-
-async function computePHash(imgUrl) {
-  const proxied = `/api/proxy-image?url=${encodeURIComponent(imgUrl)}`
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas')
-        canvas.width = 8; canvas.height = 8
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(img, 0, 0, 8, 8)
-        const data = ctx.getImageData(0, 0, 8, 8).data
-        const grays = []
-        for (let i = 0; i < 64; i++) grays.push((data[i*4] + data[i*4+1] + data[i*4+2]) / 3)
-        const avg = grays.reduce((a, b) => a + b) / 64
-        resolve(grays.map(g => g >= avg ? 1 : 0))
-      } catch (e) { reject(e) }
-    }
-    img.onerror = reject
-    img.src = proxied
-  })
-}
-function hammingDistance(a, b) {
-  return a.reduce((d, v, i) => d + (v !== b[i] ? 1 : 0), 0)
 }
 
 function getLargeThumbUrl(thumbnailLink, size = 1600) {
@@ -413,7 +372,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const globalTimerRef = useRef(null)
   const [similarTo, setSimilarTo] = useState(null)
   const [similarResults, setSimilarResults] = useState([])
-  const [balloons, setBalloons] = useState([])
+  const { handleSimilarity: ctxHandleSimilarity, handleGlobalSimilarity: ctxHandleGlobalSimilarity, pendingView, consumePendingView } = useSimilarity()
   const [cropPhoto, setCropPhoto] = useState(null)
   const [batchCropPhotos, setBatchCropPhotos] = useState(null)
   const [enhancePhoto, setEnhancePhoto] = useState(null)
@@ -453,7 +412,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const tooltipSuppressUntilRef = useRef(0)
   const folderCursorRef = useRef({ x: 0, y: 0 })
   const [thumbTimestamps, setThumbTimestamps] = useState({}) // forza reload thumbnail dopo crop
-  const pHashCache = useRef({})
   const gridRef = useRef(null)
   const [thumbSize, setThumbSizeRaw] = useState(() => localStorage.getItem('br_thumb_size') || 'md')
   const setThumbSize = (v) => { setThumbSizeRaw(v); localStorage.setItem('br_thumb_size', v) }
@@ -468,11 +426,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
 
   // Universal view history stack
   const [viewStack, setViewStack] = useState([])
-
-  const updateBalloon = useCallback((id, patch) =>
-    setBalloons(bs => bs.map(b => b.id === id ? { ...b, ...patch } : b)), [])
-  const removeBalloon = useCallback((id) =>
-    setBalloons(bs => bs.filter(b => b.id !== id)), [])
 
   const exitSelectionMode = useCallback(() => {
     setSelectionMode(false)
@@ -575,6 +528,19 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
     })
     setViewStack(s => [...s, snapshot])
   }
+  // Consume a "view results" hand-off from a similarity balloon that may have
+  // been triggered/completed while on a different page.
+  useEffect(() => {
+    if (!pendingView) return
+    pushView()
+    setSimilarTo(pendingView.refPhoto)
+    setSimilarResults(pendingView.results)
+    setGlobalResults(null)
+    setGlobalQuery('')
+    consumePendingView()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingView])
+
   const restoreState = (snapshot) => {
     setActiveFolderId(snapshot.activeFolderId)
     setActiveFolderName(snapshot.activeFolderName)
@@ -1100,95 +1066,14 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
     } catch (e) { console.error(e) }
   }, [auth.accessToken])
 
-  const handleSimilarity = useCallback(async (photo) => {
-    if (!photo.thumbnailLink) return
-    const id = crypto.randomUUID()
-    const abortRef = { cancelled: false }
-    const total = allPhotos.filter(p => p.thumbnailLink).length
-    setBalloons(bs => [...bs, { id, type: 'folder', status: 'scanning', refPhoto: photo, progress: 0, total, cached: 0, abortRef }])
-    try {
-      if (!pHashCache.current[photo.id]) pHashCache.current[photo.id] = await computePHash(photo.thumbnailLink)
-      const refHash = pHashCache.current[photo.id]
-      const withDist = []
-      let processed = 0
-      for (const p of allPhotos) {
-        if (abortRef.cancelled) return
-        if (!p.thumbnailLink) continue
-        try {
-          if (!pHashCache.current[p.id]) pHashCache.current[p.id] = await computePHash(p.thumbnailLink)
-          withDist.push({ ...p, _dist: hammingDistance(refHash, pHashCache.current[p.id]) })
-        } catch { /* skip */ }
-        processed++
-        updateBalloon(id, { progress: processed })
-      }
-      withDist.sort((a, b) => a._dist - b._dist)
-      updateBalloon(id, { status: 'done', results: withDist.filter(p => p._dist <= 22) })
-    } catch (e) {
-      updateBalloon(id, { status: 'error', message: e.message })
-    }
-  }, [allPhotos, updateBalloon])
+  const handleSimilarity = useCallback((photo) => {
+    ctxHandleSimilarity(photo, allPhotos)
+  }, [ctxHandleSimilarity, allPhotos])
 
   // ── Global similarity ───────────────────────────────────────────────────
-  const handleGlobalSimilarity = useCallback(async (photo, scopeFolder) => {
-    if (!photo.thumbnailLink) return
-    const id = crypto.randomUUID()
-    const abortRef = { cancelled: false }
-    let cache = {}
-    try { cache = JSON.parse(localStorage.getItem(PHASH_CACHE_KEY)) || {} } catch {}
-    let refHash
-    try {
-      refHash = cache[photo.id] || await computePHash(photo.thumbnailLink)
-      cache[photo.id] = refHash
-    } catch (e) {
-      setBalloons(bs => [...bs, { id, type: 'global', status: 'error', message: 'Errore hash foto: ' + e.message, refPhoto: photo, abortRef }])
-      return
-    }
-    setBalloons(bs => [...bs, { id, type: 'global', status: 'listing', refPhoto: photo, abortRef, listingFolder: scopeFolder.name, listingCount: 0 }])
-    let allMedia = []
-    try {
-      const folders = await listFilesRecursive(auth.accessToken, scopeFolder.id, scopeFolder.name, true)
-      for (const f of folders) {
-        if (abortRef.cancelled) return
-        const media = f.files.filter(isMediaFile)
-        allMedia.push(...media)
-        updateBalloon(id, { listingCount: allMedia.length, listingFolder: f.folderName })
-      }
-    } catch (e) {
-      updateBalloon(id, { status: 'error', message: 'Errore listing: ' + e.message })
-      return
-    }
-    if (abortRef.cancelled) return
-    const truncated = allMedia.length > GLOBAL_SIM_CAP
-    if (truncated) allMedia = allMedia.slice(0, GLOBAL_SIM_CAP)
-    const total = allMedia.length
-    updateBalloon(id, { status: 'scanning', progress: 0, total, cached: 0 })
-    const BATCH = 8
-    let processed = 0, cachedCount = 0
-    const withDist = []
-    for (let i = 0; i < allMedia.length; i += BATCH) {
-      if (abortRef.cancelled) return
-      const batch = allMedia.slice(i, i + BATCH)
-      await Promise.all(batch.map(async (p) => {
-        if (!p.thumbnailLink) return
-        try {
-          let hash = cache[p.id]
-          if (!hash) { hash = await computePHash(p.thumbnailLink); cache[p.id] = hash }
-          else cachedCount++
-          withDist.push({ ...p, _dist: hammingDistance(refHash, hash) })
-        } catch { /* skip */ }
-      }))
-      processed += batch.length
-      if (Math.floor(i / BATCH) % 20 === 0) {
-        try { localStorage.setItem(PHASH_CACHE_KEY, JSON.stringify(cache)) } catch {}
-      }
-      updateBalloon(id, { progress: processed, total, cached: cachedCount })
-      if (i + BATCH < allMedia.length) await new Promise(r => setTimeout(r, 50))
-    }
-    if (abortRef.cancelled) return
-    try { localStorage.setItem(PHASH_CACHE_KEY, JSON.stringify(cache)) } catch {}
-    withDist.sort((a, b) => a._dist - b._dist)
-    updateBalloon(id, { status: 'done', results: withDist.filter(p => p._dist <= 22), truncated })
-  }, [auth.accessToken, updateBalloon])
+  const handleGlobalSimilarity = useCallback((photo, scopeFolder) => {
+    ctxHandleGlobalSimilarity(photo, scopeFolder)
+  }, [ctxHandleGlobalSimilarity])
 
   // ── Results ─────────────────────────────────────────────────────────────
   const videoFiles = useMemo(() => allPhotos.filter(f => isVideoFile(f)), [allPhotos])
@@ -1804,23 +1689,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
         />
       )}
 
-      {balloons.map((b, i) => (
-        <SimilarityBalloon
-          key={b.id}
-          state={b}
-          index={i}
-          onViewResults={() => {
-            pushView()
-            setSimilarTo(b.refPhoto)
-            setSimilarResults(b.results)
-            setGlobalResults(null)
-            setGlobalQuery('')
-            removeBalloon(b.id)
-          }}
-          onCancel={() => { b.abortRef.cancelled = true; removeBalloon(b.id) }}
-          onClose={() => removeBalloon(b.id)}
-        />
-      ))}
       {/* Context menu */}
       {contextMenu && (
         <PhotoContextMenu
