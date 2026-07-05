@@ -9,6 +9,7 @@ export default function VidstackVideoPlayer({ src, type = 'video/mp4', poster, a
       src={{ src, type }}
       poster={poster}
       autoPlay={autoPlay}
+      preload="auto"
       load="eager"
       posterLoad="eager"
       playsInline

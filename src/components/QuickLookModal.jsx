@@ -242,6 +242,11 @@ export default function QuickLookModal({ files, auth, onClose, onPrev, onNext, c
 
   useEffect(() => { setFocusedIndex(null) }, [files])
 
+  // Prefetch il chunk Vidstack appena si apre il modale, cosi' non paghiamo
+  // il costo di download+parse del player proprio nel momento in cui l'utente
+  // clicca play su un video (es. mentre sfoglia la griglia masonry).
+  useEffect(() => { import('./VidstackVideoPlayer') }, [])
+
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Escape' || e.key === ' ') { e.preventDefault(); onClose() }
