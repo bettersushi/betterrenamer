@@ -1213,7 +1213,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
     <div className="search-page-bg">
       {/* Header */}
       <div className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button onClick={() => navigate('/')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Torna a BetterRenamer">
             <IconChevronLeft />
           </button>
