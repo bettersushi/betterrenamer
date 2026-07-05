@@ -9,6 +9,7 @@ import UserMenu from '../components/UserMenu'
 import ScopePickerModal from '../components/ScopePickerModal'
 import DriveStatsModal from '../components/DriveStatsModal'
 import PhotoContextMenu from '../components/PhotoContextMenu'
+import FolderContextMenu from '../components/FolderContextMenu'
 import FolderPickerModal from '../components/FolderPickerModal'
 import CropModal from '../components/CropModal'
 import BatchCropModal from '../components/BatchCropModal'
@@ -36,13 +37,13 @@ function getBaseName(name) {
   return ext ? name.slice(0, -ext.length) : name
 }
 
-function RenameModal({ photo, onClose, onConfirm }) {
+function RenameModal({ photo, title = 'Rinomina file', onClose, onConfirm }) {
   const [name, setName] = useState(photo.name)
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div style={{ background: 'var(--surface)', borderRadius: 14, padding: '20px 22px', width: 360, maxWidth: '92vw', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', border: '1px solid var(--border)' }}>
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: 'var(--text-primary)' }}>Rinomina file</div>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: 'var(--text-primary)' }}>{title}</div>
         <input
           autoFocus
           value={name}
@@ -395,9 +396,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [showStats, setShowStats] = useState(false)
   const [contextMenu, setContextMenu] = useState(null) // { photo, idx, x, y }
   const [folderContextMenu, setFolderContextMenu] = useState(null) // { folder, x, y }
+  const [gridContextMenu, setGridContextMenu] = useState(null) // { x, y }
   const [movingFolder, setMovingFolder] = useState(null)
   const [movePhoto, setMovePhoto] = useState(null)
   const [renamePhoto, setRenamePhoto] = useState(null)
+  const [renameFolder, setRenameFolder] = useState(null)
   const [undoToast, setUndoToast] = useState(null) // { photo, insertIdx, timer }
   const { wizardOpen, wizardMeta, openWizard } = useVideoMontage()
   const [showStatus, setShowStatus] = useState(false)
@@ -443,7 +446,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   }, [])
 
   const handleGridMouseDown = useCallback((e) => {
-    if (!selectionMode || e.button !== 0) return
+    if (e.button !== 0) return
     // Don't start rubber band if clicking directly on a photo card — let drag handle it
     if (e.target.closest('[data-photo-id]')) return
     const container = gridRef.current
@@ -454,10 +457,10 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
     rubberBand.current = { startX: x, startY: y }
     setRubberRect({ x, y, w: 0, h: 0 })
     e.preventDefault()
-  }, [selectionMode])
+  }, [])
 
   const handleGridMouseMove = useCallback((e) => {
-    if (!selectionMode || !rubberBand.current) return
+    if (!rubberBand.current) return
     const container = gridRef.current
     if (!container) return
     const cr = container.getBoundingClientRect()
@@ -472,6 +475,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
     }
     setRubberRect(rect)
     if (rect.w < 6 && rect.h < 6) return
+    // Il drag su sfondo vuoto attiva la modalita' selezione anche se non era stata
+    // attivata esplicitamente dal tasto in toolbar
+    setSelectionMode(m => m || true)
     // Hit-test all cards
     const cards = container.querySelectorAll('[data-photo-id]')
     const newSelected = new Set()
@@ -489,7 +495,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
       }
     })
     setSelectedIds(newSelected)
-  }, [selectionMode])
+  }, [setSelectionMode, setSelectedIds])
 
   const wasDragging = useRef(false)
 
@@ -707,6 +713,22 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
       setTreeChildren(t => ({ ...t, [parentId]: [...(t[parentId] || []), newFolder] }))
     } catch (e) {
       alert('Errore nella creazione della cartella: ' + e.message)
+    }
+  }, [auth.accessToken])
+
+  const handleRenameFolder = useCallback(async (folder, newName) => {
+    if (!newName.trim() || newName === folder.name) return
+    try {
+      await renameFile(auth.accessToken, folder.id, newName.trim())
+      const trimmed = newName.trim()
+      setCurrentSubfolders(sf => sf.map(s => s.id === folder.id ? { ...s, name: trimmed } : s))
+      setTreeChildren(t => {
+        const c = { ...t }
+        Object.keys(c).forEach(k => { c[k] = c[k].map(x => x.id === folder.id ? { ...x, name: trimmed } : x) })
+        return c
+      })
+    } catch (e) {
+      alert('Errore nel rinominare la cartella: ' + e.message)
     }
   }, [auth.accessToken])
 
@@ -1064,6 +1086,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                 dragOverFolder={dragOverFolder}
                 setDragOverFolder={setDragOverFolder}
                 onDropPhoto={handleDropOnFolder}
+                onContextMenu={(folder, e) => setFolderContextMenu({ folder, x: e.clientX, y: e.clientY })}
               />
             ))}
 
@@ -1360,6 +1383,16 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
               onMouseDown={handleGridMouseDown}
               onMouseMove={handleGridMouseMove}
               onScroll={handleGridScroll}
+              onClick={e => {
+                if (wasDragging.current) return
+                if (e.target.closest('[data-photo-id]')) return
+                if (selectionMode) exitSelectionMode()
+              }}
+              onContextMenu={e => {
+                if (e.target.closest('[data-photo-id]')) return
+                e.preventDefault()
+                setGridContextMenu({ x: e.clientX, y: e.clientY })
+              }}
               style={selectionMode ? { userSelect: 'none', position: 'relative' } : { position: 'relative' }}
             >
               {rubberRect && rubberRect.w > 4 && rubberRect.h > 4 && (
@@ -1509,61 +1542,67 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
 
       {/* Folder context menu */}
       {folderContextMenu && (
+        <FolderContextMenu
+          folder={folderContextMenu.folder}
+          x={folderContextMenu.x}
+          y={folderContextMenu.y}
+          onClose={() => setFolderContextMenu(null)}
+          actions={{
+            onOpen: (f) => selectFolder(f.id, f.name),
+            onNewSubfolder: (f) => handleCreateFolder(f.id, f.name),
+            onRename: (f) => setRenameFolder(f),
+            onMove: (f) => setMovingFolder(f),
+            onDelete: async (f) => {
+              if (!window.confirm(`Elimina la cartella "${f.name}"?`)) return
+              try {
+                await trashFile(auth.accessToken, f.id)
+                setCurrentSubfolders(sf => sf.filter(s => s.id !== f.id))
+                setTreeChildren(t => { const c = { ...t }; Object.keys(c).forEach(k => { c[k] = c[k].filter(x => x.id !== f.id) }); return c })
+              } catch (e) { alert('Errore: ' + e.message) }
+            },
+          }}
+        />
+      )}
+
+      {/* Grid empty-area context menu */}
+      {gridContextMenu && (
         <div
           style={{ position: 'fixed', inset: 0, zIndex: 1500 }}
-          onClick={() => setFolderContextMenu(null)}
-          onContextMenu={e => { e.preventDefault(); setFolderContextMenu(null) }}
+          onClick={() => setGridContextMenu(null)}
+          onContextMenu={e => { e.preventDefault(); setGridContextMenu(null) }}
         >
           <div
             onClick={e => e.stopPropagation()}
             style={{
               position: 'fixed',
-              left: Math.min(folderContextMenu.x, window.innerWidth - 200),
-              top: Math.min(folderContextMenu.y, window.innerHeight - 160),
+              left: Math.min(gridContextMenu.x, window.innerWidth - 200),
+              top: Math.min(gridContextMenu.y, window.innerHeight - 60),
               background: 'var(--surface)', border: '1px solid var(--border)',
               borderRadius: 10, boxShadow: '0 8px 28px rgba(0,0,0,0.22)',
               padding: '5px', minWidth: 190, zIndex: 1501,
             }}
           >
             <button
-              onClick={() => { setFolderContextMenu(null); selectFolder(folderContextMenu.folder.id, folderContextMenu.folder.name) }}
-              style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '7px 12px', background: 'none', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'inherit', textAlign: 'left' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--btn-hover)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
-              Apri cartella
-            </button>
-            <button
-              onClick={() => { setFolderContextMenu(null); handleCreateFolder(folderContextMenu.folder.id, folderContextMenu.folder.name) }}
+              onClick={() => { setGridContextMenu(null); handleCreateFolder(activeFolderId, activeFolderName) }}
               style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '7px 12px', background: 'none', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'inherit', textAlign: 'left' }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--btn-hover)'}
               onMouseLeave={e => e.currentTarget.style.background = 'none'}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
-              Nuova sottocartella
-            </button>
-            <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-            <button
-              onClick={() => { const f = folderContextMenu.folder; setFolderContextMenu(null); setMovingFolder(f) }}
-              style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '7px 12px', background: 'none', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'inherit', textAlign: 'left' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--btn-hover)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
-              Sposta in…
-            </button>
-            <button
-              onClick={async () => { const f = folderContextMenu.folder; setFolderContextMenu(null); if (!window.confirm(`Elimina la cartella "${f.name}"?`)) return; try { await trashFile(auth.accessToken, f.id); setCurrentSubfolders(sf => sf.filter(s => s.id !== f.id)); setTreeChildren(t => { const c = { ...t }; Object.keys(c).forEach(k => { c[k] = c[k].filter(x => x.id !== f.id) }); return c }) } catch (e) { alert('Errore: ' + e.message) } }}
-              style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '7px 12px', background: 'none', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, color: '#ef4444', fontFamily: 'inherit', textAlign: 'left' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
-              Elimina cartella
+              Nuova cartella qui
             </button>
           </div>
         </div>
+      )}
+
+      {/* Rename folder modal */}
+      {renameFolder && (
+        <RenameModal
+          photo={renameFolder}
+          title="Rinomina cartella"
+          onClose={() => setRenameFolder(null)}
+          onConfirm={(newName) => { handleRenameFolder(renameFolder, newName); setRenameFolder(null) }}
+        />
       )}
 
       {/* Move folder modal */}
@@ -1809,7 +1848,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
 }
 
 // Recursive tree node with full tree state passed as props
-function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildren, treeLoading, activeId, onToggle, onSelect, dragOverFolder, setDragOverFolder, onDropPhoto }) {
+function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildren, treeLoading, activeId, onToggle, onSelect, dragOverFolder, setDragOverFolder, onDropPhoto, onContextMenu }) {
   const expanded = treeExpanded[folder.id]
   const loading = treeLoading[folder.id]
   const children = treeChildren[folder.id]
@@ -1848,6 +1887,7 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
           clearSpringTimer()
           onDropPhoto(folder, e.dataTransfer.getData('photoId') || null, e.dataTransfer.getData('folderId') || null)
         }}
+        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(folder, e) }}
       >
         <span
           className="tree-chevron"
@@ -1879,6 +1919,7 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
           dragOverFolder={dragOverFolder}
           setDragOverFolder={setDragOverFolder}
           onDropPhoto={onDropPhoto}
+          onContextMenu={onContextMenu}
         />
       ))}
       {/* skeleton while loading children */}
