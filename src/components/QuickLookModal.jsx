@@ -1,5 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './QuickLookModal.css'
+
+function computeMasonryCols() {
+  if (typeof window === 'undefined') return 3
+  if (window.innerWidth <= 800) return 2
+  if (window.innerWidth <= 1200) return 3
+  return 4
+}
 
 const VIDEO_EXTS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
 
@@ -86,8 +93,14 @@ function FilePreview({ file, token }) {
   }
 
   if (isVideo(file)) {
+    const vw = file.videoMediaMetadata?.width
+    const vh = file.videoMediaMetadata?.height
+    const aspectRatio = vw && vh ? `${vw} / ${vh}` : undefined
     return (
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{
+        position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        ...(aspectRatio ? { aspectRatio, maxHeight: 'calc(100vh - 120px)', maxWidth: '100%' } : {}),
+      }}>
         {!ready && thumb && (
           <img
             src={thumb}
@@ -138,10 +151,73 @@ function FilePreview({ file, token }) {
   )
 }
 
+function FilePreviewGrid({ file, token }) {
+  const [ready, setReady] = useState(false)
+  const thumb = file.thumbnailLink || null
+
+  if (!token) {
+    return (
+      <iframe
+        src={`https://drive.google.com/file/d/${file.id}/preview`}
+        style={{ width: '100%', height: 240, border: 'none', borderRadius: '8px', background: '#111', display: 'block' }}
+        allow="autoplay"
+        title={file.name}
+      />
+    )
+  }
+
+  if (isVideo(file)) {
+    const vw = file.videoMediaMetadata?.width
+    const vh = file.videoMediaMetadata?.height
+    const aspectRatio = vw && vh ? `${vw} / ${vh}` : undefined
+    return (
+      <div style={{ position: 'relative', width: '100%', overflow: 'hidden', borderRadius: 8, ...(aspectRatio ? { aspectRatio } : {}) }}>
+        {!ready && thumb && (
+          <img
+            src={thumb}
+            alt=""
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(6px)', transform: 'scale(1.02)', borderRadius: 8, opacity: 0.85 }}
+          />
+        )}
+        {!ready && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Spinner /></div>}
+        <video
+          key={file.id}
+          src={vidSrc(file, token)}
+          controls
+          onCanPlay={() => setReady(true)}
+          style={{ width: '100%', display: ready ? 'block' : 'none', borderRadius: 8, background: '#111' }}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ position: 'relative', width: '100%', borderRadius: 8, overflow: 'hidden' }}>
+      {!ready && thumb && (
+        <img
+          src={thumb}
+          alt=""
+          style={{ width: '100%', display: 'block', filter: 'blur(6px)', transform: 'scale(1.02)', borderRadius: 8, opacity: 0.85 }}
+        />
+      )}
+      {!ready && !thumb && <Spinner />}
+      <img
+        key={file.id}
+        src={imgSrc(file, token)}
+        alt={file.name}
+        onLoad={() => setReady(true)}
+        onError={() => setReady(true)}
+        style={{ width: '100%', display: ready ? 'block' : 'none', borderRadius: 8 }}
+      />
+    </div>
+  )
+}
+
 export default function QuickLookModal({ files, auth, onClose, onPrev, onNext, currentIndex, total, onCrop, onRename, onDownload, onDelete, onDuplicate }) {
   const hasNav = onPrev && onNext && total > 1
   const hasActions = onCrop || onRename || onDownload || onDelete || onDuplicate
   const token = auth?.accessToken || null
+  const [masonryCols, setMasonryCols] = useState(() => computeMasonryCols())
 
   useEffect(() => {
     const handler = (e) => {
@@ -152,6 +228,18 @@ export default function QuickLookModal({ files, auth, onClose, onPrev, onNext, c
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [onClose, onPrev, onNext, hasNav])
+
+  useEffect(() => {
+    const onResize = () => setMasonryCols(computeMasonryCols())
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  const masonryColumns = useMemo(() => {
+    const cols = Array.from({ length: masonryCols }, () => [])
+    ;(files || []).forEach((file, idx) => cols[idx % masonryCols].push(file))
+    return cols
+  }, [files, masonryCols])
 
   if (!files || files.length === 0) return null
 
@@ -193,7 +281,7 @@ export default function QuickLookModal({ files, auth, onClose, onPrev, onNext, c
       {/* Content */}
       <div
         onClick={e => { if (e.target === e.currentTarget) onClose() }}
-        style={{ flex: 1, overflow: 'auto', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        style={{ flex: 1, overflow: 'auto', padding: '16px', display: 'flex', alignItems: files.length > 1 ? 'flex-start' : 'center', justifyContent: 'center' }}
       >
         {files.length === 1 ? (
           <div className="ql-img-wrap">
@@ -209,11 +297,14 @@ export default function QuickLookModal({ files, auth, onClose, onPrev, onNext, c
             )}
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', width: '100%' }}>
-            {files.map(file => (
-              <div key={file.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <FilePreview file={file} token={token} />
-                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', textAlign: 'center', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</p>
+          <div className="ql-masonry">
+            {masonryColumns.map((col, ci) => (
+              <div className="ql-masonry-col" key={ci}>
+                {col.map(file => (
+                  <div className="ql-masonry-item" key={file.id}>
+                    <FilePreviewGrid file={file} token={token} />
+                  </div>
+                ))}
               </div>
             ))}
           </div>

@@ -1,3 +1,6 @@
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
+
 export default async function handler(req, res) {
   const { id, token } = req.query
   if (!id || !token) return res.status(400).end('Missing id or token')
@@ -26,9 +29,10 @@ export default async function handler(req, res) {
     }
     res.setHeader('Cache-Control', 'private, max-age=300')
 
-    const buffer = await upstream.arrayBuffer()
-    res.end(Buffer.from(buffer))
+    if (!upstream.body) return res.end()
+    await pipeline(Readable.fromWeb(upstream.body), res)
   } catch (e) {
-    res.status(500).end(e.message)
+    if (!res.headersSent) res.status(500).end(e.message)
+    else res.destroy(e)
   }
 }

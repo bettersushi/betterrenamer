@@ -31,3 +31,29 @@
   opacity: 1;
   pointer-events: auto;
 }
+
+.ql-masonry {
+  display: flex;
+  gap: 16px;
+  padding: 24px 16px 40px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.ql-masonry-col {
+  flex: 1 1 0;
+  min-width: 220px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ql-masonry-item img,
+.ql-masonry-item video {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+  background: #111;
+}
