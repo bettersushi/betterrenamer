@@ -1500,7 +1500,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
           {/* Grid */}
           <div className="content-area">
             {showSubfolderSidebar && showSubfolders && (
-              <motion.div className="subfolder-grid" variants={staggerContainerFast} initial="hidden" animate="visible">
+              <motion.div key={activeFolderId} className="subfolder-grid" variants={staggerContainerFast} initial="hidden" animate="visible">
                 {currentSubfolders.map(f => (
                   <motion.div
                     key={f.id}
