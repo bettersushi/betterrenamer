@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { staggerContainer, fadeItem } from '../motionVariants'
+import { staggerContainer, fadeItem, staggerContainerFast, slideFadeItem } from '../motionVariants'
 import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata, patchFileMetadata, trashFile, restoreFile, copyFile, moveFile, renameFile, createFolder } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
 import PalettePicker from '../components/PalettePicker'
@@ -1500,10 +1500,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
           {/* Grid */}
           <div className="content-area">
             {showSubfolderSidebar && showSubfolders && (
-              <div className="subfolder-grid">
+              <motion.div className="subfolder-grid" variants={staggerContainerFast} initial="hidden" animate="visible">
                 {currentSubfolders.map(f => (
-                  <div
+                  <motion.div
                     key={f.id}
+                    variants={slideFadeItem}
                     role="button"
                     tabIndex={0}
                     className={`subfolder-grid-item${dragOverFolder === f.id ? ' drop-target' : ''}`}
@@ -1535,9 +1536,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                     >
                       <IconEye />
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             )}
           {loading ? (
             <div className="search-empty" style={{ flex: 1 }}><span>Caricamento...</span></div>
