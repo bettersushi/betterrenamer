@@ -10,6 +10,8 @@ import ScopePickerModal from '../components/ScopePickerModal'
 import DriveStatsModal from '../components/DriveStatsModal'
 import PhotoContextMenu from '../components/PhotoContextMenu'
 import FolderContextMenu from '../components/FolderContextMenu'
+import { uploadFileResumable } from '../driveUpload'
+import UploadQueuePanel from '../components/UploadQueuePanel'
 import FolderPickerModal from '../components/FolderPickerModal'
 import CropModal from '../components/CropModal'
 import BatchCropModal from '../components/BatchCropModal'
@@ -397,6 +399,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [contextMenu, setContextMenu] = useState(null) // { photo, idx, x, y }
   const [folderContextMenu, setFolderContextMenu] = useState(null) // { folder, x, y }
   const [gridContextMenu, setGridContextMenu] = useState(null) // { x, y }
+  const [uploadQueue, setUploadQueue] = useState([]) // { id, name, progress, status: 'uploading'|'done'|'error', error }
+  const uploadQueueRef = useRef(uploadQueue)
+  const uploadInputRef = useRef(null)
   const [movingFolder, setMovingFolder] = useState(null)
   const [movePhoto, setMovePhoto] = useState(null)
   const [renamePhoto, setRenamePhoto] = useState(null)
@@ -436,6 +441,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
     rubberBand.current = null
     setRubberRect(null)
   }, [])
+
+  useEffect(() => { uploadQueueRef.current = uploadQueue }, [uploadQueue])
 
   const toggleSelection = useCallback((photoId) => {
     setSelectedIds(prev => {
@@ -731,6 +738,43 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
       alert('Errore nel rinominare la cartella: ' + e.message)
     }
   }, [auth.accessToken])
+
+  const startUpload = useCallback((item) => {
+    setUploadQueue(q => q.map(x => x.id === item.id ? { ...x, status: 'uploading', progress: 0, error: null } : x))
+    uploadFileResumable(auth.accessToken, item.file, activeFolderId, {
+      onProgress: (sent, total) => {
+        setUploadQueue(q => q.map(x => x.id === item.id ? { ...x, progress: total > 0 ? sent / total : 0 } : x))
+      },
+    }).then(newFile => {
+      setUploadQueue(q => q.map(x => x.id === item.id ? { ...x, status: 'done', progress: 1 } : x))
+      if (newFile) setAllPhotos(photos => [newFile, ...photos])
+      setTimeout(() => {
+        setUploadQueue(q => q.filter(x => x.id !== item.id))
+      }, 3000)
+    }).catch(err => {
+      setUploadQueue(q => q.map(x => x.id === item.id ? { ...x, status: 'error', error: err.message } : x))
+    })
+  }, [auth.accessToken, activeFolderId])
+
+  const enqueueUploads = useCallback((fileList) => {
+    const files = Array.from(fileList).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'))
+    if (files.length === 0) return
+    const items = files.map(file => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      file, name: file.name, progress: 0, status: 'uploading', error: null,
+    }))
+    setUploadQueue(q => [...q, ...items])
+    items.forEach(item => startUpload(item))
+  }, [startUpload])
+
+  const retryUpload = useCallback((id) => {
+    const item = uploadQueueRef.current.find(x => x.id === id)
+    if (item) startUpload(item)
+  }, [startUpload])
+
+  const dismissUpload = useCallback((id) => {
+    setUploadQueue(q => q.filter(x => x.id !== id))
+  }, [])
 
   const handleDropOnFolder = useCallback(async (targetFolder, draggedPhotoId, draggedFolderId) => {
     setDragOverFolder(null)
@@ -1193,6 +1237,23 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
                   <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+                </svg>
+              </button>
+              <input
+                ref={uploadInputRef}
+                type="file"
+                multiple
+                accept="image/*,video/*"
+                style={{ display: 'none' }}
+                onChange={e => { enqueueUploads(e.target.files); e.target.value = '' }}
+              />
+              <button
+                onClick={() => uploadInputRef.current?.click()}
+                className="thumb-size-btn"
+                title="Carica file"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
                 </svg>
               </button>
               <button
@@ -1843,6 +1904,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
           </div>
         )
       })()}
+      <UploadQueuePanel queue={uploadQueue} onRetry={retryUpload} onDismiss={dismissUpload} />
     </motion.div>
   )
 }
