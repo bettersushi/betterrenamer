@@ -940,7 +940,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
       )}
       {isVideoFile(photo) && (
         <>
-          <div className="video-icon-badge" style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 4, padding: '2px 6px 2px 4px', color: 'white', pointerEvents: 'none' }}>
+          <div className="video-icon-badge">
             <IconVideoFile />
             {photo.videoMediaMetadata?.durationMillis && (
               <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.2, lineHeight: 1 }}>{formatDuration(photo.videoMediaMetadata.durationMillis)}</span>

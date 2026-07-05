@@ -318,9 +318,20 @@
   height: 32px;
 }
 
-.masonry-card .video-icon-badge {
-  width: 40px;
-  height: 40px;
+.video-icon-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: auto;
+  height: 30px;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  color: white;
+  pointer-events: none;
 }
 
 .masonry-video-hover {

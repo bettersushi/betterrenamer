@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import './QuickLookModal.css'
+
+const VidstackVideoPlayer = lazy(() => import('./VidstackVideoPlayer'))
 
 function computeMasonryCols() {
   if (typeof window === 'undefined') return 3
@@ -109,14 +111,15 @@ function FilePreview({ file, token }) {
           />
         )}
         {!ready && <div style={{ position: 'relative', zIndex: 1 }}><Spinner /></div>}
-        <video
-          key={file.id}
-          src={vidSrc(file, token)}
-          controls
-          autoPlay
-          onCanPlay={() => setReady(true)}
-          style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, background: '#111', display: ready ? 'block' : 'none', position: 'relative', zIndex: 1 }}
-        />
+        <Suspense fallback={null}>
+          <VidstackVideoPlayer
+            src={vidSrc(file, token)}
+            poster={thumb}
+            autoPlay
+            onCanPlay={() => setReady(true)}
+            style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, background: '#111', display: ready ? 'block' : 'none', position: 'relative', zIndex: 1 }}
+          />
+        </Suspense>
       </div>
     )
   }
@@ -151,7 +154,13 @@ function FilePreview({ file, token }) {
   )
 }
 
-function FilePreviewGrid({ file, token }) {
+const IPlay = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
+    <path d="M8 5v14l11-7z" />
+  </svg>
+)
+
+function FilePreviewGrid({ file, token, onClick }) {
   const [ready, setReady] = useState(false)
   const thumb = file.thumbnailLink || null
 
@@ -171,28 +180,31 @@ function FilePreviewGrid({ file, token }) {
     const vh = file.videoMediaMetadata?.height
     const aspectRatio = vw && vh ? `${vw} / ${vh}` : undefined
     return (
-      <div style={{ position: 'relative', width: '100%', overflow: 'hidden', borderRadius: 8, ...(aspectRatio ? { aspectRatio } : {}) }}>
-        {!ready && thumb && (
+      <div
+        onClick={onClick}
+        style={{ position: 'relative', width: '100%', overflow: 'hidden', borderRadius: 8, cursor: 'pointer', ...(aspectRatio ? { aspectRatio } : { minHeight: 160 }) }}
+      >
+        {thumb ? (
           <img
             src={thumb}
             alt=""
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(6px)', transform: 'scale(1.02)', borderRadius: 8, opacity: 0.85 }}
+            onLoad={() => setReady(true)}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }}
           />
+        ) : (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#111' }}><Spinner /></div>
         )}
-        {!ready && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Spinner /></div>}
-        <video
-          key={file.id}
-          src={vidSrc(file, token)}
-          controls
-          onCanPlay={() => setReady(true)}
-          style={{ width: '100%', display: ready ? 'block' : 'none', borderRadius: 8, background: '#111' }}
-        />
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.18)' }}>
+          <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <IPlay />
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div style={{ position: 'relative', width: '100%', borderRadius: 8, overflow: 'hidden' }}>
+    <div onClick={onClick} style={{ position: 'relative', width: '100%', borderRadius: 8, overflow: 'hidden', cursor: 'pointer' }}>
       {!ready && thumb && (
         <img
           src={thumb}
@@ -214,20 +226,30 @@ function FilePreviewGrid({ file, token }) {
 }
 
 export default function QuickLookModal({ files, auth, onClose, onPrev, onNext, currentIndex, total, onCrop, onRename, onDownload, onDelete, onDuplicate }) {
-  const hasNav = onPrev && onNext && total > 1
   const hasActions = onCrop || onRename || onDownload || onDelete || onDuplicate
   const token = auth?.accessToken || null
   const [masonryCols, setMasonryCols] = useState(() => computeMasonryCols())
+  const [focusedIndex, setFocusedIndex] = useState(null)
+
+  const isGridFocused = files && files.length > 1 && focusedIndex !== null
+  const hasNav = (onPrev && onNext && total > 1) || isGridFocused
+  const activeFile = isGridFocused ? files[focusedIndex] : files?.[0]
+  const curIdx = isGridFocused ? focusedIndex : currentIndex
+  const totalCount = isGridFocused ? files.length : total
+  const goPrev = isGridFocused ? () => setFocusedIndex(i => Math.max(0, i - 1)) : onPrev
+  const goNext = isGridFocused ? () => setFocusedIndex(i => Math.min(files.length - 1, i + 1)) : onNext
+
+  useEffect(() => { setFocusedIndex(null) }, [files])
 
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Escape' || e.key === ' ') { e.preventDefault(); onClose() }
-      if (hasNav && e.key === 'ArrowLeft') { e.preventDefault(); onPrev() }
-      if (hasNav && e.key === 'ArrowRight') { e.preventDefault(); onNext() }
+      if (hasNav && e.key === 'ArrowLeft') { e.preventDefault(); goPrev() }
+      if (hasNav && e.key === 'ArrowRight') { e.preventDefault(); goNext() }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [onClose, onPrev, onNext, hasNav])
+  }, [onClose, goPrev, goNext, hasNav])
 
   useEffect(() => {
     const onResize = () => setMasonryCols(computeMasonryCols())
@@ -237,7 +259,7 @@ export default function QuickLookModal({ files, auth, onClose, onPrev, onNext, c
 
   const masonryColumns = useMemo(() => {
     const cols = Array.from({ length: masonryCols }, () => [])
-    ;(files || []).forEach((file, idx) => cols[idx % masonryCols].push(file))
+    ;(files || []).forEach((file, idx) => cols[idx % masonryCols].push({ file, idx }))
     return cols
   }, [files, masonryCols])
 
@@ -261,15 +283,18 @@ export default function QuickLookModal({ files, auth, onClose, onPrev, onNext, c
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {isGridFocused && (
+            <button onClick={() => setFocusedIndex(null)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '13px', cursor: 'pointer', opacity: 0.8, padding: '0 4px', display: 'flex', alignItems: 'center', gap: '4px' }}>← griglia</button>
+          )}
           {hasNav && (
-            <button onClick={onPrev} style={{ background: 'none', border: 'none', color: 'white', fontSize: '18px', cursor: 'pointer', opacity: currentIndex === 0 ? 0.3 : 0.8, padding: '0 4px' }}>←</button>
+            <button onClick={goPrev} style={{ background: 'none', border: 'none', color: 'white', fontSize: '18px', cursor: 'pointer', opacity: curIdx === 0 ? 0.3 : 0.8, padding: '0 4px' }}>←</button>
           )}
           <span style={{ color: 'white', fontSize: '13px', fontWeight: 500 }}>
-            {files[0]?.name}
-            {hasNav && <span style={{ color: 'rgba(255,255,255,0.4)', marginLeft: '8px' }}>{currentIndex + 1} / {total}</span>}
+            {activeFile?.name}
+            {hasNav && <span style={{ color: 'rgba(255,255,255,0.4)', marginLeft: '8px' }}>{curIdx + 1} / {totalCount}</span>}
           </span>
           {hasNav && (
-            <button onClick={onNext} style={{ background: 'none', border: 'none', color: 'white', fontSize: '18px', cursor: 'pointer', opacity: currentIndex === total - 1 ? 0.3 : 0.8, padding: '0 4px' }}>→</button>
+            <button onClick={goNext} style={{ background: 'none', border: 'none', color: 'white', fontSize: '18px', cursor: 'pointer', opacity: curIdx === totalCount - 1 ? 0.3 : 0.8, padding: '0 4px' }}>→</button>
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -281,11 +306,11 @@ export default function QuickLookModal({ files, auth, onClose, onPrev, onNext, c
       {/* Content */}
       <div
         onClick={e => { if (e.target === e.currentTarget) onClose() }}
-        style={{ flex: 1, overflow: 'auto', padding: '16px', display: 'flex', alignItems: files.length > 1 ? 'flex-start' : 'center', justifyContent: 'center' }}
+        style={{ flex: 1, overflow: 'auto', padding: '16px', display: 'flex', alignItems: (files.length > 1 && !isGridFocused) ? 'flex-start' : 'center', justifyContent: 'center' }}
       >
-        {files.length === 1 ? (
+        {(files.length === 1 || isGridFocused) ? (
           <div className="ql-img-wrap">
-            <FilePreview file={files[0]} token={token} />
+            <FilePreview file={activeFile} token={token} />
             {hasActions && (
               <div className="ql-actions" onClick={e => e.stopPropagation()}>
                 {onCrop && <BtnIcon onClick={onCrop} title="Ritaglia"><ICrop /></BtnIcon>}
@@ -300,9 +325,9 @@ export default function QuickLookModal({ files, auth, onClose, onPrev, onNext, c
           <div className="ql-masonry">
             {masonryColumns.map((col, ci) => (
               <div className="ql-masonry-col" key={ci}>
-                {col.map(file => (
+                {col.map(({ file, idx }) => (
                   <div className="ql-masonry-item" key={file.id}>
-                    <FilePreviewGrid file={file} token={token} />
+                    <FilePreviewGrid file={file} token={token} onClick={() => setFocusedIndex(idx)} />
                   </div>
                 ))}
               </div>
@@ -315,12 +340,12 @@ export default function QuickLookModal({ files, auth, onClose, onPrev, onNext, c
       {hasNav && (
         <>
           <button
-            onClick={e => { e.stopPropagation(); onPrev() }}
-            style={{ position: 'fixed', left: 0, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.4)', border: 'none', color: 'white', fontSize: '28px', padding: '20px 14px', cursor: 'pointer', opacity: currentIndex === 0 ? 0.2 : 0.7, borderRadius: '0 8px 8px 0', transition: 'opacity 0.15s' }}
+            onClick={e => { e.stopPropagation(); goPrev() }}
+            style={{ position: 'fixed', left: 0, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.4)', border: 'none', color: 'white', fontSize: '28px', padding: '20px 14px', cursor: 'pointer', opacity: curIdx === 0 ? 0.2 : 0.7, borderRadius: '0 8px 8px 0', transition: 'opacity 0.15s' }}
           >‹</button>
           <button
-            onClick={e => { e.stopPropagation(); onNext() }}
-            style={{ position: 'fixed', right: 0, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.4)', border: 'none', color: 'white', fontSize: '28px', padding: '20px 14px', cursor: 'pointer', opacity: currentIndex === total - 1 ? 0.2 : 0.7, borderRadius: '8px 0 0 8px', transition: 'opacity 0.15s' }}
+            onClick={e => { e.stopPropagation(); goNext() }}
+            style={{ position: 'fixed', right: 0, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.4)', border: 'none', color: 'white', fontSize: '28px', padding: '20px 14px', cursor: 'pointer', opacity: curIdx === totalCount - 1 ? 0.2 : 0.7, borderRadius: '8px 0 0 8px', transition: 'opacity 0.15s' }}
           >›</button>
         </>
       )}
