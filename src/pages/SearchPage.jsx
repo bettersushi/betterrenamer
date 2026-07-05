@@ -1540,7 +1540,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                     {thumbSize === 'list' ? (
                       <>
                         <div className="list-cell list-cell-thumb">
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill={f.folderColorRgb || 'none'} stroke={f.folderColorRgb || 'currentColor'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: f.folderColorRgb ? 1 : 0.6 }}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill={f.folderColorRgb || '#f59e0b'} stroke="none"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
                         </div>
                         <div className="list-cell list-cell-name" style={{ width: columnWidth(LIST_COLUMNS[1]) }}>{f.name}</div>
                         {listColumnsVisible.size && (
@@ -1556,13 +1556,15 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                             {f.modifiedTime ? new Date(f.modifiedTime).toLocaleDateString() : ''}
                           </div>
                         )}
-                        <button
-                          className="list-row-actions"
-                          onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setFolderContextMenu({ folder: f, x: r.left, y: r.bottom + 4 }) }}
-                          title="Altre azioni"
-                        >
-                          <IconDots />
-                        </button>
+                        <div className="list-row-actions-cell">
+                          <button
+                            className="list-row-actions"
+                            onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setFolderContextMenu({ folder: f, x: r.left, y: r.bottom + 4 }) }}
+                            title="Altre azioni"
+                          >
+                            <IconDots />
+                          </button>
+                        </div>
                       </>
                     ) : (
                       <>
@@ -1644,7 +1646,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
               ) : thumbSize === 'list' ? (
                 <div className="list-view">
                   <div className="list-header">
-                    <div className="list-cell list-cell-thumb" />
+                    <div className="list-cell list-cell-thumb">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    </div>
                     <div
                       className="list-cell list-cell-name list-header-cell"
                       style={{ width: columnWidth(LIST_COLUMNS[1]) }}
@@ -1682,7 +1686,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                         <div className="list-col-resize" onMouseDown={e => { e.stopPropagation(); handleColumnResizeStart(e, LIST_COLUMNS[4]) }} />
                       </div>
                     )}
-                    <div className="list-row-actions-spacer" />
                   </div>
                   {results.map((photo, idx) => (
                     <div
@@ -1747,13 +1750,15 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                         <div className={`selection-check${selectedIds.has(photo.id) ? ' checked' : ''}`} />
                       )}
                       {!selectionMode && !renameMode && (
-                        <button
-                          className="list-row-actions"
-                          onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setContextMenu({ photo, idx, x: r.left, y: r.bottom + 4 }) }}
-                          title="Altre azioni"
-                        >
-                          <IconDots />
-                        </button>
+                        <div className="list-row-actions-cell">
+                          <button
+                            className="list-row-actions"
+                            onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setContextMenu({ photo, idx, x: r.left, y: r.bottom + 4 }) }}
+                            title="Altre azioni"
+                          >
+                            <IconDots />
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}
