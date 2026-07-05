@@ -1,17 +1,16 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import logoSrc from '../assets/logo-br.svg'
 import { useNavigate } from 'react-router-dom'
-import { listFiles, listFilesRecursive, getOrCreateFolder, moveFile, renameFile, listSubfolders, patchFileMetadata, getFolderAncestors } from '../drive'
-import { saveSession, getSessions, clearSessions, downloadCSV } from '../logs'
+import { listFiles, listFilesRecursive, renameFile, getFolderAncestors } from '../drive'
+import { getSessions, clearSessions, downloadCSV } from '../logs'
 import QuickLookModal from '../components/QuickLookModal'
 import BatchOpsModal from '../components/BatchOpsModal'
 import RulesModal from '../components/RulesModal'
 import StatusModal from '../components/StatusModal'
 import PalettePicker from '../components/PalettePicker'
+import { useRenameQueue } from '../context/RenameQueueContext'
+import { getExt, isVideoFile, buildLegacyPreview, formatETA } from '../renameQueueEngine'
 import './DashboardPage.css'
-
-const MEDIA_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp', '.tiff', '.tif', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
-const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.3gp', '.webm'])
 
 const PLACEHOLDERS = [
   { token: '{cartella}', label: 'Cartella', desc: 'Nome della cartella corrente' },
@@ -100,103 +99,6 @@ async function buildRenamePreviewForConfig(accessToken, folder, config) {
   return previewList
 }
 
-const TAB_ID = crypto.randomUUID()
-const LOCK_KEY = 'br_processing_lock'
-const LOCK_TTL = 20000 // ms — lock scade se non refreshato
-
-function readLock() {
-  try { return JSON.parse(localStorage.getItem(LOCK_KEY)) } catch { return null }
-}
-function acquireLock() {
-  const existing = readLock()
-  if (existing && existing.tabId !== TAB_ID && Date.now() - existing.ts < LOCK_TTL) return false
-  localStorage.setItem(LOCK_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }))
-  return true
-}
-function refreshLock() {
-  const existing = readLock()
-  if (existing?.tabId === TAB_ID) localStorage.setItem(LOCK_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }))
-}
-function releaseLock() {
-  const existing = readLock()
-  if (existing?.tabId === TAB_ID) localStorage.removeItem(LOCK_KEY)
-}
-
-function getExt(name) {
-  return name.includes('.') ? name.substring(name.lastIndexOf('.')).toLowerCase() : ''
-}
-function isMediaFile(file) {
-  if (file.mimeType === 'application/vnd.google-apps.shortcut') return false
-  const ext = getExt(file.name)
-  if (MEDIA_EXTENSIONS.has(ext)) return true
-  if (file.mimeType && ['image/', 'video/'].some(m => file.mimeType.startsWith(m))) return true
-  return false
-}
-function isVideoFile(name, mimeType) {
-  if (mimeType && mimeType.includes('video')) return true
-  return VIDEO_EXTENSIONS.has(getExt(name))
-}
-function formatETA(ms) {
-  const totalSec = Math.round(ms / 1000)
-  if (totalSec < 60) return `${totalSec}s`
-  const min = Math.floor(totalSec / 60)
-  const sec = totalSec % 60
-  if (min < 60) return `${min}m ${sec}s`
-  const h = Math.floor(min / 60)
-  return `${h}h ${min % 60}m`
-}
-function jobSubfolders(job) {
-  const source = job.preview && job.preview.length > 0 ? job.preview : job.entries
-  if (!source) return []
-  return [...new Set(source.map(p => p.folderName).filter(n => n && n !== job.rootFolderName))]
-}
-function baseFolderName(folderName) {
-  return folderName.replace(/ (Vid|Gif)$/, '').replace(/^[-_*]+/, '')
-}
-function generateLegacyName(folderName, fileName, mimeType, counter) {
-  const sanitized = baseFolderName(folderName).toLowerCase().replace(/[^a-z0-9]/g, '-')
-  const ext = fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : ''
-  let prefix = ''
-  if (isVideoFile(fileName, mimeType)) prefix = 'vid-'
-  else if (getExt(fileName) === '.gif') prefix = 'gif-'
-  return `${sanitized}-${prefix}${counter}${ext}`
-}
-function matchesLegacyPattern(folderName, fileName, mimeType) {
-  const sanitized = baseFolderName(folderName).toLowerCase().replace(/[^a-z0-9]/g, '-')
-  const ext = getExt(fileName).replace('.', '\\.')
-  const prefix = isVideoFile(fileName, mimeType) ? 'vid-' : getExt(fileName) === '.gif' ? 'gif-' : ''
-  return new RegExp(`^${sanitized}-${prefix}\\d+${ext}$`).test(fileName)
-}
-function extractLegacyCounter(folderName, fileName) {
-  const sanitized = baseFolderName(folderName).toLowerCase().replace(/[^a-z0-9]/g, '-')
-  const ext = getExt(fileName).replace('.', '\\.')
-  const m = fileName.match(new RegExp(`^${sanitized}-(?:vid-|gif-)?(\\d+)${ext}$`))
-  return m ? parseInt(m[1], 10) : null
-}
-function buildLegacyPreview(groups) {
-  const preview = []
-  for (const group of groups) {
-    // Passata 1: trovare il counter max tra file già rinominati
-    let counter = 100000
-    for (const file of group.files) {
-      if (!isMediaFile(file)) continue
-      if (matchesLegacyPattern(group.folderName, file.name, file.mimeType)) {
-        const n = extractLegacyCounter(group.folderName, file.name)
-        if (n !== null && n >= counter) counter = n + 1000
-      }
-    }
-    // Passata 2: costruire preview, assegnando counter solo ai file nuovi
-    for (const file of group.files) {
-      if (!isMediaFile(file)) continue
-      const skip = matchesLegacyPattern(group.folderName, file.name, file.mimeType)
-      const newName = skip ? file.name : generateLegacyName(group.folderName, file.name, file.mimeType, counter)
-      preview.push({ id: file.id, oldName: file.name, newName, folderName: group.folderName, folderId: group.folderId, mimeType: file.mimeType, thumbnailLink: file.thumbnailLink || null, skip })
-      if (!skip) counter += Math.floor(Math.random() * 1000) + 100
-    }
-  }
-  return preview
-}
-
 const IconFolder = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
@@ -266,9 +168,6 @@ const IconX = () => (
     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
   </svg>
 )
-
-const MAX_PARALLEL = 2
-let jobIdCounter = 0
 
 const IconSun = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -443,285 +342,16 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
     setCheckedFolders(allChecked ? new Set() : new Set(visibleFolders.map(f => f.id)))
   }
 
-  // Cross-tab lock — prevent two windows from running jobs simultaneously
-  const [lockedByOther, setLockedByOther] = useState(() => {
-    const l = readLock(); return !!(l && l.tabId !== TAB_ID && Date.now() - l.ts < LOCK_TTL)
-  })
-  const lockRefreshInterval = useRef(null)
-
-  useEffect(() => {
-    const onStorage = (e) => {
-      if (e.key !== LOCK_KEY) return
-      const l = readLock()
-      setLockedByOther(!!(l && l.tabId !== TAB_ID && Date.now() - l.ts < LOCK_TTL))
-    }
-    window.addEventListener('storage', onStorage)
-    return () => { window.removeEventListener('storage', onStorage); releaseLock() }
-  }, [])
-
-  // Queue — restore interrupted jobs from localStorage on mount
-  const [queue, setQueue] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('br_queue_interrupted') || '[]')
-      return saved.map(j => ({ ...j, status: 'interrupted' }))
-    } catch { return [] }
-  })
-  const queueRef = useRef(queue)
-  const runningCount = useRef(0)
-
-  // Persist active jobs on unload
-  useEffect(() => {
-    const handler = () => {
-      // Save only config needed to re-run — no preview/entries to avoid quota issues
-      const toSave = queueRef.current
-        .filter(j => j.status === 'queued' || j.status === 'pending' || j.status === 'running' || j.status === 'interrupted')
-        .map(j => ({
-          id: j.id,
-          rootFolderId: j.rootFolderId,
-          rootFolderName: j.rootFolderName,
-          mode: j.mode,
-          organizeMedia: j.organizeMedia,
-          skipCount: j.skipCount,
-          preview: [], // re-generated on restart
-          entries: [],
-          status: 'interrupted',
-          progress: { current: 0, total: 0, currentFile: '', phase: '' },
-        }))
-      try {
-        if (toSave.length > 0) localStorage.setItem('br_queue_interrupted', JSON.stringify(toSave))
-        else localStorage.removeItem('br_queue_interrupted')
-      } catch { /* quota exceeded — skip */ }
-    }
-    window.addEventListener('beforeunload', handler)
-    return () => window.removeEventListener('beforeunload', handler)
-  }, [])
-
-  // Clear localStorage when no more interrupted/active jobs remain
-  useEffect(() => {
-    const active = queue.filter(j => j.status === 'queued' || j.status === 'pending' || j.status === 'running' || j.status === 'interrupted')
-    if (active.length === 0) localStorage.removeItem('br_queue_interrupted')
-  }, [queue])
-
-  const updateJob = useCallback((id, updates) => {
-    queueRef.current = queueRef.current.map(j => {
-      if (j.id !== id) return j
-      const merged = { ...j, ...updates }
-      if (updates.status === 'running' && !j.startedAt) merged.startedAt = Date.now()
-      if (merged.progress && merged.startedAt && merged.progress.current > 0 && merged.progress.total > 0) {
-        const elapsed = Date.now() - merged.startedAt
-        const rate = elapsed / merged.progress.current
-        const remaining = merged.progress.total - merged.progress.current
-        merged.progress = { ...merged.progress, etaMs: Math.max(0, Math.round(rate * remaining)) }
-      }
-      return merged
-    })
-    setQueue([...queueRef.current])
-  }, [])
-
-  const processJob = useCallback(async (job) => {
-    if (!acquireLock()) {
-      // Another tab holds the lock — put job back to queued
-      updateJob(job.id, { status: 'queued' })
-      setLockedByOther(true)
-      return
-    }
-    // Refresh lock every 10s while running
-    lockRefreshInterval.current = setInterval(refreshLock, 10000)
-    runningCount.current++
-    updateJob(job.id, { status: 'running', progress: { current: 0, total: job.preview.length, currentFile: '', phase: 'Avvio...' } })
-
-    const entries = []
-    const folderCache = {}
-
-    const getMediaFolder = async (parentId, parentName, suffix) => {
-      const key = `${parentId}:${suffix}`
-      if (!folderCache[key]) {
-        folderCache[key] = await getOrCreateFolder(auth.accessToken, `${parentName} ${suffix}`, parentId)
-      }
-      return folderCache[key]
-    }
-
-    const moveItems = (job.moveOnly || job.organizeMedia)
-      ? job.preview.filter(item => isVideoFile(item.oldName, item.mimeType) || getExt(item.oldName) === '.gif')
-      : []
-
-    const renameItems = job.moveOnly ? [] : job.preview
-    const total = moveItems.length + renameItems.length
-    let current = 0
-
-    // Fase 1: rinomina (skip in moveOnly)
-    for (let i = 0; i < renameItems.length; i++) {
-      const item = renameItems[i]
-      current++
-      if (item.skip) {
-        entries.push({ type: 'rename', ...item, success: true, skipped: true })
-        continue
-      }
-      updateJob(job.id, { progress: { current, total, currentFile: item.oldName, currentNewName: item.newName, phase: 'Rinomino' } })
-      try {
-        await renameFile(auth.accessToken, item.id, item.newName)
-        entries.push({ type: 'rename', ...item, success: true })
-      } catch (err) {
-        entries.push({ type: 'rename', ...item, success: false, error: err.message })
-      }
-      if ((i + 1) % 50 === 0) await new Promise(r => setTimeout(r, 500))
-    }
-
-    // Fase 2: sposta
-    for (const item of moveItems) {
-      current++
-      const suffix = isVideoFile(item.oldName, item.mimeType) ? 'Vid' : 'Gif'
-      const alreadyInPlace = item.folderName === `${baseFolderName(item.folderName)} ${suffix}`
-      if (alreadyInPlace) {
-        entries.push({ type: 'move', oldName: item.oldName, newName: item.newName, folderName: item.folderName, success: true, skipped: true })
-        continue
-      }
-      updateJob(job.id, { progress: { current, total, currentFile: item.oldName, phase: `Sposto → ${item.folderName} ${suffix}` } })
-      try {
-        const destFolder = await getMediaFolder(item.folderId, item.folderName, suffix)
-        await moveFile(auth.accessToken, item.id, destFolder.id, item.folderId)
-        item.folderId = destFolder.id
-        item.folderName = destFolder.name
-        entries.push({ type: 'move', oldName: item.oldName, newName: item.newName, folderName: destFolder.name, success: true })
-      } catch (err) {
-        entries.push({ type: 'move', oldName: item.oldName, newName: item.newName, folderName: item.folderName, success: false, error: err.message })
-      }
-    }
-
-    saveSession({ date: new Date().toISOString(), rootFolder: job.rootFolderName, mode: job.mode, entries })
-    updateJob(job.id, { status: 'done', entries, progress: { current: total, total, currentFile: '', phase: 'Completato' } })
-    runningCount.current--
-    if (runningCount.current === 0) {
-      clearInterval(lockRefreshInterval.current)
-      releaseLock()
-    }
-
-    // Avvia prossimi job in coda
-    startPending()
-  }, [auth.accessToken, updateJob])
-
-  const processBatchOp = useCallback(async (job) => {
-    runningCount.current++
-    updateJob(job.id, { status: 'running', progress: { current: 0, total: 0, currentFile: '', phase: 'Avvio...' } })
-
-    try {
-      if (job.type === 'colorByKeyword') {
-        let colored = 0
-        const rules = (job.rules || []).filter(r => r.keyword?.trim() && r.color)
-        if (job.scope === 'drive') {
-          // Query diretta Drive per ogni keyword
-          for (const rule of rules) {
-            let pageToken = null
-            do {
-              const escaped = rule.keyword.replace(/'/g, "\\'")
-              const params = new URLSearchParams({
-                q: `mimeType = 'application/vnd.google-apps.folder' and trashed = false and name contains '${escaped}'`,
-                fields: 'files(id,name,folderColorRgb),nextPageToken',
-                pageSize: 200,
-              })
-              if (pageToken) params.set('pageToken', pageToken)
-              const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
-                headers: { Authorization: `Bearer ${auth.accessToken}` },
-              })
-              const data = await res.json()
-              for (const folder of data.files || []) {
-                if (folder.folderColorRgb === rule.color) continue
-                updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: folder.name, phase: `"${rule.keyword}"` } })
-                await patchFileMetadata(auth.accessToken, folder.id, { folderColorRgb: rule.color })
-              }
-              pageToken = data.nextPageToken || null
-            } while (pageToken)
-          }
-        } else {
-          // Scope cartella: ricorsione per trovare cartelle a qualsiasi profondità
-          const processFolder = async (folderId) => {
-            const subs = await listSubfolders(auth.accessToken, folderId)
-            for (const folder of subs) {
-              for (const rule of rules) {
-                if (folder.name.toLowerCase().includes(rule.keyword.toLowerCase()) && folder.folderColorRgb !== rule.color) {
-                  updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: folder.name, phase: `"${rule.keyword}"` } })
-                  await patchFileMetadata(auth.accessToken, folder.id, { folderColorRgb: rule.color })
-                }
-              }
-              await processFolder(folder.id)
-            }
-          }
-          await processFolder(job.folderId)
-        }
-        updateJob(job.id, { status: 'done', progress: { current: colored, total: colored, currentFile: '', phase: `${colored} cartelle colorate` } })
-
-      } else if (job.type === 'colorAllSubfolders') {
-        let colored = 0
-        const propagateColor = async (folderId, color) => {
-          const subs = await listSubfolders(auth.accessToken, folderId)
-          for (const sub of subs) {
-            if (sub.folderColorRgb !== color) {
-              updateJob(job.id, { progress: { current: ++colored, total: colored, currentFile: sub.name, phase: 'Coloro' } })
-              await patchFileMetadata(auth.accessToken, sub.id, { folderColorRgb: color })
-            }
-            await propagateColor(sub.id, color)
-          }
-        }
-        const rootFolderId = job.scope === 'drive' ? 'root' : job.folderId
-        const topFolders = await listSubfolders(auth.accessToken, rootFolderId)
-        for (const folder of topFolders) {
-          if (folder.folderColorRgb) await propagateColor(folder.id, folder.folderColorRgb)
-        }
-        updateJob(job.id, { status: 'done', progress: { current: colored, total: colored, currentFile: '', phase: `${colored} cartelle colorate` } })
-
-      } else if (job.type === 'normalizeNames') {
-        const normalize = (name) => {
-          const dot = name.lastIndexOf('.')
-          const base = dot > 0 ? name.slice(0, dot) : name
-          const ext = dot > 0 ? name.slice(dot).toLowerCase() : ''
-          const norm = base.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9._\-]/g, '')
-          return norm + ext
-        }
-        const collectFiles = async (folderId) => {
-          const data = await listFiles(auth.accessToken, folderId)
-          const all = data.files || []
-          const files = all.filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
-          const folders = all.filter(f => f.mimeType === 'application/vnd.google-apps.folder')
-          let result = [...files]
-          if (job.scope === 'drive') {
-            for (const f of folders) result = result.concat(await collectFiles(f.id))
-          }
-          return result
-        }
-        const allFiles = await collectFiles(job.scope === 'drive' ? 'root' : job.folderId)
-        const toRename = allFiles.filter(f => normalize(f.name) !== f.name)
-        let done = 0
-        for (const f of toRename) {
-          const newName = normalize(f.name)
-          updateJob(job.id, { progress: { current: ++done, total: toRename.length, currentFile: f.name, phase: 'Rinomino' } })
-          await renameFile(auth.accessToken, f.id, newName)
-        }
-        updateJob(job.id, { status: 'done', progress: { current: done, total: toRename.length, currentFile: '', phase: `${done} file rinominati` } })
-      }
-    } catch (err) {
-      updateJob(job.id, { status: 'error', progress: { current: 0, total: 0, currentFile: '', phase: err.message } })
-    }
-
-    runningCount.current--
-    startPending()
-  }, [auth.accessToken, updateJob])
-
-  const startPending = useCallback(() => {
-    while (runningCount.current < MAX_PARALLEL) {
-      const next = queueRef.current.find(j => j.status === 'pending')
-      if (!next) break
-      if (next.type === 'colorByKeyword' || next.type === 'colorAllSubfolders' || next.type === 'normalizeNames') {
-        processBatchOp(next)
-      } else {
-        processJob(next)
-      }
-    }
-  }, [processJob, processBatchOp])
+  const {
+    interruptedJobs, queuedJobs, runningJobs, pendingJobs,
+    lockedByOther, setLockedByOther,
+    enqueueJob, enqueueRaw, startJob, startAll, removeQueued, removeJob,
+    restartJob, restartAll,
+  } = useRenameQueue()
 
   const handleAddToQueue = () => {
     if (preview.length === 0 || !previewFolder) return
-    const job = {
-      id: ++jobIdCounter,
+    enqueueJob({
       rootFolderName: previewFolder.name,
       rootFolderId: previewFolder.id,
       mode,
@@ -729,12 +359,8 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
       organizeMedia: moveOnly ? true : organizeMedia,
       preview: preview.filter(p => !p.skip).map(p => ({ ...p })),
       skipCount: preview.filter(p => p.skip).length,
-      status: 'queued',
       progress: { current: 0, total: preview.filter(p => !p.skip).length, currentFile: '', phase: '' },
-      entries: [],
-    }
-    queueRef.current = [...queueRef.current, job]
-    setQueue([...queueRef.current])
+    })
     setPreview([])
     setPreviewFolder(null)
     setCheckedFolders(new Set())
@@ -756,8 +382,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
           )
           const toRename = previewList.filter(p => !p.skip)
           if (toRename.length === 0) continue
-          const job = {
-            id: ++jobIdCounter,
+          enqueueRaw({
             rootFolderName: rule.folderName,
             rootFolderId: rule.folderId,
             mode: 'custom',
@@ -765,17 +390,13 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
             skipCount: previewList.length - toRename.length,
             status: 'pending',
             progress: { current: 0, total: toRename.length, currentFile: '', phase: '' },
-            entries: [],
-          }
-          queueRef.current = [...queueRef.current, job]
-          setQueue([...queueRef.current])
+          })
           queuedCount++
         } catch (e) {
           console.error(`Regola "${rule.name}" fallita:`, e)
           errorCount++
         }
       }
-      startPending()
       setRulesApplyMessage(
         queuedCount === 0 && errorCount === 0
           ? 'Nessun file da rinominare — tutte le regole sono già rispettate.'
@@ -784,47 +405,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
     } finally {
       setRulesApplying(false)
     }
-  }, [rules, auth.accessToken, startPending])
-
-  const reanalizeAndQueue = useCallback(async (jobId) => {
-    const job = queueRef.current.find(j => j.id === jobId)
-    if (!job) return
-    updateJob(jobId, { status: 'pending', progress: { current: 0, total: 0, currentFile: '', phase: 'Ri-analisi...' } })
-    try {
-      const groups = await listFilesRecursive(auth.accessToken, job.rootFolderId, job.rootFolderName, true)
-      const preview = buildLegacyPreview(groups).filter(p => !p.skip)
-      updateJob(jobId, { status: 'pending', preview, progress: { current: 0, total: preview.length, currentFile: '', phase: '' }, entries: [] })
-      startPending()
-    } catch (e) {
-      updateJob(jobId, { status: 'interrupted', progress: { current: 0, total: 0, currentFile: '', phase: '' } })
-    }
-  }, [auth.accessToken, updateJob, startPending])
-
-  const handleRestartJob = useCallback((jobId) => {
-    reanalizeAndQueue(jobId)
-  }, [reanalizeAndQueue])
-
-  const handleRestartAll = useCallback(() => {
-    const interrupted = queueRef.current.filter(j => j.status === 'interrupted')
-    interrupted.forEach(j => reanalizeAndQueue(j.id))
-  }, [reanalizeAndQueue])
-
-  const handleStartJob = useCallback((jobId) => {
-    queueRef.current = queueRef.current.map(j => j.id === jobId && j.status === 'queued' ? { ...j, status: 'pending' } : j)
-    setQueue([...queueRef.current])
-    startPending()
-  }, [startPending])
-
-  const handleStartAll = useCallback(() => {
-    queueRef.current = queueRef.current.map(j => j.status === 'queued' ? { ...j, status: 'pending' } : j)
-    setQueue([...queueRef.current])
-    startPending()
-  }, [startPending])
-
-  const handleRemoveQueued = useCallback((jobId) => {
-    queueRef.current = queueRef.current.filter(j => !(j.id === jobId && j.status === 'queued'))
-    setQueue([...queueRef.current])
-  }, [])
+  }, [rules, auth.accessToken, enqueueRaw])
 
   const loadFolder = async (folderId, token) => {
     setBrowserLoading(true)
@@ -1021,12 +602,6 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
 
   const handleLogout = () => { onLogout(); navigate('/login') }
 
-  const queueHasItems = queue.length > 0
-  const interruptedJobs = queue.filter(j => j.status === 'interrupted')
-  const queuedJobs = queue.filter(j => j.status === 'queued')
-  const runningJobs = queue.filter(j => j.status === 'running')
-  const pendingJobs = queue.filter(j => j.status === 'pending')
-  const doneJobs = queue.filter(j => j.status === 'done' || j.status === 'error')
   const activeFolderIds = new Set(
     [...queuedJobs, ...runningJobs, ...pendingJobs].flatMap(j => [j.rootFolderId, ...(j.preview || []).map(p => p.folderId)])
   )
@@ -1389,149 +964,6 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
         </div>
       </div>
 
-      {/* Queue panel */}
-      {queueHasItems && (
-        <div className="queue-panel">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <IconList /> Coda
-              {queuedJobs.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>{queuedJobs.length} in coda</span>}
-              {runningJobs.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#3b82f6' }}>{runningJobs.length} in esecuzione</span>}
-              {pendingJobs.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#888' }}>{pendingJobs.length} in partenza</span>}
-              {doneJobs.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#16a34a' }}>{doneJobs.length} completati</span>}
-            </h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {interruptedJobs.length > 0 && (
-                <button onClick={handleRestartAll} className="btn-avvia-tutto" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)', boxShadow: '0 2px 8px rgba(239,68,68,0.3)' }}>
-                  <IconPlay /> Riavvia tutto
-                </button>
-              )}
-              {queuedJobs.length > 0 && (
-                <button onClick={handleStartAll} className="btn-avvia-tutto">
-                  <IconPlay /> Avvia tutto
-                </button>
-              )}
-              {runningJobs.length > 0 && (
-                <span style={{ color: '#3b82f6', display: 'flex', animation: 'dancer-bounce 0.6s ease-in-out infinite alternate' }}>
-                  <IconDancer />
-                </span>
-              )}
-              {doneJobs.length > 0 && (
-                <button
-                  onClick={() => {
-                    queueRef.current = queueRef.current.filter(j => j.status !== 'done' && j.status !== 'error')
-                    setQueue([...queueRef.current])
-                  }}
-                  className="btn-secondary"
-                  style={{ fontSize: '12px', padding: '4px 10px' }}
-                >
-                  Svuota
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {queue.map(job => {
-              const pct = job.progress.total > 0 ? Math.round((job.progress.current / job.progress.total) * 100) : 0
-              const successCount = job.entries.filter(e => e.success).length
-              const failCount = job.entries.filter(e => !e.success).length
-
-              return (
-                <div key={job.id} className="queue-job">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: job.status === 'running' ? '6px' : 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ display: 'flex', color: job.status === 'interrupted' ? '#f59e0b' : '#888' }}>
-                        {job.status === 'interrupted' && <IconX />}
-                        {job.status === 'queued' && <IconClock />}
-                        {job.status === 'pending' && <IconClock />}
-                        {job.status === 'running' && <IconRefresh />}
-                        {job.status === 'done' && <IconCheck />}
-                        {job.status === 'error' && <IconX />}
-                      </span>
-                      <strong style={{ fontSize: '13px' }}>{job.rootFolderName}</strong>
-                      <span style={{ fontSize: '11px', color: '#888' }}>[{job.mode}]</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#888' }}>
-                      {job.status === 'queued' && (
-                        <>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{job.progress.total} file</span>
-                          <button onClick={() => handleStartJob(job.id)} className="btn-primary" style={{ fontSize: '11px', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px' }} title="Avvia">
-                            <IconPlay /> Avvia
-                          </button>
-                          <button onClick={() => handleRemoveQueued(job.id)} className="btn-secondary" style={{ fontSize: '11px', padding: '3px 6px', color: 'var(--danger)' }} title="Rimuovi">
-                            <IconXSmall />
-                          </button>
-                        </>
-                      )}
-                      {job.status === 'interrupted' && (
-                        <>
-                          <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 600 }}>Interrotto</span>
-                          {job.preview && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{job.preview.length} file</span>}
-                          <button onClick={() => handleRestartJob(job.id)} className="btn-primary" style={{ fontSize: '11px', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <IconPlay /> Riavvia
-                          </button>
-                          <button onClick={() => { queueRef.current = queueRef.current.filter(j => j.id !== job.id); setQueue([...queueRef.current]) }} className="btn-secondary" style={{ fontSize: '11px', padding: '3px 6px', color: 'var(--danger)' }}>
-                            <IconXSmall />
-                          </button>
-                        </>
-                      )}
-                      {job.status === 'pending' && 'In partenza...'}
-                      {job.status === 'running' && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          {job.progress.current} / {job.progress.total}
-                          {job.progress.etaMs && (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                              <IconClock />
-                              {formatETA(job.progress.etaMs)}
-                            </span>
-                          )}
-                        </span>
-                      )}
-                      {job.status === 'done' && (
-                        <>
-                          <span style={{ color: '#16a34a' }}>{successCount} ok</span>
-                          {job.skipCount > 0 && <span style={{ color: 'var(--text-muted)', marginLeft: '6px', opacity: 0.6 }}>{job.skipCount} già ok</span>}
-                          {failCount > 0 && <span style={{ color: '#dc2626', marginLeft: '6px' }}>{failCount} errori</span>}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {(() => {
-                    const subs = jobSubfolders(job)
-                    return subs.length > 0 && (
-                      <div style={{ fontSize: '8px', color: 'var(--text-muted)', opacity: 0.65, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {subs.slice(0, 8).join(', ')}{subs.length > 8 ? ` +${subs.length - 8} altre` : ''}
-                      </div>
-                    )
-                  })()}
-
-                  {job.status === 'running' && (
-                    <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#888', marginBottom: '4px' }}>
-                        <span>
-                          <strong style={{ color: '#3b82f6' }}>{job.progress.phase}</strong>{' '}
-                          <span style={{ opacity: 0.7 }}>{job.progress.currentFile}</span>
-                          {job.progress.currentNewName && (
-                            <span style={{ opacity: 0.5 }}> → </span>
-                          )}
-                          {job.progress.currentNewName && (
-                            <span style={{ color: '#3b82f6', opacity: 0.9 }}>{job.progress.currentNewName}</span>
-                          )}
-                        </span>
-                        <span>{pct}%</span>
-                      </div>
-                      <div className="queue-progress-bg">
-                        <div style={{ background: '#3b82f6', height: '100%', width: `${pct}%`, transition: 'width 0.2s ease' }} />
-                      </div>
-                    </>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
       {showStatus && <StatusModal auth={auth} onClose={() => setShowStatus(false)} />}
       {showBatchOps && (
         <BatchOpsModal
@@ -1540,8 +972,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
           onClose={() => setShowBatchOps(false)}
           onAddJob={(job) => {
             const enriched = { ...job, rootFolderName: job.label, mode: job.scope === 'drive' ? 'Drive' : job.folderName }
-            queueRef.current = [...queueRef.current, enriched]
-            setQueue([...queueRef.current])
+            enqueueRaw(enriched)
             setShowBatchOps(false)
           }}
         />
@@ -1576,7 +1007,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
               {interruptedJobs.length > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Interrotti ({interruptedJobs.length})</span>
-                  <button onClick={handleRestartAll} className="btn-avvia-tutto" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)', boxShadow: '0 2px 8px rgba(239,68,68,0.3)' }}>
+                  <button onClick={restartAll} className="btn-avvia-tutto" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)', boxShadow: '0 2px 8px rgba(239,68,68,0.3)' }}>
                     <IconPlay /> Riavvia tutto
                   </button>
                 </div>
@@ -1588,10 +1019,10 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
                       <strong style={{ fontSize: '13px' }}>{job.rootFolderName}</strong>
                       {job.preview && <span style={{ fontSize: '11px', color: '#f59e0b', marginLeft: '8px' }}>Interrotto — {job.preview.length} file</span>}
                     </div>
-                    <button onClick={() => handleRestartJob(job.id)} className="btn-primary" style={{ fontSize: '11px', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <button onClick={() => restartJob(job.id)} className="btn-primary" style={{ fontSize: '11px', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <IconPlay /> Riavvia
                     </button>
-                    <button onClick={() => { queueRef.current = queueRef.current.filter(j => j.id !== job.id); setQueue([...queueRef.current]) }} className="btn-secondary" style={{ fontSize: '11px', padding: '3px 6px', color: 'var(--danger)' }}>
+                    <button onClick={() => removeJob(job.id)} className="btn-secondary" style={{ fontSize: '11px', padding: '3px 6px', color: 'var(--danger)' }}>
                       <IconXSmall />
                     </button>
                   </div>
@@ -1600,7 +1031,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
               {queuedJobs.length > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>In coda ({queuedJobs.length})</span>
-                  <button onClick={handleStartAll} className="btn-avvia-tutto">
+                  <button onClick={startAll} className="btn-avvia-tutto">
                     <IconPlay /> Avvia tutto
                   </button>
                 </div>
@@ -1614,10 +1045,10 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
                       <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '8px' }}>{job.progress.total} file</span>
                     </div>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
-                      <button onClick={() => handleStartJob(job.id)} className="btn-primary" style={{ fontSize: '11px', padding: '3px 9px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <button onClick={() => startJob(job.id)} className="btn-primary" style={{ fontSize: '11px', padding: '3px 9px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <IconPlay /> Avvia
                       </button>
-                      <button onClick={() => handleRemoveQueued(job.id)} className="btn-secondary" style={{ fontSize: '11px', padding: '3px 6px', color: 'var(--danger)' }} title="Rimuovi">
+                      <button onClick={() => removeQueued(job.id)} className="btn-secondary" style={{ fontSize: '11px', padding: '3px 6px', color: 'var(--danger)' }} title="Rimuovi">
                         <IconXSmall />
                       </button>
                     </div>

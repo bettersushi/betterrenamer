@@ -107,40 +107,6 @@
   color: var(--text-secondary);
 }
 
-.queue-panel {
-  border-top: 2px solid var(--border);
-  background: #fafafa;
-  padding: 12px 24px;
-  max-height: 260px;
-  overflow-y: auto;
-}
-
-[data-theme="dark"] .queue-panel {
-  background: #161614;
-}
-
-.queue-job {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 10px 14px;
-}
-
-[data-theme="dark"] .queue-job {
-  background: #1e1e1c;
-  border-color: var(--border);
-}
-
-.queue-progress-bg {
-  background: #e5e7eb;
-  border-radius: 999px;
-  height: 6px;
-  overflow: hidden;
-}
-
-[data-theme="dark"] .queue-progress-bg {
-  background: #2e2e2a;
-}
 
 .logs-drawer {
   position: fixed;

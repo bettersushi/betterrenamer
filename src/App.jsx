@@ -7,6 +7,8 @@ import LogsPage from './pages/LogsPage'
 import SearchPage from './pages/SearchPage'
 import { VideoMontageProvider, useVideoMontage } from './context/VideoMontageContext'
 import VideoMontageBalloon from './components/VideoMontageBalloon'
+import { RenameQueueProvider } from './context/RenameQueueContext'
+import RenameQueuePanel from './components/RenameQueuePanel'
 import { refreshAccessToken } from './auth'
 import './App.css'
 
@@ -120,6 +122,7 @@ function App() {
     <ErrorBoundary>
     <BrowserRouter>
       <VideoMontageProvider auth={auth} onTokenRefresh={handleTokenRefresh}>
+      <RenameQueueProvider auth={auth}>
         <VideoMontageWizardGuard />
         <Routes>
           <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
@@ -130,6 +133,8 @@ function App() {
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
         <VideoMontageBalloon />
+        <RenameQueuePanel />
+      </RenameQueueProvider>
       </VideoMontageProvider>
     </BrowserRouter>
     </ErrorBoundary>

@@ -1,0 +1,27 @@
+.queue-job {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+[data-theme="dark"] .queue-job {
+  background: #1e1e1c;
+  border-color: var(--border);
+}
+
+.queue-progress-bg {
+  background: #e5e7eb;
+  border-radius: 999px;
+  height: 6px;
+  overflow: hidden;
+}
+
+[data-theme="dark"] .queue-progress-bg {
+  background: #2e2e2a;
+}
+
+@keyframes dancer-bounce {
+  0%   { transform: rotate(-10deg) translateY(0px); }
+  100% { transform: rotate(10deg) translateY(-2px); }
+}
