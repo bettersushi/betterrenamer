@@ -1148,7 +1148,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
         <motion.div variants={fadeItem} className="search-main">
           {/* Search bar + toolbar */}
           <div className="search-bar-row">
-            <div style={{ position: 'relative', width: '38%', flexShrink: 0 }}>
+            <div style={{ position: 'relative', width: '19%', flexShrink: 0 }}>
               <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }}>
                 <IconSearch />
               </span>
