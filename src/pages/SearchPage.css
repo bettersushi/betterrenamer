@@ -1042,15 +1042,11 @@
 }
 
 .list-row-actions-cell {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
+  width: 26px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2;
 }
 
 .list-row-actions {
@@ -1065,15 +1061,13 @@
   justify-content: center;
   opacity: 0;
   cursor: pointer;
-  transform: translateX(6px);
-  transition: opacity 0.15s, transform 0.15s, color 0.12s;
+  transition: opacity 0.15s, color 0.12s;
   flex-shrink: 0;
 }
 
 .list-row:hover .list-row-actions,
 .list-row-folder:hover .list-row-actions {
   opacity: 1;
-  transform: translateX(0);
 }
 
 .list-row-actions:hover {
