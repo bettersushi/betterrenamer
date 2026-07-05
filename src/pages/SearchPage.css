@@ -174,6 +174,9 @@
 }
 
 .sub-toolbar-folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
@@ -849,18 +852,24 @@
 
 .list-header {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   height: 30px;
+  padding: 0 8px;
+  box-sizing: border-box;
   position: sticky;
   top: 0;
   z-index: 2;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  font-size: 11px;
-  font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.02em;
+}
+
+.list-header .list-cell {
+  font-size: 9px !important;
+  font-weight: 600;
+  overflow: visible;
 }
 
 .list-header-cell {
@@ -883,27 +892,29 @@
 .list-col-resize {
   position: absolute;
   top: 0;
-  right: -5px;
-  width: 9px;
+  right: 0;
+  width: 10px;
   height: 100%;
   cursor: col-resize;
   z-index: 3;
   display: flex;
+  align-items: center;
   justify-content: center;
 }
 
 .list-col-resize::after {
   content: '';
   width: 1px;
-  height: 60%;
-  align-self: center;
-  background: var(--border);
-  transition: background 0.12s, width 0.12s;
+  height: 55%;
+  background: var(--text-muted);
+  opacity: 0.5;
+  transition: background 0.12s, width 0.12s, opacity 0.12s;
 }
 
 .list-col-resize:hover::after,
 .list-col-resize:active::after {
   background: var(--primary);
+  opacity: 1;
   width: 2px;
 }
 

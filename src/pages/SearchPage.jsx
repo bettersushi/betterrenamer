@@ -1406,7 +1406,10 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
               </button>
             )}
             {!similarTo && !globalResults && (
-              <span className="sub-toolbar-folder">📁 {activeFolderName}</span>
+              <span className="sub-toolbar-folder">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b" stroke="none"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+                {activeFolderName}
+              </span>
             )}
             {navHistory.length > 0 && (
               <div className="sub-toolbar-tags">
