@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { FOLDER_COLORS } from '../driveFolderColors'
 
 const IColor = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -20,12 +21,6 @@ const IClose = () => (
     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
   </svg>
 )
-
-const FALLBACK_COLORS = [
-  '#ac725e', '#d06b64', '#f83a22', '#ff7537', '#ffad46',
-  '#16a765', '#7bd148', '#42d692', '#4986e7', '#9a9cff',
-  '#b99aff', '#cd74e6',
-]
 
 const DEFAULT_RULES = [
   { keyword: 'Vid', color: '#4986e7' },
@@ -90,7 +85,7 @@ export default function BatchOpsModal({ currentFolder, onClose, onAddJob, access
   const [scopes, setScopes] = useState({ colorByKeyword: 'folder', colorAllSubfolders: 'folder', normalizeNames: 'folder' })
   const [added, setAdded] = useState({})
   const [kwRules, setKwRules] = useState(DEFAULT_RULES)
-  const [palette, setPalette] = useState(FALLBACK_COLORS)
+  const [palette, setPalette] = useState(FOLDER_COLORS)
 
   useEffect(() => {
     if (!accessToken) return

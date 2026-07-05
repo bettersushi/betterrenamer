@@ -219,8 +219,8 @@ const IconRotateCCW = () => (
     <path d="M3 3v5h5"/>
   </svg>
 )
-const IconFolder = () => (
-  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+const IconFolder = ({ color } = {}) => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill={color || 'none'} stroke={color || 'currentColor'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
   </svg>
 )
@@ -739,6 +739,20 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
       })
     } catch (e) {
       alert('Errore nel rinominare la cartella: ' + e.message)
+    }
+  }, [auth.accessToken])
+
+  const handleColorFolder = useCallback(async (folder, hexColor) => {
+    try {
+      await patchFileMetadata(auth.accessToken, folder.id, { folderColorRgb: hexColor })
+      setCurrentSubfolders(sf => sf.map(s => s.id === folder.id ? { ...s, folderColorRgb: hexColor } : s))
+      setTreeChildren(t => {
+        const c = { ...t }
+        Object.keys(c).forEach(k => { c[k] = c[k].map(x => x.id === folder.id ? { ...x, folderColorRgb: hexColor } : x) })
+        return c
+      })
+    } catch (e) {
+      alert('Errore nel colorare la cartella: ' + e.message)
     }
   }, [auth.accessToken])
 
@@ -1402,6 +1416,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                     role="button"
                     tabIndex={0}
                     className={`subfolder-grid-item${dragOverFolder === f.id ? ' drop-target' : ''}`}
+                    style={f.folderColorRgb ? { borderColor: f.folderColorRgb } : undefined}
                     onClick={() => {
                       activeFolderRef.current = null
                       clearTimeout(folderHoverTimer.current)
@@ -1418,7 +1433,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                     onDrop={e => { e.preventDefault(); handleDropOnFolder(f, e.dataTransfer.getData('photoId') || null, e.dataTransfer.getData('folderId') || null) }}
                     onContextMenu={e => { e.preventDefault(); setFolderTooltip(null); setFolderContextMenu({ folder: f, x: e.clientX, y: e.clientY }) }}
                   >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill={f.folderColorRgb || 'none'} stroke={f.folderColorRgb || 'currentColor'} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: f.folderColorRgb ? 1 : 0.6 }}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
                     <span>{f.name}</span>
                     <div
                       className="subfolder-preview-trigger"
@@ -1637,6 +1652,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
             onNewSubfolder: (f) => handleCreateFolder(f.id, f.name),
             onRename: (f) => setRenameFolder(f),
             onMove: (f) => setMovingFolder(f),
+            onColor: (f, hexColor) => handleColorFolder(f, hexColor),
             onDelete: async (f) => {
               if (!window.confirm(`Elimina la cartella "${f.name}"?`)) return
               try {
@@ -1951,7 +1967,7 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
     <div className="tree-node-wrap">
       <div
         className={`tree-node${activeId === folder.id ? ' active' : ''}${dragOverFolder === folder.id ? ' drop-target' : ''}`}
-        style={{ paddingLeft: 8 + depth * 12 }}
+        style={{ paddingLeft: 8 + (depth - 1) * 12 }}
         onClick={() => onSelect(folder, siblingIds)}
         onDragOver={e => {
           e.preventDefault()
@@ -1985,7 +2001,7 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
         >
           {loading ? <IconSpinner /> : <IconChevronRight />}
         </span>
-        <span className="tree-folder-icon"><IconFolder /></span>
+        <span className="tree-folder-icon"><IconFolder color={folder.folderColorRgb} /></span>
         <span className="tree-label" title={folder.name}>
           {folder.name}
         </span>
