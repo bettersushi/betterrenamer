@@ -879,6 +879,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
   const folderHoverTimer = useRef(null)
   const folderFileCache = useRef({})
   const [folderTooltip, setFolderTooltip] = useState(null) // { names: [], x, y }
+  const [folderTooltipMode, setFolderTooltipMode] = useState('list') // 'list' | 'grid'
 
   const handleThumbEnter = (e, file) => {
     if (!file.thumbnailLink) return
@@ -903,7 +904,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
           const data = await listFiles(auth.accessToken, folder.id)
           items = (data.files || [])
             .filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
-            .slice(0, 10)
+            .slice(0, 12)
             .map(f => ({ name: f.name, thumb: f.thumbnailLink || null }))
           folderFileCache.current[folder.id] = items
         }
@@ -1167,7 +1168,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
                       {isFolder && (
                         <div
                           className="folder-preview-trigger"
-                          onClick={e => e.stopPropagation()}
+                          onClick={e => { e.stopPropagation(); setFolderTooltipMode(m => m === 'grid' ? 'list' : 'grid') }}
                           onMouseEnter={(e) => handleFolderEnter(e, file)}
                           onMouseMove={handleFolderMove}
                           onMouseLeave={handleFolderLeave}
@@ -1764,27 +1765,43 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
         </div>
       )}
       {folderTooltip?.items && (
-        <div style={{
-          position: 'fixed', left: folderTooltip.x, top: folderTooltip.y,
-          zIndex: 2000, pointerEvents: 'none',
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
-          padding: '6px', minWidth: '220px', maxWidth: '300px',
-        }}>
-          {folderTooltip.items.map((item, i) => (
-            <div key={i} style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '4px 6px',
-              borderTop: i > 0 ? '1px solid var(--border)' : 'none',
-            }}>
-              {item.thumb
-                ? <img src={item.thumb} style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} alt="" />
-                : <span style={{ width: '32px', height: '32px', borderRadius: '4px', background: 'var(--border)', flexShrink: 0, display: 'block' }} />
-              }
-              <span style={{ fontSize: '11px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
-            </div>
-          ))}
-        </div>
+        folderTooltipMode === 'grid' ? (
+          <div style={{
+            position: 'fixed', left: folderTooltip.x, top: folderTooltip.y,
+            zIndex: 2000, pointerEvents: 'none',
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
+            padding: '6px', display: 'grid', gridTemplateColumns: 'repeat(4, 96px)', gap: '6px',
+          }}>
+            {folderTooltip.items.map((item, i) => (
+              item.thumb
+                ? <img key={i} src={item.thumb} style={{ width: '96px', height: '96px', objectFit: 'cover', borderRadius: '3px', flexShrink: 0 }} alt="" />
+                : <span key={i} style={{ width: '96px', height: '96px', borderRadius: '3px', background: 'var(--border)', flexShrink: 0, display: 'block' }} />
+            ))}
+          </div>
+        ) : (
+          <div style={{
+            position: 'fixed', left: folderTooltip.x, top: folderTooltip.y,
+            zIndex: 2000, pointerEvents: 'none',
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
+            padding: '6px', minWidth: '220px', maxWidth: '300px',
+          }}>
+            {folderTooltip.items.map((item, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '4px 6px',
+                borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+              }}>
+                {item.thumb
+                  ? <img src={item.thumb} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} alt="" />
+                  : <span style={{ width: '56px', height: '56px', borderRadius: '4px', background: 'var(--border)', flexShrink: 0, display: 'block' }} />
+                }
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
+              </div>
+            ))}
+          </div>
+        )
       )}
 
       {quickLookOpen && (
