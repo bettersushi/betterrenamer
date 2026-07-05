@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { directDriveMediaUrl } from '../driveMedia'
 import './QuickLookModal.css'
 
 const VidstackVideoPlayer = lazy(() => import('./VidstackVideoPlayer'))
@@ -23,6 +24,9 @@ function imgSrc(file, token) {
   return `/api/proxy-image?id=${file.id}&token=${encodeURIComponent(token)}`
 }
 function vidSrc(file, token) {
+  return directDriveMediaUrl(file.id, token)
+}
+function vidSrcFallback(file, token) {
   return `/api/proxy-video?id=${file.id}&token=${encodeURIComponent(token)}`
 }
 
@@ -114,6 +118,7 @@ function FilePreview({ file, token }) {
         <Suspense fallback={null}>
           <VidstackVideoPlayer
             src={vidSrc(file, token)}
+            fallbackSrc={vidSrcFallback(file, token)}
             type={file.mimeType && file.mimeType.includes('video') ? file.mimeType : 'video/mp4'}
             poster={thumb}
             autoPlay
