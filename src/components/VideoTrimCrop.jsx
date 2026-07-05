@@ -1,6 +1,5 @@
 // src/components/VideoTrimCrop.jsx
 import { useRef, useState, useEffect, useCallback } from 'react'
-import { directDriveMediaUrl } from '../driveMedia'
 import './VideoTrimCrop.css'
 
 function fmt(s) {
@@ -19,8 +18,8 @@ export default function VideoTrimCrop({ clip, auth, onChange }) {
   const [cropRect, setCropRect] = useState(crop || null)  // {x,y,w,h} in CSS px over video element
   const dragRef = useRef(null)
 
-  // Drive video URL (authenticated) — diretto a Google, evita il doppio hop del proxy
-  const videoSrc = directDriveMediaUrl(file.id, auth.accessToken)
+  // Drive video URL (authenticated)
+  const videoSrc = `/api/proxy-video?id=${file.id}&token=${encodeURIComponent(auth.accessToken)}`
 
   useEffect(() => {
     const v = videoRef.current
