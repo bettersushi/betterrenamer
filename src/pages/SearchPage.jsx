@@ -402,6 +402,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [uploadQueue, setUploadQueue] = useState([]) // { id, name, progress, status: 'uploading'|'done'|'error', error }
   const [isDraggingFilesOver, setIsDraggingFilesOver] = useState(false)
   const uploadQueueRef = useRef(uploadQueue)
+  const activeFolderIdRef = useRef(activeFolderId)
   const uploadInputRef = useRef(null)
   const [movingFolder, setMovingFolder] = useState(null)
   const [movePhoto, setMovePhoto] = useState(null)
@@ -444,6 +445,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   }, [])
 
   useEffect(() => { uploadQueueRef.current = uploadQueue }, [uploadQueue])
+  useEffect(() => { activeFolderIdRef.current = activeFolderId }, [activeFolderId])
 
   const toggleSelection = useCallback((photoId) => {
     setSelectedIds(prev => {
@@ -741,6 +743,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   }, [auth.accessToken])
 
   const startUpload = useCallback((item) => {
+    const targetFolderId = activeFolderId
     setUploadQueue(q => q.map(x => x.id === item.id ? { ...x, status: 'uploading', progress: 0, error: null } : x))
     uploadFileResumable(auth.accessToken, item.file, activeFolderId, {
       onProgress: (sent, total) => {
@@ -748,7 +751,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
       },
     }).then(newFile => {
       setUploadQueue(q => q.map(x => x.id === item.id ? { ...x, status: 'done', progress: 1 } : x))
-      if (newFile) setAllPhotos(photos => [newFile, ...photos])
+      if (newFile && targetFolderId === activeFolderIdRef.current) setAllPhotos(photos => [newFile, ...photos])
       setTimeout(() => {
         setUploadQueue(q => q.filter(x => x.id !== item.id))
       }, 3000)
@@ -758,7 +761,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   }, [auth.accessToken, activeFolderId])
 
   const enqueueUploads = useCallback((fileList) => {
-    const files = Array.from(fileList).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'))
+    const files = Array.from(fileList).filter(f => (f.type.startsWith('image/') || f.type.startsWith('video/')) && f.size > 0)
     if (files.length === 0) return
     const items = files.map(file => ({
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
