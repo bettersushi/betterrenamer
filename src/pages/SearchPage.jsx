@@ -1564,8 +1564,13 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                         </div>
                         <div className="list-cell list-cell-name" style={{ width: columnWidth(LIST_COLUMNS[1]) }}>{f.name}</div>
                         {listColumnsVisible.size && (
-                          <div className="list-cell list-cell-size" style={{ width: columnWidth(LIST_COLUMNS[2]) }}>
-                            {typeof folderFileCounts[f.id] === 'number' ? `${folderFileCounts[f.id]} file` : '—'}
+                          <div className="list-cell list-cell-size" style={{ width: columnWidth(LIST_COLUMNS[2]), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                            {typeof folderFileCounts[f.id] === 'number' ? (
+                              <>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6, flexShrink: 0 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                {folderFileCounts[f.id]}
+                              </>
+                            ) : '—'}
                           </div>
                         )}
                         {listColumnsVisible.ext && (
