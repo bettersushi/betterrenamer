@@ -1,7 +1,5 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './QuickLookModal.css'
-
-const VidstackVideoPlayer = lazy(() => import('./VidstackVideoPlayer'))
 
 function computeMasonryCols() {
   if (typeof window === 'undefined') return 3
@@ -112,21 +110,22 @@ function FilePreview({ file, token }) {
           />
         )}
         {!ready && <div style={{ position: 'relative', zIndex: 1 }}><Spinner /></div>}
-        <Suspense fallback={null}>
-          <VidstackVideoPlayer
-            src={vidSrc(file, token)}
-            type={file.mimeType && file.mimeType.includes('video') ? file.mimeType : 'video/mp4'}
-            poster={thumb}
-            autoPlay
-            onCanPlay={() => setReady(true)}
-            onAspectRatio={setRealAspectRatio}
-            style={{
-              maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, background: '#111',
-              display: ready ? 'block' : 'none', position: 'relative', zIndex: 1,
-              ...(aspectRatio ? { aspectRatio } : {}),
-            }}
-          />
-        </Suspense>
+        <video
+          key={file.id}
+          src={vidSrc(file, token)}
+          controls
+          autoPlay
+          onLoadedMetadata={e => {
+            const v = e.currentTarget
+            if (v.videoWidth && v.videoHeight) setRealAspectRatio(`${v.videoWidth} / ${v.videoHeight}`)
+          }}
+          onCanPlay={() => setReady(true)}
+          style={{
+            maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, background: '#111',
+            display: ready ? 'block' : 'none', position: 'relative', zIndex: 1,
+            ...(aspectRatio ? { aspectRatio } : {}),
+          }}
+        />
       </div>
     )
   }
@@ -247,11 +246,6 @@ export default function QuickLookModal({ files, auth, onClose, onPrev, onNext, c
   const goNext = isGridFocused ? () => setFocusedIndex(i => Math.min(files.length - 1, i + 1)) : onNext
 
   useEffect(() => { setFocusedIndex(null) }, [files])
-
-  // Prefetch il chunk Vidstack appena si apre il modale, cosi' non paghiamo
-  // il costo di download+parse del player proprio nel momento in cui l'utente
-  // clicca play su un video (es. mentre sfoglia la griglia masonry).
-  useEffect(() => { import('./VidstackVideoPlayer') }, [])
 
   useEffect(() => {
     const handler = (e) => {
