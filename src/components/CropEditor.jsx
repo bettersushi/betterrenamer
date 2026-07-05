@@ -44,6 +44,14 @@ export function getCursor(id) {
   return 'move'
 }
 
+// Minimum scale to rotate a W x H rect by angleDeg around its center and still
+// fully cover the original W x H bounds, for any angle in [-180, 180].
+function coverScale(W, H, angleDeg) {
+  const t = angleDeg * Math.PI / 180
+  const c = Math.abs(Math.cos(t)), s = Math.abs(Math.sin(t))
+  return Math.max((W * c + H * s) / W, (H * c + W * s) / H)
+}
+
 const CropEditor = forwardRef(function CropEditor({ photo, maxWidth = 1100, maxHeight = 760, compact = false }, ref) {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
@@ -53,19 +61,22 @@ const CropEditor = forwardRef(function CropEditor({ photo, maxWidth = 1100, maxH
   const [rect, setRect] = useState(null)      // in canvas pixels
   const [cssRect, setCssRect] = useState(null) // in CSS pixels (for overlay)
   const [activeRatio, setActiveRatio] = useState(null)
+  const [angle, setAngle] = useState(0) // straighten angle in degrees, -180..180
   const dragState = useRef(null)
   const canvasDims = useRef({ w: 0, h: 0 })
   const activeRatioRef = useRef(null)
   const rectRef = useRef(null)
+  const angleRef = useRef(0)
 
   useEffect(() => { activeRatioRef.current = activeRatio }, [activeRatio])
   useEffect(() => { rectRef.current = rect }, [rect])
+  useEffect(() => { angleRef.current = angle }, [angle])
 
   // Load image
   useEffect(() => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
-    img.onload = () => { imgRef.current = img; setImgLoaded(true) }
+    img.onload = () => { imgRef.current = img; setImgLoaded(true); setAngle(0) }
     img.onerror = () => setImgError(true)
     img.src = `/api/proxy-image?url=${encodeURIComponent(getLargeThumbUrl(photo.thumbnailLink, 1600))}`
   }, [photo.thumbnailLink])
@@ -86,6 +97,7 @@ const CropEditor = forwardRef(function CropEditor({ photo, maxWidth = 1100, maxH
     const margin = compact ? Math.max(6, Math.round(cw * 0.04)) : 20
     const initialRect = { x: margin, y: margin, w: cw - margin * 2, h: ch - margin * 2 }
     setRect(initialRect)
+    setAngle(0)
   }, [imgLoaded, maxWidth, maxHeight, compact])
 
   // Compute cssRect whenever rect changes (for overlay positioning)
@@ -113,7 +125,12 @@ const CropEditor = forwardRef(function CropEditor({ photo, maxWidth = 1100, maxH
     const { x, y, w, h } = rect
 
     ctx.clearRect(0, 0, cw, ch)
-    ctx.drawImage(img, 0, 0, cw, ch)
+    ctx.save()
+    ctx.translate(cw / 2, ch / 2)
+    ctx.rotate(angle * Math.PI / 180)
+    const rs = coverScale(cw, ch, angle)
+    ctx.drawImage(img, -cw * rs / 2, -ch * rs / 2, cw * rs, ch * rs)
+    ctx.restore()
 
     // Darken outside crop
     ctx.fillStyle = 'rgba(0,0,0,0.52)'
@@ -136,7 +153,7 @@ const CropEditor = forwardRef(function CropEditor({ photo, maxWidth = 1100, maxH
     ctx.strokeRect(x, y, w, h)
 
     syncCssRect()
-  }, [imgLoaded, rect, activeRatio, syncCssRect, compact])
+  }, [imgLoaded, rect, activeRatio, syncCssRect, compact, angle])
 
   const clampRect = useCallback((r) => {
     const { w: cw, h: ch } = canvasDims.current
@@ -289,11 +306,21 @@ const CropEditor = forwardRef(function CropEditor({ photo, maxWidth = 1100, maxH
       const r = rectRef.current
       const img = imgRef.current
       const { w: cw, h: ch } = canvasDims.current
-      const scaleX = img.naturalWidth / cw
-      const scaleY = img.naturalHeight / ch
+      const nw = img.naturalWidth, nh = img.naturalHeight
+      const scaleX = nw / cw
+      const scaleY = nh / ch
+
+      const a = angleRef.current
+      const rotated = new OffscreenCanvas(nw, nh)
+      const rctx = rotated.getContext('2d')
+      rctx.translate(nw / 2, nh / 2)
+      rctx.rotate(a * Math.PI / 180)
+      const rs = coverScale(nw, nh, a)
+      rctx.drawImage(img, -nw * rs / 2, -nh * rs / 2, nw * rs, nh * rs)
+
       const offscreen = new OffscreenCanvas(Math.round(r.w * scaleX), Math.round(r.h * scaleY))
       const ctx2 = offscreen.getContext('2d')
-      ctx2.drawImage(img, r.x * scaleX, r.y * scaleY, r.w * scaleX, r.h * scaleY, 0, 0, offscreen.width, offscreen.height)
+      ctx2.drawImage(rotated, r.x * scaleX, r.y * scaleY, r.w * scaleX, r.h * scaleY, 0, 0, offscreen.width, offscreen.height)
       return offscreen.convertToBlob({ type: 'image/jpeg', quality: 0.92 })
     },
     hasImage: () => imgLoaded && !imgError,
@@ -316,6 +343,25 @@ const CropEditor = forwardRef(function CropEditor({ photo, maxWidth = 1100, maxH
             {r.label}
           </button>
         ))}
+      </div>
+
+      {/* Straighten slider */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: compact ? '2px 6px' : '4px 14px', flexShrink: 0 }}>
+        <span style={{ fontSize: compact ? 8 : 10, color: 'var(--text-secondary)', fontWeight: 600 }}>Raddrizza</span>
+        <input
+          type="range" min={-180} max={180} step={0.1} value={angle}
+          onChange={e => setAngle(parseFloat(e.target.value))}
+          style={{ flex: 1, accentColor: 'var(--primary)', height: compact ? 14 : 18 }}
+        />
+        <span style={{ fontSize: compact ? 8 : 10, color: 'var(--text-secondary)', minWidth: compact ? 28 : 34, textAlign: 'right' }}>
+          {angle.toFixed(1)}°
+        </span>
+        <button onClick={() => setAngle(0)} disabled={angle === 0} title="Reset" style={{
+          border: '1px solid var(--border)', borderRadius: 6, background: 'transparent',
+          color: angle === 0 ? 'var(--text-muted)' : 'var(--primary)',
+          fontSize: compact ? 8 : 9, fontWeight: 600, padding: compact ? '2px 4px' : '3px 6px',
+          cursor: angle === 0 ? 'default' : 'pointer',
+        }}>Reset</button>
       </div>
 
       {/* Canvas + overlay */}
