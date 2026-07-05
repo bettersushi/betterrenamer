@@ -21,28 +21,18 @@ export default function LoginPage({ onLogin }) {
 
   return (
     <div className="login-container">
-      <div className="login-card">
-        <div className="login-header">
-          <div className="login-logos">
-            <img src={logoRenamer} alt="" className="login-logo" />
-            <img src={logoSearch} alt="" className="login-logo" />
-          </div>
-        </div>
-
-        {error && <div className="error-message">{error}</div>}
-
-        <div className="login-content">
-          <button onClick={handleGoogleLogin} className="btn-google">
-            Accedi con Google
-          </button>
-        </div>
-
-        <div className="login-footer">
-          <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            v{appVersion}
-          </p>
-        </div>
+      <div className="login-logos">
+        <img src={logoRenamer} alt="" className="login-logo" />
+        <img src={logoSearch} alt="" className="login-logo" />
       </div>
+
+      {error && <div className="error-message">{error}</div>}
+
+      <button onClick={handleGoogleLogin} className="btn-google">
+        Accedi con Google
+      </button>
+
+      <p className="login-version">v{appVersion}</p>
     </div>
   )
 }
