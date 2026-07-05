@@ -12,6 +12,7 @@ import { RenameQueueProvider } from './context/RenameQueueContext'
 import RenameQueuePanel from './components/RenameQueuePanel'
 import { SimilarityProvider } from './context/SimilarityContext'
 import SimilarityBalloonStack from './components/SimilarityBalloonStack'
+import { SearchStateProvider } from './context/SearchStateContext'
 import AppHeaderBrand from './components/AppHeaderBrand'
 import { refreshAccessToken } from './auth'
 import './App.css'
@@ -158,6 +159,7 @@ function App() {
       <VideoMontageProvider auth={auth} onTokenRefresh={handleTokenRefresh}>
       <RenameQueueProvider auth={auth}>
       <SimilarityProvider auth={auth}>
+      <SearchStateProvider auth={auth} onTokenRefresh={handleTokenRefresh}>
         <VideoMontageWizardGuard />
         <AppHeaderBrand />
         <AnimatedRoutes
@@ -173,6 +175,7 @@ function App() {
         <VideoMontageBalloon />
         <RenameQueuePanel />
         <SimilarityBalloonStack />
+      </SearchStateProvider>
       </SimilarityProvider>
       </RenameQueueProvider>
       </VideoMontageProvider>

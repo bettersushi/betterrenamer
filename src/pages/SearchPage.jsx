@@ -16,6 +16,7 @@ import EnhanceModal from '../components/EnhanceModal'
 import VideoMontageModal from '../components/VideoMontageModal'
 import { useVideoMontage } from '../context/VideoMontageContext'
 import { useSimilarity } from '../context/SimilarityContext'
+import { useSearchState } from '../context/SearchStateContext'
 
 import StatusModal from '../components/StatusModal'
 import { MEDIA_EXTENSIONS, VIDEO_EXTENSIONS, getExt, isMediaFile, isVideoFile } from '../mediaTypes'
@@ -220,6 +221,11 @@ const IconFolder = () => (
     <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
   </svg>
 )
+function NavHistoryIcon({ type }) {
+  if (type === 'search') return <IconSearch />
+  if (type === 'folder') return <IconFolder />
+  return <IconSimilar />
+}
 const IconSortName = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <line x1="4" y1="6" x2="14" y2="6"/><line x1="4" y1="12" x2="11" y2="12"/><line x1="4" y1="18" x2="8" y2="18"/>
@@ -354,26 +360,33 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  // Tree state
-  const [treeExpanded, setTreeExpanded] = useState({ root: true })
-  const [treeChildren, setTreeChildren] = useState({})
-  const [treeLoading, setTreeLoading] = useState({})
-  const [treePhotos, setTreePhotos] = useState({})
-  const [activeFolderId, setActiveFolderId] = useState('root')
-  const [activeFolderName, setActiveFolderName] = useState('My Drive')
+  // Persistent across navigation (Dashboard <-> Search) via SearchStateContext
+  const {
+    treeExpanded, treeChildren, treeLoading, treePhotos,
+    setTreeChildren, setTreePhotos, setTreeExpanded, setTreeLoading,
+    activeFolderId, activeFolderName, setActiveFolderId, setActiveFolderName,
+    allPhotos, setAllPhotos, loading,
+    globalQuery, setGlobalQuery, globalResults, setGlobalResults, globalLoading,
+    similarTo, setSimilarTo, similarResults, setSimilarResults,
+    currentSubfolders, setCurrentSubfolders,
+    selectionMode, setSelectionMode, selectedIds, setSelectedIds,
+    mediaFilter, setMediaFilter, sortOrder, setSortOrder, sortDir, setSortDir,
+    showSubfolders, setShowSubfolders,
+    navHistory, viewStack,
+    gridScrollTopRef,
+    fetchFolder,
+    pushView,
+    popView,
+    restoreState,
+    selectFolder: ctxSelectFolder,
+    handleTreeToggle,
+    handleRefreshGrid,
+    handleFolderJump: ctxHandleFolderJump,
+    handleGlobalSearch: ctxHandleGlobalSearch,
+    bootstrap,
+  } = useSearchState()
 
-  // Grid state
-  const [allPhotos, setAllPhotos] = useState([])
-  const [loading, setLoading] = useState(false)
   const [slideshowIdx, setSlideshowIdx] = useState(null)
-
-  // Search & similarity
-  const [globalQuery, setGlobalQuery] = useState('')
-  const [globalResults, setGlobalResults] = useState(null)
-  const [globalLoading, setGlobalLoading] = useState(false)
-  const globalTimerRef = useRef(null)
-  const [similarTo, setSimilarTo] = useState(null)
-  const [similarResults, setSimilarResults] = useState([])
   const { handleSimilarity: ctxHandleSimilarity, handleGlobalSimilarity: ctxHandleGlobalSimilarity, pendingView, consumePendingView } = useSimilarity()
   const [cropPhoto, setCropPhoto] = useState(null)
   const [batchCropPhotos, setBatchCropPhotos] = useState(null)
@@ -388,13 +401,10 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [undoToast, setUndoToast] = useState(null) // { photo, insertIdx, timer }
   const { wizardOpen, wizardMeta, openWizard } = useVideoMontage()
   const [showStatus, setShowStatus] = useState(false)
-  const [mediaFilter, setMediaFilter] = useState('all')
   const [croppingIds, setCroppingIds] = useState(new Set())
   const [cropDoneIds, setCropDoneIds] = useState(new Set())
   const [rotatingIds, setRotatingIds] = useState(new Set())
   const [rotateDoneIds, setRotateDoneIds] = useState(new Set())
-  const [selectionMode, setSelectionMode] = useState(false)
-  const [selectedIds, setSelectedIds] = useState(new Set())
   const [isDraggingPhotos, setIsDraggingPhotos] = useState(false)
   const [renameMode, setRenameMode] = useState(false)
   const [renameDrafts, setRenameDrafts] = useState({})
@@ -402,8 +412,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
   const rubberBand = useRef(null) // { startX, startY, rect: {x,y,w,h} }
   const [rubberRect, setRubberRect] = useState(null) // { x, y, w, h } in px relative to scroll container
-  const [currentSubfolders, setCurrentSubfolders] = useState([])
-  const [showSubfolders, setShowSubfolders] = useState(true)
   const [dragOverFolder, setDragOverFolder] = useState(null)
   const [showHistoryOverflow, setShowHistoryOverflow] = useState(false)
   const [folderTooltip, setFolderTooltip] = useState(null) // { items, x, y }
@@ -417,17 +425,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const gridRef = useRef(null)
   const [thumbSize, setThumbSizeRaw] = useState(() => localStorage.getItem('br_thumb_size') || 'md')
   const setThumbSize = (v) => { setThumbSizeRaw(v); localStorage.setItem('br_thumb_size', v) }
-  const [sortOrder, setSortOrder] = useState('modified')
-  const [sortDir, setSortDir] = useState('desc')
-  const [navHistory, setNavHistory] = useState(() => {
-    try {
-      const saved = localStorage.getItem('br_nav_history')
-      return saved ? JSON.parse(saved).map(e => ({ ...e, Icon: e.type === 'search' ? IconSearch : e.type === 'folder' ? IconFolder : IconSimilar })) : []
-    } catch { return [] }
-  })
-
-  // Universal view history stack
-  const [viewStack, setViewStack] = useState([])
 
   const exitSelectionMode = useCallback(() => {
     setSelectionMode(false)
@@ -507,29 +504,6 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
     return () => window.removeEventListener('mouseup', handleGridMouseUp)
   }, [handleGridMouseUp])
 
-  const saveNavHistory = (entries) => {
-    try {
-      localStorage.setItem('br_nav_history', JSON.stringify(entries.map(({ Icon, snapshot, ...rest }) => rest)))
-    } catch {}
-  }
-
-  const pushView = () => {
-    const snapshot = { activeFolderId, activeFolderName, allPhotos, globalQuery, globalResults, similarTo, similarResults, currentSubfolders }
-    let entry
-    if (similarTo) {
-      entry = { type: 'similarity', label: similarTo.name, key: 'sim:' + similarTo.id, Icon: IconSimilar, snapshot }
-    } else if (globalResults !== null) {
-      entry = { type: 'search', label: globalQuery || 'Ricerca', key: 'q:' + globalQuery, query: globalQuery, Icon: IconSearch, snapshot }
-    } else {
-      entry = { type: 'folder', label: activeFolderName, key: 'f:' + activeFolderId, folderId: activeFolderId, Icon: IconFolder, snapshot }
-    }
-    setNavHistory(h => {
-      const next = [entry, ...h.filter(e => e.key !== entry.key)].slice(0, 10)
-      saveNavHistory(next)
-      return next
-    })
-    setViewStack(s => [...s, snapshot])
-  }
   // Consume a "view results" hand-off from a similarity balloon that may have
   // been triggered/completed while on a different page.
   useEffect(() => {
@@ -543,210 +517,42 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingView])
 
-  const restoreState = (snapshot) => {
-    setActiveFolderId(snapshot.activeFolderId)
-    setActiveFolderName(snapshot.activeFolderName)
-    setAllPhotos(snapshot.allPhotos)
-    setGlobalQuery(snapshot.globalQuery)
-    setGlobalResults(snapshot.globalResults)
-    setSimilarTo(snapshot.similarTo)
-    setSimilarResults(snapshot.similarResults)
-    setCurrentSubfolders(snapshot.currentSubfolders || [])
-  }
-  const popView = () => {
-    setViewStack(s => {
-      const prev = s[s.length - 1]
-      if (!prev) return s
-      restoreState(prev)
-      return s.slice(0, -1)
-    })
-  }
-
-  // ── Folder loading ──────────────────────────────────────────────────────
-  const fetchFolder = useCallback(async (folderId) => {
-    try {
-      const data = await listFiles(auth.accessToken, folderId)
-      const files = data.files || []
-      const subfolders = files.filter(f => f.mimeType === 'application/vnd.google-apps.folder')
-      const photos = files.filter(isMediaFile)
-      return { subfolders, photos }
-    } catch (e) {
-      if (e.status === 401 && onTokenRefresh) {
-        const newToken = await onTokenRefresh()
-        if (newToken) {
-          const data = await listFiles(newToken, folderId)
-          const files = data.files || []
-          return {
-            subfolders: files.filter(f => f.mimeType === 'application/vnd.google-apps.folder'),
-            photos: files.filter(isMediaFile),
-          }
-        }
-      }
-      throw e
-    }
-  }, [auth.accessToken, onTokenRefresh])
-
+  // Thin wrappers: the state/network logic lives in SearchStateContext so it
+  // survives navigating away and back; only the router (URL query params)
+  // and the grid scroll-reset need to stay page-local.
   const selectFolder = useCallback(async (folderId, folderName, pushHistory = true) => {
-    if (pushHistory) pushView()
-    setActiveFolderId(folderId)
-    setActiveFolderName(folderName)
-    setSimilarTo(null); setSimilarResults([])
-    setGlobalResults(null); setGlobalQuery('')
-    // persist in URL
     if (folderId === 'root') setSearchParams({}, { replace: true })
     else setSearchParams({ folder: folderId, name: folderName }, { replace: true })
-
     if (gridRef.current) gridRef.current.scrollTop = 0
-    if (treePhotos[folderId]) {
-      setAllPhotos(treePhotos[folderId])
-      setCurrentSubfolders(treeChildren[folderId] || [])
-      return
-    }
-    setLoading(true)
-    try {
-      const { subfolders, photos } = await fetchFolder(folderId)
-      setTreeChildren(t => ({ ...t, [folderId]: subfolders }))
-      setTreePhotos(t => ({ ...t, [folderId]: photos }))
-      setAllPhotos(photos)
-      setCurrentSubfolders(subfolders)
-    } catch (e) { console.error(e) }
-    finally { setLoading(false) }
-  }, [fetchFolder, treePhotos, treeChildren, pushView, setSearchParams])
-
-  const handleRefreshGrid = useCallback(async () => {
-    if (globalResults !== null) {
-      if (globalQuery.trim()) {
-        setGlobalLoading(true)
-        try {
-          const data = await searchFilesGlobal(auth.accessToken, globalQuery.trim())
-          setGlobalResults(data.files || [])
-        } catch (e) { console.error(e) }
-        finally { setGlobalLoading(false) }
-      }
-      return
-    }
-    if (similarTo) return // similarity results aren't tied to a single folder fetch
-    setLoading(true)
-    try {
-      const { subfolders, photos } = await fetchFolder(activeFolderId)
-      setTreeChildren(t => ({ ...t, [activeFolderId]: subfolders }))
-      setTreePhotos(t => ({ ...t, [activeFolderId]: photos }))
-      setAllPhotos(photos)
-      setCurrentSubfolders(subfolders)
-    } catch (e) { console.error(e) }
-    finally { setLoading(false) }
-  }, [globalResults, globalQuery, similarTo, activeFolderId, fetchFolder, auth.accessToken])
-
-  const handleTreeToggle = useCallback(async (folder, siblingIds = []) => {
-    const id = folder.id
-    const willExpand = !treeExpanded[id]
-    setTreeExpanded(t => {
-      const next = { ...t, [id]: willExpand }
-      // accordion: collapse siblings when expanding
-      if (willExpand) siblingIds.forEach(sid => { if (sid !== id) next[sid] = false })
-      return next
-    })
-    if (willExpand && !treeChildren[id]) {
-      setTreeLoading(t => ({ ...t, [id]: true }))
-      try {
-        const { subfolders, photos } = await fetchFolder(id)
-        setTreeChildren(t => ({ ...t, [id]: subfolders }))
-        setTreePhotos(t => ({ ...t, [id]: photos }))
-      } catch (e) { console.error(e) }
-      finally { setTreeLoading(t => ({ ...t, [id]: false })) }
-    }
-  }, [treeExpanded, treeChildren, fetchFolder])
+    await ctxSelectFolder(folderId, folderName, pushHistory)
+  }, [ctxSelectFolder, setSearchParams])
 
   const handleTreeSelect = useCallback((folder, siblingIds = []) => {
     handleTreeToggle(folder, siblingIds)
     selectFolder(folder.id, folder.name)
   }, [handleTreeToggle, selectFolder])
 
-  // Init: load root + optionally restore folder from URL
+  const handleFolderJump = useCallback((photo) => ctxHandleFolderJump(photo), [ctxHandleFolderJump])
+
+  const handleGlobalSearch = useCallback((q) => {
+    if (gridRef.current) gridRef.current.scrollTop = 0
+    ctxHandleGlobalSearch(q)
+  }, [ctxHandleGlobalSearch])
+
+  // Bootstrap once per app session: load root + optionally restore folder from URL.
+  // Guarded internally so re-entering /search doesn't re-fetch/reset state.
   useEffect(() => {
-    const urlFolder = searchParams.get('folder')
-    const urlName = searchParams.get('name') || 'Cartella'
-    setLoading(true)
-    fetchFolder('root').then(({ subfolders, photos }) => {
-      setTreeChildren(t => ({ ...t, root: subfolders }))
-      setTreePhotos(t => ({ ...t, root: photos }))
-      if (urlFolder) {
-        // restore the folder from URL without pushing to viewStack
-        setActiveFolderId(urlFolder)
-        setActiveFolderName(urlName)
-        return fetchFolder(urlFolder).then(({ subfolders: sf, photos: fp }) => {
-          setTreeChildren(t => ({ ...t, [urlFolder]: sf }))
-          setTreePhotos(t => ({ ...t, [urlFolder]: fp }))
-          setAllPhotos(fp)
-          setCurrentSubfolders(sf)
-        })
-      } else {
-        setAllPhotos(photos)
-        setCurrentSubfolders(subfolders)
-      }
-    }).catch(console.error).finally(() => setLoading(false))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    bootstrap(searchParams.get('folder'), searchParams.get('name') || 'Cartella')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  // ── Folder jump from thumb ──────────────────────────────────────────────
-  const handleFolderJump = async (photo) => {
-    if (!photo.parents?.[0]) return
-    pushView()
-    const folderId = photo.parents[0]
-    // Use cached name if available, otherwise fetch from API
-    let folderName = photo._parentName || null
-    if (!folderName) {
-      try {
-        const params = new URLSearchParams({ fields: 'id,name' })
-        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}?${params}`, {
-          headers: { Authorization: `Bearer ${auth.accessToken}` },
-        })
-        if (res.ok) { const d = await res.json(); folderName = d.name }
-      } catch {}
-    }
-    folderName = folderName || 'Cartella'
-    setActiveFolderId(folderId)
-    setActiveFolderName(folderName)
-    setSimilarTo(null); setSimilarResults([])
-    setGlobalResults(null); setGlobalQuery('')
-
-    if (treePhotos[folderId]) {
-      setAllPhotos(treePhotos[folderId])
-      return
-    }
-    setLoading(true)
-    fetchFolder(folderId).then(({ subfolders, photos }) => {
-      setTreeChildren(t => ({ ...t, [folderId]: subfolders }))
-      setTreePhotos(t => ({ ...t, [folderId]: photos }))
-      setAllPhotos(photos)
-      setCurrentSubfolders(subfolders)
-    }).catch(console.error).finally(() => setLoading(false))
-  }
-
-  // ── Global name search ──────────────────────────────────────────────────
-  const handleGlobalSearch = (q) => {
-    setGlobalQuery(q)
-    clearTimeout(globalTimerRef.current)
-    if (!q.trim()) { setGlobalResults(null); return }
-    setCurrentSubfolders([])
-    globalTimerRef.current = setTimeout(async () => {
-      setGlobalLoading(true)
-      if (gridRef.current) gridRef.current.scrollTop = 0
-      try {
-        const data = await searchFilesGlobal(auth.accessToken, q.trim())
-        const files = data.files || []
-        setGlobalResults(files)
-        // Add history tag after results arrive, with the correct query and snapshot
-        setNavHistory(h => {
-          const snapshot = { activeFolderId, activeFolderName, allPhotos, globalQuery: q, globalResults: files, similarTo: null, similarResults: [] }
-          const entry = { type: 'search', label: q, key: 'q:' + q, query: q, Icon: IconSearch, snapshot }
-          const next = [entry, ...h.filter(e => e.key !== entry.key)].slice(0, 10)
-          saveNavHistory(next)
-          return next
-        })
-      } catch (e) { console.error(e) }
-      finally { setGlobalLoading(false) }
-    }, 500)
-  }
+  // Restore grid scroll position on (re-)mount, persist it on scroll
+  useEffect(() => {
+    if (gridRef.current) gridRef.current.scrollTop = gridScrollTopRef.current
+  }, [gridScrollTopRef])
+  const handleGridScroll = useCallback((e) => {
+    gridScrollTopRef.current = e.currentTarget.scrollTop
+  }, [gridScrollTopRef])
 
   // ── Per-folder similarity ───────────────────────────────────────────────
   const handleRotate = useCallback(async (photo) => {
@@ -1410,7 +1216,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                       handleGlobalSearch(entry.query)
                     }
                   }} title={entry.label}>
-                    <entry.Icon />
+                    <NavHistoryIcon type={entry.type} />
                     <span>{entry.label}</span>
                   </button>
                 ))}
@@ -1441,7 +1247,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                               else if (entry.type === 'folder') selectFolder(entry.folderId, entry.label)
                               else if (entry.type === 'search') handleGlobalSearch(entry.query)
                             }} title={entry.label}>
-                            <entry.Icon />
+                            <NavHistoryIcon type={entry.type} />
                             <span>{entry.label}</span>
                           </button>
                         ))}
@@ -1553,6 +1359,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
               className={`${thumbSize === 'masonry' ? 'search-masonry-scroll' : 'search-grid-scroll'}${isDraggingPhotos ? ' dragging-active' : ''}`}
               onMouseDown={handleGridMouseDown}
               onMouseMove={handleGridMouseMove}
+              onScroll={handleGridScroll}
               style={selectionMode ? { userSelect: 'none', position: 'relative' } : { position: 'relative' }}
             >
               {rubberRect && rubberRect.w > 4 && rubberRect.h > 4 && (
