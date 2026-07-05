@@ -704,8 +704,8 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
                       className={`file-item ${isFolder ? 'folder' : ''} ${isActive ? 'folder-active' : hasActiveJob ? 'folder-has-active-job' : ''}`}
                       style={{
                         fontSize: '13px', padding: 0,
-                        background: isChecked ? 'color-mix(in srgb, var(--primary) 8%, transparent)' : isSelected ? '#eff6ff' : undefined,
-                        borderLeft: isChecked ? '3px solid var(--primary)' : isSelected ? '3px solid #3b82f6' : '3px solid transparent',
+                        background: isChecked ? 'color-mix(in srgb, var(--primary) 8%, transparent)' : isSelected ? 'color-mix(in srgb, var(--primary) 10%, transparent)' : undefined,
+                        borderLeft: isChecked ? '3px solid var(--primary)' : isSelected ? '3px solid var(--primary)' : '3px solid transparent',
                       }}
                       onMouseEnter={!isFolder ? (e) => handleThumbEnter(e, file) : undefined}
                       onMouseMove={!isFolder ? handleThumbMove : undefined}
@@ -742,7 +742,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
               </>
             )}
           </div>
-          <div style={{ fontSize: '11px', color: selectedFiles.length > 0 ? '#3b82f6' : '#bbb', textAlign: 'center', padding: '4px 0' }}>
+          <div style={{ fontSize: '11px', color: selectedFiles.length > 0 ? 'var(--primary)' : 'var(--text-muted)', textAlign: 'center', padding: '4px 0' }}>
             {selectedFiles.length > 0
               ? `${selectedFiles.length} selezionato${selectedFiles.length > 1 ? 'i' : ''} · Spazio per anteprima`
               : 'Click · Cmd+click per più · Spazio anteprima'}
@@ -1255,7 +1255,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
       })()}
 
       {quickLookOpen && (
-        <QuickLookModal files={selectedFiles} onClose={() => setQuickLookOpen(false)} />
+        <QuickLookModal files={selectedFiles} auth={auth} onClose={() => setQuickLookOpen(false)} />
       )}
     </motion.div>
   )
