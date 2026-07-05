@@ -1230,36 +1230,39 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
 
         {/* Sidebar — tree */}
         <div className="search-sidebar">
-          {/* Tree root label */}
-          <div
-            className={`tree-node tree-root${activeFolderId === 'root' ? ' active' : ''}`}
-            onClick={() => selectFolder('root', 'My Drive')}
-          >
-            <span className="tree-label" style={{ fontWeight: 600 }}>My Drive</span>
+          <div className="tree-list">
+            {/* Tree root label */}
+            <div
+              className={`tree-node tree-root${activeFolderId === 'root' ? ' active' : ''}`}
+              onClick={() => selectFolder('root', 'My Drive')}
+            >
+              <span className="tree-folder-icon"><IconFolder /></span>
+              <span className="tree-label" style={{ fontWeight: 600 }}>My Drive</span>
+            </div>
+
+            {/* Tree children of root */}
+            {rootFolders.map(f => (
+              <TreeNodeFull
+                key={f.id}
+                folder={f}
+                depth={1}
+                siblingIds={rootFolders.map(s => s.id)}
+                treeExpanded={treeExpanded}
+                treeChildren={treeChildren}
+                treeLoading={treeLoading}
+                activeId={activeFolderId}
+                onToggle={handleTreeToggle}
+                onSelect={handleTreeSelect}
+                dragOverFolder={dragOverFolder}
+                setDragOverFolder={setDragOverFolder}
+                onDropPhoto={handleDropOnFolder}
+              />
+            ))}
+
+            {treeLoading['root'] && (
+              <div style={{ padding: '10px 16px', fontSize: '12px', color: 'var(--text-muted)' }}>Caricamento...</div>
+            )}
           </div>
-
-          {/* Tree children of root */}
-          {rootFolders.map(f => (
-            <TreeNodeFull
-              key={f.id}
-              folder={f}
-              depth={1}
-              siblingIds={rootFolders.map(s => s.id)}
-              treeExpanded={treeExpanded}
-              treeChildren={treeChildren}
-              treeLoading={treeLoading}
-              activeId={activeFolderId}
-              onToggle={handleTreeToggle}
-              onSelect={handleTreeSelect}
-              dragOverFolder={dragOverFolder}
-              setDragOverFolder={setDragOverFolder}
-              onDropPhoto={handleDropOnFolder}
-            />
-          ))}
-
-          {treeLoading['root'] && (
-            <div style={{ padding: '10px 16px', fontSize: '12px', color: 'var(--text-muted)' }}>Caricamento...</div>
-          )}
         </div>
 
         {/* Main */}
@@ -2046,6 +2049,7 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
         >
           {loading ? <IconSpinner /> : <IconChevronRight />}
         </span>
+        <span className="tree-folder-icon"><IconFolder /></span>
         <span className="tree-label" title={folder.name}>
           {folder.name}
         </span>

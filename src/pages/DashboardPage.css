@@ -5,8 +5,8 @@
 }
 
 .sidebar {
-  width: 30%;
-  min-width: 300px;
+  width: 22%;
+  min-width: 260px;
   flex-shrink: 0;
   overflow-y: auto;
   border-right: 1px solid var(--border);
@@ -77,7 +77,7 @@
 }
 
 .file-item.folder:hover {
-  background: #f9f9f9;
+  background: color-mix(in srgb, var(--border) 60%, transparent);
 }
 
 .file-icon {
