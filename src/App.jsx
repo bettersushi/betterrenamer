@@ -61,7 +61,7 @@ function AnimatedRoutes({ auth, handleLogin, handleLogout, isDark, setIsDark, co
   return (
     <AnimatePresence mode="sync">
       <Routes location={location} key={location.pathname}>
-        <Route path="/login" element={<PageFade><LoginPage onLogin={handleLogin} /></PageFade>} />
+        <Route path="/login" element={<PageFade><LoginPage onLogin={handleLogin} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} /></PageFade>} />
         <Route path="/callback" element={<PageFade><CallbackPage onLogin={handleLogin} /></PageFade>} />
         <Route path="/" element={auth ? <PageFade><DashboardPage auth={auth} onLogout={handleLogout} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} colorScheme={colorScheme} onChangeScheme={handleScheme} onTokenRefresh={handleTokenRefresh} /></PageFade> : <Navigate to="/login" />} />
         <Route path="/logs" element={auth ? <PageFade><LogsPage onLogout={handleLogout} /></PageFade> : <Navigate to="/login" />} />
