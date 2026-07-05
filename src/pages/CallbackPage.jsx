@@ -27,6 +27,8 @@ export default function CallbackPage({ onLogin }) {
           refreshToken: tokenData.refresh_token,
           expiresIn: tokenData.expires_in,
           email: tokenData.email,
+          picture: tokenData.picture,
+          name: tokenData.name,
         })
 
         navigate('/')

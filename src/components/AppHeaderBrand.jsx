@@ -51,7 +51,7 @@ export default function AppHeaderBrand() {
 
   return (
     <div style={{ position: 'fixed', top: 12, left: 24, zIndex: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
-      <div style={{ position: 'relative', overflow: 'hidden', height: 40, display: 'flex', alignItems: 'center' }}>
+      <div style={{ position: 'relative', overflow: 'hidden', height: 40, width: 230, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
         <AnimatePresence mode="sync" custom={direction} initial={false}>
           <motion.div
             key={key}

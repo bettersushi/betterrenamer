@@ -42,6 +42,8 @@ export default async function handler(req, res) {
       refresh_token: data.refresh_token,
       expires_in: data.expires_in,
       email: payload.email,
+      picture: payload.picture,
+      name: payload.name,
     });
   } catch (error) {
     console.error('Exchange token error:', error);

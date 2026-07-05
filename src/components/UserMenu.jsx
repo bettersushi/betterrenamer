@@ -1,8 +1,10 @@
 import { useState } from 'react'
 
-export default function UserMenu({ email, onLogout }) {
+export default function UserMenu({ email, avatarUrl, onLogout }) {
   const [open, setOpen] = useState(false)
+  const [imgError, setImgError] = useState(false)
   const initial = (email || '?')[0].toUpperCase()
+  const showImg = avatarUrl && !imgError
 
   return (
     <div style={{ position: 'relative' }}>
@@ -12,11 +14,14 @@ export default function UserMenu({ email, onLogout }) {
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           width: 34, height: 34, borderRadius: '50%', border: 'none', padding: 0,
-          background: 'var(--primary)', color: 'white', fontSize: 14, fontWeight: 700,
+          overflow: 'hidden',
+          background: showImg ? 'transparent' : 'var(--primary)', color: 'white', fontSize: 14, fontWeight: 700,
           cursor: 'pointer', flexShrink: 0,
         }}
       >
-        {initial}
+        {showImg
+          ? <img src={avatarUrl} alt="" referrerPolicy="no-referrer" onError={() => setImgError(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : initial}
       </button>
       {open && (
         <div
