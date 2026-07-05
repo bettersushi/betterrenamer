@@ -100,8 +100,8 @@ function FilePreview({ file, token }) {
     const aspectRatio = vw && vh ? `${vw} / ${vh}` : undefined
     return (
       <div style={{
-        position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        ...(aspectRatio ? { aspectRatio, maxHeight: 'calc(100vh - 120px)', maxWidth: '100%' } : {}),
+        position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%',
+        ...(aspectRatio ? { aspectRatio, maxHeight: 'calc(100vh - 120px)', maxWidth: '100%' } : { height: 'calc(100vh - 120px)' }),
       }}>
         {!ready && thumb && (
           <img
