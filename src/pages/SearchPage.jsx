@@ -400,6 +400,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [folderContextMenu, setFolderContextMenu] = useState(null) // { folder, x, y }
   const [gridContextMenu, setGridContextMenu] = useState(null) // { x, y }
   const [uploadQueue, setUploadQueue] = useState([]) // { id, name, progress, status: 'uploading'|'done'|'error', error }
+  const [isDraggingFilesOver, setIsDraggingFilesOver] = useState(false)
   const uploadQueueRef = useRef(uploadQueue)
   const uploadInputRef = useRef(null)
   const [movingFolder, setMovingFolder] = useState(null)
@@ -1454,7 +1455,27 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                 e.preventDefault()
                 setGridContextMenu({ x: e.clientX, y: e.clientY })
               }}
-              style={selectionMode ? { userSelect: 'none', position: 'relative' } : { position: 'relative' }}
+              onDragOver={e => {
+                if (!e.dataTransfer.types.includes('Files')) return
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'copy'
+                setIsDraggingFilesOver(true)
+              }}
+              onDragLeave={e => {
+                if (!e.dataTransfer.types.includes('Files')) return
+                if (!e.currentTarget.contains(e.relatedTarget)) setIsDraggingFilesOver(false)
+              }}
+              onDrop={e => {
+                if (!e.dataTransfer.types.includes('Files')) return
+                e.preventDefault()
+                setIsDraggingFilesOver(false)
+                enqueueUploads(e.dataTransfer.files)
+              }}
+              style={{
+                ...(selectionMode ? { userSelect: 'none' } : {}),
+                position: 'relative',
+                ...(isDraggingFilesOver ? { outline: '2px dashed var(--primary)', outlineOffset: -8 } : {}),
+              }}
             >
               {rubberRect && rubberRect.w > 4 && rubberRect.h > 4 && (
                 <div className="rubber-band" style={{ left: rubberRect.x, top: rubberRect.y, width: rubberRect.w, height: rubberRect.h }} />
