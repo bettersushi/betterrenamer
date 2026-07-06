@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRenameQueue } from '../context/RenameQueueContext'
 import { formatETA, jobSubfolders } from '../renameQueueEngine'
 import './RenameQueuePanel.css'
+
+const PANEL_POSITION_KEY = 'br_rename_panel_position'
+const SNAP_TRANSITION = 'left 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
 
 const IconList = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -63,21 +66,90 @@ export default function RenameQueuePanel() {
     startJob, startAll, removeQueued, restartJob, restartAll, clearCompleted,
   } = useRenameQueue()
   const [collapsed, setCollapsed] = useState(false)
+  const [position, setPositionRaw] = useState(() => localStorage.getItem(PANEL_POSITION_KEY) || 'left')
+  const setPosition = (p) => { setPositionRaw(p); localStorage.setItem(PANEL_POSITION_KEY, p) }
+  const panelRef = useRef(null)
+  const [dragLeft, setDragLeft] = useState(null) // px while actively dragging, else null
+  const dragState = useRef(null)
+
+  const onHeaderDown = (e) => {
+    if (e.target.closest('button')) return
+    const panel = panelRef.current
+    if (!panel) return
+    const rect = panel.getBoundingClientRect()
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    dragState.current = { startX: clientX, startLeft: rect.left, currentLeft: rect.left, panelWidth: rect.width, moved: false }
+    setDragLeft(rect.left)
+  }
+
+  useEffect(() => {
+    const onMove = (e) => {
+      const ds = dragState.current
+      if (!ds) return
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX
+      const dx = clientX - ds.startX
+      if (Math.abs(dx) > 5) ds.moved = true
+      ds.currentLeft = ds.startLeft + dx
+      setDragLeft(ds.currentLeft)
+    }
+    const onUp = () => {
+      const ds = dragState.current
+      if (!ds) return
+      dragState.current = null
+      if (!ds.moved) {
+        setDragLeft(null)
+        setCollapsed(c => !c)
+        return
+      }
+      const vw = window.innerWidth
+      const w = ds.panelWidth
+      const center = ds.currentLeft + w / 2
+      const targets = { left: 20 + w / 2, center: vw / 2, right: vw - 20 - w / 2 }
+      let nearest = 'left', best = Infinity
+      for (const [k, v] of Object.entries(targets)) {
+        const d = Math.abs(center - v)
+        if (d < best) { best = d; nearest = k }
+      }
+      setPosition(nearest)
+      setDragLeft(null)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('touchmove', onMove, { passive: true })
+    window.addEventListener('touchend', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('touchmove', onMove)
+      window.removeEventListener('touchend', onUp)
+    }
+  }, [])
 
   if (!queueHasItems) return null
 
+  const positionStyle = dragLeft !== null
+    ? { left: dragLeft, right: 'auto', transform: 'none', transition: 'none' }
+    : {
+        left: position === 'right' ? 'auto' : position === 'center' ? '50%' : 20,
+        right: position === 'right' ? 20 : 'auto',
+        transform: position === 'center' ? 'translateX(-50%)' : 'none',
+        transition: SNAP_TRANSITION,
+      }
+
   return (
-    <div style={{
-      position: 'fixed', bottom: 20, left: 20, zIndex: 3999,
+    <div ref={panelRef} style={{
+      position: 'fixed', bottom: 20, zIndex: 3999,
       width: '36%', maxWidth: 'calc(100vw - 40px)', maxHeight: '70vh',
       display: 'flex', flexDirection: 'column',
       background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14,
       boxShadow: '0 12px 40px rgba(0,0,0,0.35)', overflow: 'hidden',
+      ...positionStyle,
     }}>
-      {/* Header — always visible */}
+      {/* Header — always visible, drag to reposition (left/center/right), click to collapse */}
       <div
-        onClick={() => setCollapsed(c => !c)}
-        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer', flexShrink: 0, borderBottom: collapsed ? 'none' : '1px solid var(--border)' }}
+        onMouseDown={onHeaderDown}
+        onTouchStart={onHeaderDown}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'grab', flexShrink: 0, borderBottom: collapsed ? 'none' : '1px solid var(--border)' }}
       >
         <IconList />
         <strong style={{ fontSize: 13 }}>Coda</strong>
