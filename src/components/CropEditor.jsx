@@ -155,10 +155,20 @@ const CropEditor = forwardRef(function CropEditor({ photo, maxWidth = 1100, maxH
     syncCssRect()
   }, [imgLoaded, rect, activeRatio, syncCssRect, compact, angle])
 
-  const clampRect = useCallback((r) => {
+  const clampRect = useCallback((r, ratio) => {
     const { w: cw, h: ch } = canvasDims.current
-    const w = Math.min(Math.max(20, r.w), cw)
-    const h = Math.min(Math.max(20, r.h), ch)
+    let w = Math.max(20, r.w)
+    let h = Math.max(20, r.h)
+    if (ratio) {
+      // Shrink proportionally on both axes so the locked aspect ratio survives
+      // clamping against the canvas bounds, instead of clamping w/h independently.
+      const scale = Math.min(cw / w, ch / h, 1)
+      w *= scale
+      h *= scale
+    } else {
+      w = Math.min(w, cw)
+      h = Math.min(h, ch)
+    }
     return {
       x: Math.max(0, Math.min(r.x, cw - w)),
       y: Math.max(0, Math.min(r.y, ch - h)),
@@ -182,7 +192,7 @@ const CropEditor = forwardRef(function CropEditor({ photo, maxWidth = 1100, maxH
         if (rh >= ch - 1) rh = ch
         const rx = rw === cw ? 0 : Math.round((cw - rw) / 2)
         const ry = rh === ch ? 0 : Math.round((ch - rh) / 2)
-        return clampRect({ x: rx, y: ry, w: rw, h: rh })
+        return clampRect({ x: rx, y: ry, w: rw, h: rh }, ratio)
       })
     }
   }, [clampRect])
@@ -255,7 +265,7 @@ const CropEditor = forwardRef(function CropEditor({ photo, maxWidth = 1100, maxH
     }
 
     if (ds.type === 'move') {
-      setRect(clampRect({ ...ds.origRect, x: ds.origRect.x + dx, y: ds.origRect.y + dy }))
+      setRect(clampRect({ ...ds.origRect, x: ds.origRect.x + dx, y: ds.origRect.y + dy }, ratio))
       return
     }
 
@@ -274,7 +284,7 @@ const CropEditor = forwardRef(function CropEditor({ photo, maxWidth = 1100, maxH
       const newH = newW / targetR
       if (h === 'tl' || h === 'tr') ry = (ry + rh) - newH
       if (h === 'tl' || h === 'bl') rx = (rx + rw) - newW
-      setRect(clampRect({ x: rx, y: ry, w: newW, h: newH }))
+      setRect(clampRect({ x: rx, y: ry, w: newW, h: newH }, ratio))
       return
     }
 

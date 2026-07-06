@@ -1,5 +1,6 @@
 // src/components/VideoTrimCrop.jsx
 import { useRef, useState, useEffect, useCallback } from 'react'
+import { RATIOS } from './CropEditor'
 import './VideoTrimCrop.css'
 
 function fmt(s) {
@@ -8,7 +9,7 @@ function fmt(s) {
 }
 
 export default function VideoTrimCrop({ clip, auth, onChange }) {
-  const { file, trim, crop } = clip
+  const { file, trim, crop, rotation: initialRotation } = clip
   const videoRef = useRef(null)
   const timelineRef = useRef(null)
   const [duration, setDuration] = useState(0)
@@ -16,6 +17,8 @@ export default function VideoTrimCrop({ clip, auth, onChange }) {
   const [end, setEnd] = useState(trim?.end ?? null)  // null = use full length
   const [cropMode, setCropMode] = useState(!!crop)
   const [cropRect, setCropRect] = useState(crop || null)  // {x,y,w,h} in CSS px over video element
+  const [activeRatio, setActiveRatio] = useState(null)
+  const [rotation, setRotation] = useState(initialRotation || 0)
   const dragRef = useRef(null)
 
   // Drive video URL (authenticated)
@@ -38,9 +41,28 @@ export default function VideoTrimCrop({ clip, auth, onChange }) {
       ...clip,
       trim: duration > 0 ? { start, end: end ?? duration } : null,
       crop: cropMode && cropRect ? { ...cropRect } : null,
+      rotation,
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [start, end, cropMode, cropRect])
+  }, [start, end, cropMode, cropRect, rotation])
+
+  const applyRatio = useCallback((ratio) => {
+    const toggling = activeRatio?.label === ratio.label
+    setActiveRatio(toggling ? null : ratio)
+    if (toggling) return
+    setCropMode(true)
+    const v = videoRef.current
+    if (!v) return
+    const b = v.getBoundingClientRect()
+    const targetR = ratio.w / ratio.h
+    let rw, rh
+    if (b.width / b.height >= targetR) { rh = b.height; rw = rh * targetR }
+    else { rw = b.width; rh = rw / targetR }
+    setCropRect({
+      x: (b.width - rw) / 2, y: (b.height - rh) / 2,
+      w: rw, h: rh, vw: b.width, vh: b.height,
+    })
+  }, [activeRatio])
 
   // Timeline drag
   const startTimelineDrag = useCallback((handle, e) => {
@@ -72,6 +94,7 @@ export default function VideoTrimCrop({ clip, auth, onChange }) {
   const onVideoCropMouseDown = useCallback((e) => {
     if (!cropMode) return
     e.preventDefault()
+    setActiveRatio(null)
     const v = videoRef.current
     const b = v.getBoundingClientRect()
     const sx = e.clientX - b.left, sy = e.clientY - b.top
@@ -142,14 +165,37 @@ export default function VideoTrimCrop({ clip, auth, onChange }) {
         </div>
       </div>
 
+      {/* Rotation */}
+      <div>
+        <div className="vtc-section-label">Rotazione</div>
+        <div className="vtc-toggle-row" style={{ alignItems: 'center' }}>
+          <button className="vtc-toggle-btn" onClick={() => setRotation(r => (r + 270) % 360)} title="Ruota 90° a sinistra">⟲ 90°</button>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 32, textAlign: 'center' }}>{rotation}°</span>
+          <button className="vtc-toggle-btn" onClick={() => setRotation(r => (r + 90) % 360)} title="Ruota 90° a destra">⟳ 90°</button>
+        </div>
+      </div>
+
       {/* Crop toggle */}
       <div>
         <div className="vtc-section-label">Crop spaziale</div>
         <div className="vtc-toggle-row">
-          <button className={`vtc-toggle-btn${!cropMode ? ' active' : ''}`} onClick={() => { setCropMode(false); setCropRect(null) }}>Nessun crop</button>
+          <button className={`vtc-toggle-btn${!cropMode ? ' active' : ''}`} onClick={() => { setCropMode(false); setCropRect(null); setActiveRatio(null) }}>Nessun crop</button>
           <button className={`vtc-toggle-btn${cropMode ? ' active' : ''}`} onClick={() => setCropMode(true)}>Disegna area</button>
         </div>
-        {cropMode && <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>Trascina sull'anteprima per definire l'area da tagliare</p>}
+        {cropMode && (
+          <>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>Trascina sull'anteprima per definire l'area da tagliare, o scegli un formato standard:</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+              {RATIOS.map(r => (
+                <button
+                  key={r.label}
+                  className={`vtc-toggle-btn${activeRatio?.label === r.label ? ' active' : ''}`}
+                  onClick={() => applyRatio(r)}
+                >{r.label}</button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

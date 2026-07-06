@@ -15,6 +15,7 @@ import UploadQueuePanel from '../components/UploadQueuePanel'
 import FolderPickerModal from '../components/FolderPickerModal'
 import CropModal from '../components/CropModal'
 import BatchCropModal from '../components/BatchCropModal'
+import VideoEditModal from '../components/VideoEditModal'
 import EnhanceModal from '../components/EnhanceModal'
 import VideoMontageModal from '../components/VideoMontageModal'
 import { useVideoMontage } from '../context/VideoMontageContext'
@@ -401,6 +402,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [slideshowIdx, setSlideshowIdx] = useState(null)
   const { handleSimilarity: ctxHandleSimilarity, handleGlobalSimilarity: ctxHandleGlobalSimilarity, pendingView, consumePendingView } = useSimilarity()
   const [cropPhoto, setCropPhoto] = useState(null)
+  const [videoEditFile, setVideoEditFile] = useState(null)
   const [batchCropPhotos, setBatchCropPhotos] = useState(null)
   const [enhancePhoto, setEnhancePhoto] = useState(null)
   const [scopePickerPhoto, setScopePickerPhoto] = useState(null)
@@ -1127,13 +1129,16 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
       )}
       {!selectionMode && !renameMode && <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
         <button className="thumb-overlay-btn" title="Vai alla cartella" onClick={() => handleFolderJump(photo)}><IconFolderJump /></button>
-        {photo.thumbnailLink && (
+        {photo.thumbnailLink && !isVideoFile(photo) && (
           <button className="thumb-overlay-btn" title="Crop" onClick={() => setCropPhoto(photo)}><IconCrop /></button>
+        )}
+        {isVideoFile(photo) && (
+          <button className="thumb-overlay-btn" title="Modifica video (crop/ruota)" onClick={() => setVideoEditFile(photo)}><IconCrop /></button>
         )}
         {photo.thumbnailLink && (
           <button className="thumb-overlay-btn" title="Enhance (AI upscale)" onClick={() => setEnhancePhoto(photo)}><IconEnhance /></button>
         )}
-        {photo.thumbnailLink && (
+        {photo.thumbnailLink && !isVideoFile(photo) && (
           <button className="thumb-overlay-btn" title="Ruota 90° sx" onClick={() => handleRotate(photo)}><IconRotateCCW /></button>
         )}
         <button className="thumb-overlay-btn" title="Altre azioni" onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setContextMenu({ photo, idx, x: r.left, y: r.bottom + 4 }) }}><IconDots /></button>
@@ -1827,10 +1832,13 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                     )}
                     {!selectionMode && !renameMode && <div className="thumb-overlay" onClick={e => e.stopPropagation()}>
                       <button className="thumb-overlay-btn" title="Vai alla cartella" onClick={() => handleFolderJump(photo)}><IconFolderJump /></button>
-                      {photo.thumbnailLink && (
+                      {photo.thumbnailLink && !isVideoFile(photo) && (
                         <button className="thumb-overlay-btn" title="Crop" onClick={() => setCropPhoto(photo)}><IconCrop /></button>
                       )}
-                      {photo.thumbnailLink && (
+                      {isVideoFile(photo) && (
+                        <button className="thumb-overlay-btn" title="Modifica video (crop/ruota)" onClick={() => setVideoEditFile(photo)}><IconCrop /></button>
+                      )}
+                      {photo.thumbnailLink && !isVideoFile(photo) && (
                         <button className="thumb-overlay-btn" title="Ruota 90° sx" onClick={() => handleRotate(photo)}><IconRotateCCW /></button>
                       )}
                       <button className="thumb-overlay-btn" title="Altre azioni" onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setContextMenu({ photo, idx, x: r.left, y: r.bottom + 4 }) }}><IconDots /></button>
@@ -1893,7 +1901,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
           onPrev={() => setSlideshowIdx(i => Math.max(0, i - 1))}
           onNext={() => setSlideshowIdx(i => Math.min(results.length - 1, i + 1))}
           onClose={() => setSlideshowIdx(null)}
-          onCrop={() => { setCropPhoto(results[slideshowIdx]); setSlideshowIdx(null) }}
+          onCrop={isVideoFile(results[slideshowIdx]) ? undefined : () => { setCropPhoto(results[slideshowIdx]); setSlideshowIdx(null) }}
           onRename={() => { setRenamePhoto(results[slideshowIdx]); setSlideshowIdx(null) }}
           onDownload={() => handleDownload(results[slideshowIdx])}
           onDelete={() => { handleDelete(results[slideshowIdx]); setSlideshowIdx(null) }}
@@ -2164,6 +2172,17 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                 setCropDoneIds(ids => { const n = new Set(ids); n.delete(photoId); return n })
               }, 1500)
             }, 2500)
+          }}
+        />
+      )}
+
+      {videoEditFile && (
+        <VideoEditModal
+          file={videoEditFile}
+          auth={auth}
+          onClose={() => setVideoEditFile(null)}
+          onSaved={() => {
+            setThumbTimestamps(ts => ({ ...ts, [videoEditFile.id]: Date.now() }))
           }}
         />
       )}
