@@ -69,7 +69,7 @@ export default function RenameQueuePanel() {
   return (
     <div style={{
       position: 'fixed', bottom: 20, left: 20, zIndex: 3999,
-      width: 420, maxWidth: 'calc(100vw - 40px)', maxHeight: '70vh',
+      width: '36%', maxWidth: 'calc(100vw - 40px)', maxHeight: '70vh',
       display: 'flex', flexDirection: 'column',
       background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14,
       boxShadow: '0 12px 40px rgba(0,0,0,0.35)', overflow: 'hidden',
