@@ -33,16 +33,22 @@ export default function VideoEditModal({ file, auth, onClose, onSaved }) {
       await ff.writeFile('in.mp4', await fetchFile(blob))
 
       const filters = []
-      const { crop, rotation, trim } = clip
+      const { crop, rotation, trim, nativeSize } = clip
       if (crop && crop.w > 4 && crop.h > 4) {
-        const scaleX = file.videoMediaMetadata?.width ? file.videoMediaMetadata.width / crop.vw : 1
-        const scaleY = file.videoMediaMetadata?.height ? file.videoMediaMetadata.height / crop.vh : 1
+        // Use the browser-decoded (post-rotation, as-displayed) video dimensions rather than
+        // Drive's videoMediaMetadata, which for phone videos with a rotation matrix often
+        // reports the raw pre-rotation width/height — mismatched with the crop rectangle,
+        // which was drawn against the video element as actually displayed.
+        const nativeW = nativeSize?.w || file.videoMediaMetadata?.width
+        const nativeH = nativeSize?.h || file.videoMediaMetadata?.height
+        const scaleX = nativeW ? nativeW / crop.vw : 1
+        const scaleY = nativeH ? nativeH / crop.vh : 1
         const rawCx = Math.round(crop.x * scaleX)
         const rawCy = Math.round(crop.y * scaleY)
         const rawCw = Math.round(crop.w * scaleX)
         const rawCh = Math.round(crop.h * scaleY)
-        const vidW = file.videoMediaMetadata?.width ?? rawCw
-        const vidH = file.videoMediaMetadata?.height ?? rawCh
+        const vidW = nativeW ?? rawCw
+        const vidH = nativeH ?? rawCh
         const cx = Math.max(0, Math.min(rawCx, vidW - 2))
         const cy = Math.max(0, Math.min(rawCy, vidH - 2))
         const cw = Math.max(2, Math.min(rawCw, vidW - cx))

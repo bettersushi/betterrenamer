@@ -19,6 +19,7 @@ export default function VideoTrimCrop({ clip, auth, onChange }) {
   const [cropRect, setCropRect] = useState(crop || null)  // {x,y,w,h} in CSS px over video element
   const [activeRatio, setActiveRatio] = useState(null)
   const [rotation, setRotation] = useState(initialRotation || 0)
+  const [nativeSize, setNativeSize] = useState(null) // { w, h } as decoded/displayed by the browser (post-rotation)
   const dragRef = useRef(null)
 
   // Drive video URL (authenticated)
@@ -30,6 +31,7 @@ export default function VideoTrimCrop({ clip, auth, onChange }) {
     const onMeta = () => {
       setDuration(v.duration)
       setEnd(e => e ?? v.duration)
+      if (v.videoWidth && v.videoHeight) setNativeSize({ w: v.videoWidth, h: v.videoHeight })
     }
     v.addEventListener('loadedmetadata', onMeta)
     return () => v.removeEventListener('loadedmetadata', onMeta)
@@ -42,9 +44,10 @@ export default function VideoTrimCrop({ clip, auth, onChange }) {
       trim: duration > 0 ? { start, end: end ?? duration } : null,
       crop: cropMode && cropRect ? { ...cropRect } : null,
       rotation,
+      nativeSize,
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [start, end, cropMode, cropRect, rotation])
+  }, [start, end, cropMode, cropRect, rotation, nativeSize])
 
   const applyRatio = useCallback((ratio) => {
     const toggling = activeRatio?.label === ratio.label
