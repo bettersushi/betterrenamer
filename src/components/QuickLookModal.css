@@ -33,6 +33,74 @@
   pointer-events: auto;
 }
 
+.ql-zoom-controls {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+}
+
+.ql-img-wrap:hover .ql-zoom-controls {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ql-zoom-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.12s;
+}
+
+.ql-zoom-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.ql-zoom-btn.active {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.ql-zoom-pct {
+  font-size: 12px;
+  color: white;
+  min-width: 46px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  opacity: 0.85;
+}
+
+.ql-zoom-pct:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.ql-zoom-sep {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.25);
+  margin: 0 2px;
+}
+
 .ql-masonry {
   display: flex;
   gap: 16px;

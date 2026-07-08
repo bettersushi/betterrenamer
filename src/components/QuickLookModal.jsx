@@ -67,6 +67,21 @@ const ICopy = () => (
     <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
   </svg>
 )
+const IZoomIn = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+  </svg>
+)
+const IZoomOut = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/>
+  </svg>
+)
+const IWidthFit = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+  </svg>
+)
 
 const Spinner = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 80, minHeight: 80 }}>
@@ -77,10 +92,34 @@ const Spinner = () => (
   </div>
 )
 
+const ZOOM_STEP = 25
+const ZOOM_MIN = 25
+const ZOOM_MAX = 400
+
 function FilePreview({ file, token }) {
   const [ready, setReady] = useState(false)
   const [realAspectRatio, setRealAspectRatio] = useState(null)
+  const [zoomPct, setZoomPct] = useState(null) // null = "adatta" (fit), altrimenti percentuale della dimensione nativa
+  const [fullWidth, setFullWidth] = useState(false)
+  const [naturalSize, setNaturalSize] = useState(null) // { w, h }
   const thumb = file.thumbnailLink || null
+
+  useEffect(() => {
+    setZoomPct(null)
+    setFullWidth(false)
+    setNaturalSize(null)
+  }, [file.id])
+
+  const zoomIn = () => {
+    setFullWidth(false)
+    setZoomPct(z => Math.min(ZOOM_MAX, (z ?? 100) + ZOOM_STEP))
+  }
+  const zoomOut = () => {
+    setFullWidth(false)
+    setZoomPct(z => Math.max(ZOOM_MIN, (z ?? 100) - ZOOM_STEP))
+  }
+  const resetZoom = () => { setZoomPct(null); setFullWidth(false) }
+  const toggleFullWidth = () => { setFullWidth(fw => !fw); setZoomPct(null) }
 
   if (!token) {
     return (
@@ -130,8 +169,15 @@ function FilePreview({ file, token }) {
     )
   }
 
+  const isZoomed = zoomPct !== null || fullWidth
+  const imgSizeStyle = fullWidth
+    ? { width: '100%', height: 'auto', maxWidth: '100%', maxHeight: 'none', objectFit: 'unset' }
+    : zoomPct !== null && naturalSize
+      ? { width: naturalSize.w * zoomPct / 100, height: naturalSize.h * zoomPct / 100, maxWidth: 'none', maxHeight: 'none', objectFit: 'unset' }
+      : { maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', objectFit: 'contain' }
+
   return (
-    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: 'calc(100vh - 120px)', overflow: 'hidden', borderRadius: 8 }}>
+    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: 'calc(100vh - 120px)', overflow: isZoomed ? 'auto' : 'hidden', borderRadius: 8 }}>
       {/* blur placeholder */}
       {!ready && thumb && (
         <img
@@ -147,15 +193,29 @@ function FilePreview({ file, token }) {
         key={file.id}
         src={imgSrc(file, token)}
         alt={file.name}
-        onLoad={() => setReady(true)}
+        onLoad={e => {
+          setReady(true)
+          setNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
+        }}
         onError={() => setReady(true)}
         style={{
-          maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', borderRadius: 8, objectFit: 'contain',
+          ...imgSizeStyle,
+          borderRadius: 8,
           position: ready ? 'relative' : 'absolute', inset: 0,
           opacity: ready ? 1 : 0,
           transition: 'opacity 0.35s ease',
+          flexShrink: 0,
         }}
       />
+      {ready && (
+        <div className="ql-zoom-controls" onClick={e => e.stopPropagation()}>
+          <button className="ql-zoom-btn" onClick={zoomOut} title="Riduci zoom"><IZoomOut /></button>
+          <span className="ql-zoom-pct" onClick={resetZoom} title="Adatta alla finestra">{zoomPct !== null ? `${zoomPct}%` : 'Adatta'}</span>
+          <button className="ql-zoom-btn" onClick={zoomIn} title="Aumenta zoom"><IZoomIn /></button>
+          <span className="ql-zoom-sep" />
+          <button className={`ql-zoom-btn${fullWidth ? ' active' : ''}`} onClick={toggleFullWidth} title="Larghezza 100%"><IWidthFit /></button>
+        </div>
+      )}
     </div>
   )
 }
