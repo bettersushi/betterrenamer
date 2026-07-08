@@ -121,6 +121,17 @@ function FilePreview({ file, token }) {
   const resetZoom = () => { setZoomPct(null); setFullWidth(false) }
   const toggleFullWidth = () => { setFullWidth(fw => !fw); setZoomPct(null) }
 
+  useEffect(() => {
+    if (isVideo(file)) return
+    const handler = (e) => {
+      if (e.key === 'ArrowUp') { e.preventDefault(); zoomIn() }
+      if (e.key === 'ArrowDown') { e.preventDefault(); zoomOut() }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file.id])
+
   if (!token) {
     return (
       <iframe
@@ -210,7 +221,7 @@ function FilePreview({ file, token }) {
       {ready && (
         <div className="ql-zoom-controls" onClick={e => e.stopPropagation()}>
           <button className="ql-zoom-btn" onClick={zoomOut} title="Riduci zoom"><IZoomOut /></button>
-          <span className="ql-zoom-pct" onClick={resetZoom} title="Adatta alla finestra">{zoomPct !== null ? `${zoomPct}%` : 'Adatta'}</span>
+          <span className="ql-zoom-pct" onClick={resetZoom} title="Adatta alla finestra">{zoomPct !== null ? `${zoomPct}%` : 'Originale'}</span>
           <button className="ql-zoom-btn" onClick={zoomIn} title="Aumenta zoom"><IZoomIn /></button>
           <span className="ql-zoom-sep" />
           <button className={`ql-zoom-btn${fullWidth ? ' active' : ''}`} onClick={toggleFullWidth} title="Larghezza 100%"><IWidthFit /></button>
@@ -364,7 +375,7 @@ export default function QuickLookModal({ files, auth, onClose, onPrev, onNext, c
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>ESC per chiudere{hasNav ? ' · ← → naviga' : ''}</span>
+          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>ESC per chiudere{hasNav ? ' · ← → naviga' : ''}{activeFile && !isVideo(activeFile) ? ' · ↑↓ zoom' : ''}</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'white', fontSize: '20px', cursor: 'pointer', lineHeight: 1, padding: '0 4px' }}>✕</button>
         </div>
       </div>
