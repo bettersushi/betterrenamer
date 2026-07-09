@@ -242,7 +242,7 @@ function FilePreview({ file, token }) {
         <img
           src={thumb}
           alt=""
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, filter: 'blur(6px)', transform: 'scale(1.02)', opacity: 0.5 }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, filter: 'blur(6px)', transform: 'scale(1.02)' }}
         />
       )}
       {/* spinner over placeholder when no thumb */}
@@ -339,7 +339,7 @@ function FilePreviewGrid({ file, token, onClick }) {
         <img
           src={thumb}
           alt=""
-          style={{ width: '100%', display: 'block', filter: 'blur(6px)', transform: 'scale(1.02)', borderRadius: 8, opacity: 0.85 }}
+          style={{ width: '100%', display: 'block', filter: 'blur(6px)', transform: 'scale(1.02)', borderRadius: 8, opacity: 0.5 }}
         />
       )}
       {!ready && !thumb && <Spinner />}
