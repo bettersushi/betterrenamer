@@ -375,7 +375,7 @@ const CropEditor = forwardRef(function CropEditor({ photo, maxWidth = 1100, maxH
       </div>
 
       {/* Canvas + overlay */}
-      <div style={{ flex: 1, overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: compact ? 8 : 20, minHeight: compact ? 100 : 200 }}>
+      <div style={{ flex: 1, overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: compact ? 8 : 60, minHeight: compact ? 100 : 200 }}>
         {imgError ? (
           <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Impossibile caricare l'immagine</div>
         ) : !imgLoaded ? (
