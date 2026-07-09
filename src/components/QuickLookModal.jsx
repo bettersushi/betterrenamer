@@ -236,7 +236,7 @@ function FilePreview({ file, token }) {
         : { maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', objectFit: 'contain' }
 
   return (
-    <div ref={wrapperRef} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: 'calc(100vh - 120px)', overflow: isZoomed ? 'auto' : 'hidden', borderRadius: 8 }}>
+    <div ref={wrapperRef} style={{ position: 'relative', display: 'flex', alignItems: isZoomed ? 'flex-start' : 'center', justifyContent: isZoomed ? 'flex-start' : 'center', width: '100%', height: 'calc(100vh - 120px)', overflow: isZoomed ? 'auto' : 'hidden', borderRadius: 8 }}>
       {/* blur placeholder */}
       {!ready && thumb && (
         <img
