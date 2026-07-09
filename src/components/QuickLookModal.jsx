@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './QuickLookModal.css'
 
 function computeMasonryCols() {
@@ -82,6 +82,11 @@ const IWidthFit = () => (
     <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
   </svg>
 )
+const IWidthAlways = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="3" y1="12" x2="21" y2="12"/><polyline points="7 8 3 12 7 16"/><polyline points="17 8 21 12 17 16"/>
+  </svg>
+)
 
 const Spinner = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 80, minHeight: 80 }}>
@@ -100,26 +105,64 @@ function FilePreview({ file, token }) {
   const [ready, setReady] = useState(false)
   const [realAspectRatio, setRealAspectRatio] = useState(null)
   const [zoomPct, setZoomPct] = useState(null) // null = "adatta" (fit), altrimenti percentuale della dimensione nativa
-  const [fullWidth, setFullWidth] = useState(false)
+  const [fullWidth, setFullWidth] = useState(false) // toggle orientamento-aware (width o height 100%)
+  const [fitWidthForced, setFitWidthForced] = useState(false) // "Adatta": sempre width 100%, ignora orientamento
   const [naturalSize, setNaturalSize] = useState(null) // { w, h }
+  const wrapperRef = useRef(null)
+  const panState = useRef(null)
   const thumb = file.thumbnailLink || null
 
   useEffect(() => {
     setZoomPct(null)
     setFullWidth(false)
+    setFitWidthForced(false)
     setNaturalSize(null)
   }, [file.id])
 
   const zoomIn = () => {
     setFullWidth(false)
+    setFitWidthForced(false)
     setZoomPct(z => Math.min(ZOOM_MAX, (z ?? 100) + ZOOM_STEP))
   }
   const zoomOut = () => {
     setFullWidth(false)
+    setFitWidthForced(false)
     setZoomPct(z => Math.max(ZOOM_MIN, (z ?? 100) - ZOOM_STEP))
   }
-  const resetZoom = () => { setZoomPct(null); setFullWidth(false) }
-  const toggleFullWidth = () => { setFullWidth(fw => !fw); setZoomPct(null) }
+  const resetZoom = () => { setZoomPct(null); setFullWidth(false); setFitWidthForced(false) }
+  const toggleFullWidth = () => { setFullWidth(fw => !fw); setFitWidthForced(false); setZoomPct(null) }
+  const toggleFitWidth = () => { setFitWidthForced(fw => !fw); setFullWidth(false); setZoomPct(null) }
+
+  const onPanStart = (e) => {
+    const wrapper = wrapperRef.current
+    if (!wrapper) return
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    panState.current = { startX: clientX, startY: clientY, startLeft: wrapper.scrollLeft, startTop: wrapper.scrollTop }
+  }
+
+  useEffect(() => {
+    const onMove = (e) => {
+      const ps = panState.current
+      const wrapper = wrapperRef.current
+      if (!ps || !wrapper) return
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY
+      wrapper.scrollLeft = ps.startLeft - (clientX - ps.startX)
+      wrapper.scrollTop = ps.startTop - (clientY - ps.startY)
+    }
+    const onUp = () => { panState.current = null }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('touchmove', onMove, { passive: true })
+    window.addEventListener('touchend', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('touchmove', onMove)
+      window.removeEventListener('touchend', onUp)
+    }
+  }, [])
 
   useEffect(() => {
     if (isVideo(file)) return
@@ -180,21 +223,26 @@ function FilePreview({ file, token }) {
     )
   }
 
-  const isZoomed = zoomPct !== null || fullWidth
-  const imgSizeStyle = fullWidth
+  const isZoomed = zoomPct !== null || fullWidth || fitWidthForced
+  const isPortrait = naturalSize && naturalSize.h > naturalSize.w
+  const imgSizeStyle = fitWidthForced
     ? { width: '100%', height: 'auto', maxWidth: '100%', maxHeight: 'none', objectFit: 'unset' }
-    : zoomPct !== null && naturalSize
-      ? { width: naturalSize.w * zoomPct / 100, height: naturalSize.h * zoomPct / 100, maxWidth: 'none', maxHeight: 'none', objectFit: 'unset' }
-      : { maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', objectFit: 'contain' }
+    : fullWidth
+      ? (isPortrait
+          ? { width: 'auto', height: '100%', maxWidth: 'none', maxHeight: 'none', objectFit: 'unset' }
+          : { width: '100%', height: 'auto', maxWidth: '100%', maxHeight: 'none', objectFit: 'unset' })
+      : zoomPct !== null && naturalSize
+        ? { width: naturalSize.w * zoomPct / 100, height: naturalSize.h * zoomPct / 100, maxWidth: 'none', maxHeight: 'none', objectFit: 'unset' }
+        : { maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', objectFit: 'contain' }
 
   return (
-    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: 'calc(100vh - 120px)', overflow: isZoomed ? 'auto' : 'hidden', borderRadius: 8 }}>
+    <div ref={wrapperRef} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: 'calc(100vh - 120px)', overflow: isZoomed ? 'auto' : 'hidden', borderRadius: 8 }}>
       {/* blur placeholder */}
       {!ready && thumb && (
         <img
           src={thumb}
           alt=""
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, filter: 'blur(6px)', transform: 'scale(1.02)', opacity: 0.85 }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, filter: 'blur(6px)', transform: 'scale(1.02)', opacity: 0.5 }}
         />
       )}
       {/* spinner over placeholder when no thumb */}
@@ -209,6 +257,9 @@ function FilePreview({ file, token }) {
           setNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
         }}
         onError={() => setReady(true)}
+        onMouseDown={isZoomed ? onPanStart : undefined}
+        onTouchStart={isZoomed ? onPanStart : undefined}
+        draggable={false}
         style={{
           ...imgSizeStyle,
           borderRadius: 8,
@@ -216,6 +267,7 @@ function FilePreview({ file, token }) {
           opacity: ready ? 1 : 0,
           transition: 'opacity 0.35s ease',
           flexShrink: 0,
+          cursor: isZoomed ? 'grab' : undefined,
         }}
       />
       {ready && (
@@ -224,7 +276,8 @@ function FilePreview({ file, token }) {
           <span className="ql-zoom-pct" onClick={resetZoom} title="Adatta alla finestra">{zoomPct !== null ? `${zoomPct}%` : 'Originale'}</span>
           <button className="ql-zoom-btn" onClick={zoomIn} title="Aumenta zoom"><IZoomIn /></button>
           <span className="ql-zoom-sep" />
-          <button className={`ql-zoom-btn${fullWidth ? ' active' : ''}`} onClick={toggleFullWidth} title="Larghezza 100%"><IWidthFit /></button>
+          <button className={`ql-zoom-btn${fullWidth ? ' active' : ''}`} onClick={toggleFullWidth} title={isPortrait ? 'Altezza 100%' : 'Larghezza 100%'}><IWidthFit /></button>
+          <button className={`ql-zoom-btn${fitWidthForced ? ' active' : ''}`} onClick={toggleFitWidth} title="Adatta larghezza (sempre 100%)"><IWidthAlways /></button>
         </div>
       )}
     </div>
