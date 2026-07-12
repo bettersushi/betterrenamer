@@ -274,6 +274,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
   }
 
   const loadFolder = async (folderId, token) => {
+    if (folderId === 'multi') return // id sintetico della selezione multi-cartella, non una vera cartella Drive
     setBrowserLoading(true)
     setBrowserError('')
     const accessToken = token || auth.accessToken
@@ -304,7 +305,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
       // navigazione reale, si finge un "files" + checkedFolders sintetico così il flusso
       // di preview esistente (legacy o pattern custom, vedi handleGeneratePreview) le trova.
       setFolderPath([{ id: 'multi', name: `Selezione multipla (${initialFolders.length} cartelle)` }])
-      setFiles(initialFolders)
+      setFiles(initialFolders.map(f => ({ ...f, mimeType: 'application/vnd.google-apps.folder' })))
       setCheckedFolders(new Set(initialFolders.map(f => f.id)))
     } else if (initialFolder) {
       setFolderPath([{ id: 'root', name: 'My Drive' }, initialFolder])
@@ -579,6 +580,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
               <button
                 className="nav-icon-btn"
                 onClick={() => loadFolder(folderPath[folderPath.length - 1].id)}
+                disabled={folderPath[folderPath.length - 1]?.id === 'multi'}
                 title="Ricarica"
               ><IconRefresh /></button>
             </div>
@@ -841,13 +843,13 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
                             <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{item.oldName}</span>
                           </div>
                         </td>
-                        <td style={{ padding: '4px 10px', fontWeight: 500, fontSize: '13px', color: item.skip ? 'var(--text-muted)' : 'var(--success, #16a34a)' }}>
+                        <td style={{ padding: '4px 10px', fontWeight: item.skip ? 400 : 700, fontSize: '13px', color: item.skip ? 'var(--text-muted)' : 'var(--success, #16a34a)' }}>
                           {moveOnly
-                            ? <span style={{ color: 'var(--text-muted)' }}>già ok ✓</span>
+                            ? <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>già ok ✓</span>
                             : item.skip ? 'già ok ✓' : item.newName}
                         </td>
                         {showMoveColumn && (
-                          <td style={{ padding: '4px 10px', fontWeight: 500, fontSize: '13px', color: itemNeedsMove ? 'var(--primary)' : 'var(--text-muted)' }}>
+                          <td style={{ padding: '4px 10px', fontWeight: itemNeedsMove ? 700 : 400, fontSize: '13px', color: itemNeedsMove ? 'var(--primary)' : 'var(--text-muted)' }}>
                             {itemNeedsMove
                               ? <span>→ {item.folderName} {isVideoFile(item.oldName, item.mimeType) ? 'Vid' : 'Gif'}</span>
                               : 'già ok ✓'}
@@ -861,11 +863,16 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
               )}
             </div>
 
-            {preview.length > 0 && (
-              <button onClick={handleAddToQueue} className="btn-primary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexShrink: 0 }}>
-                <IconPlus /> Aggiungi alla coda ({preview.length} file)
-              </button>
-            )}
+            {preview.length > 0 && (() => {
+              const toProcessCount = preview.filter(needsAnyAction).length
+              return (
+                <button onClick={handleAddToQueue} className="btn-primary" disabled={toProcessCount === 0} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexShrink: 0, opacity: toProcessCount === 0 ? 0.5 : 1 }}>
+                  <IconPlus /> Aggiungi alla coda (
+                  <strong style={{ fontWeight: 800, textDecoration: 'underline', textUnderlineOffset: 2 }}>{toProcessCount}</strong>
+                  {toProcessCount !== preview.length && ` su ${preview.length}`} file)
+                </button>
+              )
+            })()}
           </div>
 
         </motion.div>
