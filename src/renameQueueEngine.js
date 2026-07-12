@@ -35,6 +35,14 @@ export function jobSubfolders(job) {
 export function baseFolderName(folderName) {
   return folderName.replace(/ (Vid|Gif)$/, '').replace(/^[-_*]+/, '')
 }
+export function needsMediaMove(item, moveOnly, organizeMedia) {
+  if (!moveOnly && !organizeMedia) return false
+  const isVideo = isVideoFile(item.oldName, item.mimeType)
+  const isGif = getExt(item.oldName) === '.gif'
+  if (!isVideo && !isGif) return false
+  const suffix = isVideo ? 'Vid' : 'Gif'
+  return item.folderName !== `${baseFolderName(item.folderName)} ${suffix}`
+}
 export function generateLegacyName(folderName, fileName, mimeType, counter) {
   const sanitized = baseFolderName(folderName).toLowerCase().replace(/[^a-z0-9]/g, '-')
   const ext = fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : ''
