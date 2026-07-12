@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import './QuickLookModal.css'
 
 function computeMasonryCols() {
@@ -104,65 +105,88 @@ const ZOOM_MAX = 400
 function FilePreview({ file, token }) {
   const [ready, setReady] = useState(false)
   const [realAspectRatio, setRealAspectRatio] = useState(null)
-  const [zoomPct, setZoomPct] = useState(null) // null = "adatta" (fit), altrimenti percentuale della dimensione nativa
-  const [fullWidth, setFullWidth] = useState(false) // toggle orientamento-aware (width o height 100%)
-  const [fitWidthForced, setFitWidthForced] = useState(false) // "Adatta": sempre width 100%, ignora orientamento
   const [naturalSize, setNaturalSize] = useState(null) // { w, h }
-  const wrapperRef = useRef(null)
-  const panState = useRef(null)
+  const [scalePct, setScalePct] = useState(100)
+  const [fitMode, setFitMode] = useState('contain') // 'contain' | 'width' | 'fill' | 'manual'
+  const containerRef = useRef(null)
+  const transformRef = useRef(null)
   const thumb = file.thumbnailLink || null
 
   useEffect(() => {
-    setZoomPct(null)
-    setFullWidth(false)
-    setFitWidthForced(false)
+    setReady(false)
     setNaturalSize(null)
+    setScalePct(100)
+    setFitMode('contain')
   }, [file.id])
 
+  const isPortrait = naturalSize && naturalSize.h > naturalSize.w
+  const computeFitScale = () => {
+    const c = containerRef.current
+    if (!c || !naturalSize) return 1
+    return Math.min(c.clientWidth / naturalSize.w, c.clientHeight / naturalSize.h, 1)
+  }
+  const computeWidthScale = () => {
+    const c = containerRef.current
+    if (!c || !naturalSize) return 1
+    return c.clientWidth / naturalSize.w
+  }
+  const computeHeightScale = () => {
+    const c = containerRef.current
+    if (!c || !naturalSize) return 1
+    return c.clientHeight / naturalSize.h
+  }
+
+  const applyScale = (scale, mode, animationTime = 200) => {
+    const clamped = Math.min(ZOOM_MAX / 100, Math.max(ZOOM_MIN / 100, scale))
+    setFitMode(mode)
+    transformRef.current?.centerView(clamped, animationTime)
+  }
+
   const zoomIn = () => {
-    setFullWidth(false)
-    setFitWidthForced(false)
-    setZoomPct(z => Math.min(ZOOM_MAX, (z ?? 100) + ZOOM_STEP))
+    const cur = transformRef.current?.instance?.transformState?.scale ?? 1
+    applyScale(cur + ZOOM_STEP / 100, 'manual')
   }
   const zoomOut = () => {
-    setFullWidth(false)
-    setFitWidthForced(false)
-    setZoomPct(z => Math.max(ZOOM_MIN, (z ?? 100) - ZOOM_STEP))
+    const cur = transformRef.current?.instance?.transformState?.scale ?? 1
+    applyScale(cur - ZOOM_STEP / 100, 'manual')
   }
-  const resetZoom = () => { setZoomPct(null); setFullWidth(false); setFitWidthForced(false) }
-  const toggleFullWidth = () => { setFullWidth(fw => !fw); setFitWidthForced(false); setZoomPct(null) }
-  const toggleFitWidth = () => { setFitWidthForced(fw => !fw); setFullWidth(false); setZoomPct(null) }
-
-  const onPanStart = (e) => {
-    const wrapper = wrapperRef.current
-    if (!wrapper) return
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY
-    panState.current = { startX: clientX, startY: clientY, startLeft: wrapper.scrollLeft, startTop: wrapper.scrollTop }
+  const resetZoom = () => applyScale(computeFitScale(), 'contain')
+  const toggleFullWidth = () => {
+    if (fitMode === 'fill') { resetZoom(); return }
+    applyScale(isPortrait ? computeHeightScale() : computeWidthScale(), 'fill')
+  }
+  const toggleFitWidth = () => {
+    if (fitMode === 'width') { resetZoom(); return }
+    applyScale(computeWidthScale(), 'width')
   }
 
+  const handleImgLoad = (e) => {
+    setReady(true)
+    setNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
+  }
+
+  // applica il fit "Adatta" iniziale non appena conosciamo la dimensione nativa
   useEffect(() => {
-    const onMove = (e) => {
-      const ps = panState.current
-      const wrapper = wrapperRef.current
-      if (!ps || !wrapper) return
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY
-      wrapper.scrollLeft = ps.startLeft - (clientX - ps.startX)
-      wrapper.scrollTop = ps.startTop - (clientY - ps.startY)
+    if (!naturalSize || !transformRef.current) return
+    applyScale(computeFitScale(), 'contain', 0)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [naturalSize])
+
+  // ricalcola il fit attivo al resize della finestra (non per lo zoom manuale)
+  useEffect(() => {
+    const onResize = () => {
+      if (fitMode === 'manual' || !naturalSize) return
+      const scale = fitMode === 'width'
+        ? computeWidthScale()
+        : fitMode === 'fill'
+          ? (isPortrait ? computeHeightScale() : computeWidthScale())
+          : computeFitScale()
+      transformRef.current?.centerView(scale, 0)
     }
-    const onUp = () => { panState.current = null }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    window.addEventListener('touchmove', onMove, { passive: true })
-    window.addEventListener('touchend', onUp)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-      window.removeEventListener('touchmove', onMove)
-      window.removeEventListener('touchend', onUp)
-    }
-  }, [])
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitMode, isPortrait, naturalSize])
 
   useEffect(() => {
     if (isVideo(file)) return
@@ -223,61 +247,59 @@ function FilePreview({ file, token }) {
     )
   }
 
-  const isZoomed = zoomPct !== null || fullWidth || fitWidthForced
-  const isPortrait = naturalSize && naturalSize.h > naturalSize.w
-  const imgSizeStyle = fitWidthForced
-    ? { width: '100%', height: 'auto', maxWidth: '100%', maxHeight: 'none', objectFit: 'unset' }
-    : fullWidth
-      ? (isPortrait
-          ? { width: 'auto', height: '100%', maxWidth: 'none', maxHeight: 'none', objectFit: 'unset' }
-          : { width: '100%', height: 'auto', maxWidth: '100%', maxHeight: 'none', objectFit: 'unset' })
-      : zoomPct !== null && naturalSize
-        ? { width: naturalSize.w * zoomPct / 100, height: naturalSize.h * zoomPct / 100, maxWidth: 'none', maxHeight: 'none', objectFit: 'unset' }
-        : { maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', objectFit: 'contain' }
-
   return (
-    <div ref={wrapperRef} style={{ position: 'relative', display: 'flex', alignItems: isZoomed ? 'flex-start' : 'center', justifyContent: isZoomed ? 'flex-start' : 'center', width: '100%', height: 'calc(100vh - 120px)', overflow: isZoomed ? 'auto' : 'hidden', borderRadius: 8 }}>
+    <div ref={containerRef} style={{ position: 'relative', width: '100%', height: 'calc(100vh - 120px)', overflow: 'hidden', borderRadius: 8 }}>
       {/* blur placeholder */}
       {!ready && thumb && (
         <img
           src={thumb}
           alt=""
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, filter: 'blur(6px)', transform: 'scale(1.02)' }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, filter: 'blur(6px)', transform: 'scale(1.02)', zIndex: 2 }}
         />
       )}
       {/* spinner over placeholder when no thumb */}
-      {!ready && !thumb && <Spinner />}
-      {/* full-res crossfade in */}
-      <img
+      {!ready && !thumb && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}>
+          <Spinner />
+        </div>
+      )}
+      <TransformWrapper
         key={file.id}
-        src={imgSrc(file, token)}
-        alt={file.name}
-        onLoad={e => {
-          setReady(true)
-          setNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
-        }}
-        onError={() => setReady(true)}
-        onMouseDown={isZoomed ? onPanStart : undefined}
-        onTouchStart={isZoomed ? onPanStart : undefined}
-        draggable={false}
-        style={{
-          ...imgSizeStyle,
-          borderRadius: 8,
-          position: ready ? 'relative' : 'absolute', inset: 0,
-          opacity: ready ? 1 : 0,
-          transition: 'opacity 0.35s ease',
-          flexShrink: 0,
-          cursor: isZoomed ? 'grab' : undefined,
-        }}
-      />
+        ref={transformRef}
+        initialScale={1}
+        minScale={ZOOM_MIN / 100}
+        maxScale={ZOOM_MAX / 100}
+        centerOnInit
+        limitToBounds
+        wheel={{ disabled: true }}
+        doubleClick={{ disabled: true }}
+        onTransformed={(_ref, state) => setScalePct(Math.round(state.scale * 100))}
+      >
+        <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }}>
+          <img
+            src={imgSrc(file, token)}
+            alt={file.name}
+            onLoad={handleImgLoad}
+            onError={() => setReady(true)}
+            draggable={false}
+            style={{
+              display: 'block',
+              borderRadius: 8,
+              opacity: ready ? 1 : 0,
+              transition: 'opacity 0.35s ease',
+              cursor: 'grab',
+            }}
+          />
+        </TransformComponent>
+      </TransformWrapper>
       {ready && (
         <div className="ql-zoom-controls" onClick={e => e.stopPropagation()}>
           <button className="ql-zoom-btn" onClick={zoomOut} title="Riduci zoom"><IZoomOut /></button>
-          <span className="ql-zoom-pct" onClick={resetZoom} title="Adatta alla finestra">{zoomPct !== null ? `${zoomPct}%` : 'Originale'}</span>
+          <span className="ql-zoom-pct" onClick={resetZoom} title="Adatta alla finestra">{fitMode === 'manual' ? `${scalePct}%` : 'Originale'}</span>
           <button className="ql-zoom-btn" onClick={zoomIn} title="Aumenta zoom"><IZoomIn /></button>
           <span className="ql-zoom-sep" />
-          <button className={`ql-zoom-btn${fullWidth ? ' active' : ''}`} onClick={toggleFullWidth} title={isPortrait ? 'Altezza 100%' : 'Larghezza 100%'}><IWidthFit /></button>
-          <button className={`ql-zoom-btn${fitWidthForced ? ' active' : ''}`} onClick={toggleFitWidth} title="Adatta larghezza (sempre 100%)"><IWidthAlways /></button>
+          <button className={`ql-zoom-btn${fitMode === 'fill' ? ' active' : ''}`} onClick={toggleFullWidth} title={isPortrait ? 'Altezza 100%' : 'Larghezza 100%'}><IWidthFit /></button>
+          <button className={`ql-zoom-btn${fitMode === 'width' ? ' active' : ''}`} onClick={toggleFitWidth} title="Adatta larghezza (sempre 100%)"><IWidthAlways /></button>
         </div>
       )}
     </div>
