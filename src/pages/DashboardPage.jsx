@@ -150,9 +150,14 @@ const CbDot = ({ checked, onChange, refProp, id }) => (
   </span>
 )
 
-// embedded/initialFolder/onClose: usati quando questo componente viene montato dentro
-// BetterRenamerModal (da SearchPage) invece che come pagina /  a sé stante.
-export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, colorScheme, onChangeScheme, onTokenRefresh, embedded = false, initialFolder = null, onClose = null }) {
+// embedded/initialFolder/initialFolders/onClose: usati quando questo componente viene
+// montato dentro BetterRenamerModal (da SearchPage) invece che come pagina /  a sé stante.
+// initialFolder = singola cartella (naviga dentro e genera preview su quella).
+// initialFolders = array di cartelle arbitrarie (anche rami diversi dell'albero, da
+// checkbox sidebar in Search): niente navigazione, si "finge" un files/checkedFolders
+// sintetico così il flusso a preview esistente (mode legacy o pattern custom) le processa
+// tutte insieme come se fossero selezionate manualmente.
+export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, colorScheme, onChangeScheme, onTokenRefresh, embedded = false, initialFolder = null, initialFolders = null, onClose = null }) {
   const navigate = useNavigate()
   const [logsOpen, setLogsOpen] = useState(false)
   const [logSessions, setLogSessions] = useState([])
@@ -308,7 +313,14 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
 
   const autoPreviewDone = useRef(false)
   useEffect(() => {
-    if (initialFolder) {
+    if (initialFolders && initialFolders.length > 0) {
+      // Selezione multi-cartella arbitraria (da checkbox sidebar in Search): nessuna
+      // navigazione reale, si finge un "files" + checkedFolders sintetico così il flusso
+      // di preview esistente (legacy o pattern custom, vedi handleGeneratePreview) le trova.
+      setFolderPath([{ id: 'multi', name: `Selezione multipla (${initialFolders.length} cartelle)` }])
+      setFiles(initialFolders)
+      setCheckedFolders(new Set(initialFolders.map(f => f.id)))
+    } else if (initialFolder) {
       setFolderPath([{ id: 'root', name: 'My Drive' }, initialFolder])
       loadFolder(initialFolder.id)
     } else {
@@ -317,6 +329,11 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
   }, [auth.accessToken])
 
   useEffect(() => {
+    if (initialFolders && initialFolders.length > 0 && !autoPreviewDone.current && checkedFolders.size > 0) {
+      autoPreviewDone.current = true
+      handleGeneratePreview()
+      return
+    }
     if (!initialFolder || autoPreviewDone.current || browserLoading) return
     if (folderPath[folderPath.length - 1]?.id !== initialFolder.id) return
     autoPreviewDone.current = true
@@ -469,11 +486,18 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
           }
         }
       } else {
-        const previewList = await buildRenamePreviewForConfig(auth.accessToken, currentFolder, {
+        const patternConfig = {
           pattern, separator, startNumber, padding, customPrefix, customAddSeq, customSeqSeparator,
           recursive: pattern === 'custom-free' && customRecursive,
-        })
-        setPreview(previewList)
+        }
+        if (checkedFolders.size > 0) {
+          const selectedFolders = files.filter(f => checkedFolders.has(f.id))
+          const results = await Promise.all(selectedFolders.map(f => buildRenamePreviewForConfig(auth.accessToken, f, patternConfig)))
+          setPreview(results.flat())
+        } else {
+          const previewList = await buildRenamePreviewForConfig(auth.accessToken, currentFolder, patternConfig)
+          setPreview(previewList)
+        }
       }
     } catch (err) {
       if (err.status === 401 && onTokenRefresh) {

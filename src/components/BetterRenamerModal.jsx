@@ -2,9 +2,11 @@ import DashboardPage from '../pages/DashboardPage'
 
 // Mega-modale che ospita l'intera UI di DashboardPage (rename batch a pattern,
 // coda, spostamento media) come "sotto-app" di Search, invece che come pagina
-// a sé stante. initialFolder, se presente, fa navigare la Dashboard dentro quella
-// cartella e avvia subito la preview (selezione fatta da Search prima di aprire).
-export default function BetterRenamerModal({ auth, onLogout, isDark, onToggleTheme, colorScheme, onChangeScheme, onTokenRefresh, initialFolder = null, onClose }) {
+// a sé stante. initialFolder (singola) fa navigare la Dashboard dentro quella
+// cartella; initialFolders (array, cartelle anche a rami diversi dell'albero,
+// da checkbox sidebar) seleziona tutte insieme senza navigazione. In entrambi
+// i casi la preview parte da sola (selezione fatta da Search prima di aprire).
+export default function BetterRenamerModal({ auth, onLogout, isDark, onToggleTheme, colorScheme, onChangeScheme, onTokenRefresh, initialFolder = null, initialFolders = null, onClose }) {
   return (
     <div style={overlay} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div style={frame}>
@@ -18,6 +20,7 @@ export default function BetterRenamerModal({ auth, onLogout, isDark, onToggleThe
           onTokenRefresh={onTokenRefresh}
           embedded
           initialFolder={initialFolder}
+          initialFolders={initialFolders}
           onClose={onClose}
         />
       </div>

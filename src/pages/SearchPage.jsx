@@ -415,6 +415,17 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [showStats, setShowStats] = useState(false)
   const [contextMenu, setContextMenu] = useState(null) // { photo, idx, x, y }
   const [folderContextMenu, setFolderContextMenu] = useState(null) // { folder, x, y }
+  // Cartelle spuntate nell'albero sidebar per Better Renamer multi-cartella (Map, non Set:
+  // servono id+name, e a differenza di Dashboard qui possono stare su rami diversi dell'albero).
+  const [checkedTreeFolders, setCheckedTreeFolders] = useState(new Map())
+  const toggleTreeFolderCheck = useCallback((folder) => {
+    setCheckedTreeFolders(prev => {
+      const next = new Map(prev)
+      if (next.has(folder.id)) next.delete(folder.id)
+      else next.set(folder.id, { id: folder.id, name: folder.name })
+      return next
+    })
+  }, [])
   const [gridContextMenu, setGridContextMenu] = useState(null) // { x, y }
   const [uploadQueue, setUploadQueue] = useState([]) // { id, name, progress, status: 'uploading'|'done'|'error', error }
   const [isDraggingFilesOver, setIsDraggingFilesOver] = useState(false)
@@ -430,6 +441,32 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [showStatus, setShowStatus] = useState(false)
   const [showRenameMegaModal, setShowRenameMegaModal] = useState(false)
   const [renameMegaModalFolder, setRenameMegaModalFolder] = useState(null)
+  const [renameMegaModalFolders, setRenameMegaModalFolders] = useState(null)
+
+  // Apre Better Renamer su una singola cartella, a meno che questa non faccia parte
+  // di una selezione multi-cartella spuntata in sidebar (checkedTreeFolders) con più
+  // di un elemento — in quel caso usa l'intero set spuntato.
+  const openBetterRenamerForFolder = useCallback((folder) => {
+    if (checkedTreeFolders.size > 1 && checkedTreeFolders.has(folder.id)) {
+      setRenameMegaModalFolders([...checkedTreeFolders.values()])
+      setRenameMegaModalFolder(null)
+    } else {
+      setRenameMegaModalFolder(folder)
+      setRenameMegaModalFolders(null)
+    }
+    setShowRenameMegaModal(true)
+  }, [checkedTreeFolders])
+
+  const openBetterRenamerFromToolbar = useCallback(() => {
+    if (checkedTreeFolders.size > 0) {
+      setRenameMegaModalFolders([...checkedTreeFolders.values()])
+      setRenameMegaModalFolder(null)
+    } else {
+      setRenameMegaModalFolders(null)
+      setRenameMegaModalFolder(activeFolderId && activeFolderId !== 'root' ? { id: activeFolderId, name: activeFolderName } : null)
+    }
+    setShowRenameMegaModal(true)
+  }, [checkedTreeFolders, activeFolderId, activeFolderName])
   const [showBatchOps, setShowBatchOps] = useState(false)
   const [showRules, setShowRules] = useState(false)
   const { enqueueRaw } = useRenameQueue()
@@ -1203,7 +1240,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
       <motion.div variants={fadeItem} className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0, justifyContent: 'flex-end' }}>
         <div className="header-actions">
           <MacroToolsMenu onSelect={(key) => {
-            if (key === 'renamer') { setRenameMegaModalFolder(null); setShowRenameMegaModal(true) }
+            if (key === 'renamer') { setRenameMegaModalFolder(null); setRenameMegaModalFolders(null); setShowRenameMegaModal(true) }
             else if (key === 'batch') setShowBatchOps(true)
             else if (key === 'rules') setShowRules(true)
           }} />
@@ -1250,6 +1287,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                 setDragOverFolder={setDragOverFolder}
                 onDropPhoto={handleDropOnFolder}
                 onContextMenu={(folder, e) => setFolderContextMenu({ folder, x: e.clientX, y: e.clientY })}
+                checkedTreeFolders={checkedTreeFolders}
+                onToggleCheck={toggleTreeFolderCheck}
               />
             ))}
 
@@ -1428,6 +1467,29 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
               {selectionMode && (
                 <span style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600, marginLeft: 2, whiteSpace: 'nowrap' }}>
                   {selectedIds.size > 0 ? `${selectedIds.size} sel.` : 'Seleziona'}
+                </span>
+              )}
+              <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
+              <button
+                onClick={openBetterRenamerFromToolbar}
+                className="thumb-size-btn"
+                title="Better Renamer"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 4V2m0 18v-2M8 12H2m18 0h-2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
+              {checkedTreeFolders.size > 0 && (
+                <span style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600, marginLeft: 2, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {checkedTreeFolders.size} cartell{checkedTreeFolders.size === 1 ? 'a' : 'e'} sel.
+                  <button
+                    onClick={() => setCheckedTreeFolders(new Map())}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0, display: 'flex', alignItems: 'center' }}
+                    title="Svuota selezione cartelle"
+                  >
+                    <IconX />
+                  </button>
                 </span>
               )}
             </div>
@@ -1955,7 +2017,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
             onNewSubfolder: (f) => handleCreateFolder(f.id, f.name),
             onRename: (f) => setRenameFolder(f),
             onMove: (f) => setMovingFolder(f),
-            onBetterRenamer: (f) => { setRenameMegaModalFolder(f); setShowRenameMegaModal(true) },
+            onBetterRenamer: (f) => openBetterRenamerForFolder(f),
             onColor: (f, hexColor) => handleColorFolder(f, hexColor),
             onDelete: async (f) => {
               if (!window.confirm(`Elimina la cartella "${f.name}"?`)) return
@@ -2215,7 +2277,8 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
           auth={auth} onLogout={onLogout} isDark={isDark} onToggleTheme={onToggleTheme}
           colorScheme={colorScheme} onChangeScheme={onChangeScheme} onTokenRefresh={onTokenRefresh}
           initialFolder={renameMegaModalFolder}
-          onClose={() => { setShowRenameMegaModal(false); setRenameMegaModalFolder(null) }}
+          initialFolders={renameMegaModalFolders}
+          onClose={() => { setShowRenameMegaModal(false); setRenameMegaModalFolder(null); setRenameMegaModalFolders(null) }}
         />
       )}
       {showBatchOps && (
@@ -2296,7 +2359,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
 }
 
 // Recursive tree node with full tree state passed as props
-function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildren, treeLoading, activeId, onToggle, onSelect, dragOverFolder, setDragOverFolder, onDropPhoto, onContextMenu }) {
+function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildren, treeLoading, activeId, onToggle, onSelect, dragOverFolder, setDragOverFolder, onDropPhoto, onContextMenu, checkedTreeFolders, onToggleCheck }) {
   const expanded = treeExpanded[folder.id]
   const loading = treeLoading[folder.id]
   const children = treeChildren[folder.id]
@@ -2337,6 +2400,16 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
         }}
         onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(folder, e) }}
       >
+        {onToggleCheck && (
+          <input
+            type="checkbox"
+            checked={checkedTreeFolders?.has(folder.id) || false}
+            onChange={() => onToggleCheck(folder)}
+            onClick={e => e.stopPropagation()}
+            style={{ marginRight: 4, flexShrink: 0, cursor: 'pointer' }}
+            title="Seleziona per Better Renamer"
+          />
+        )}
         <span
           className="tree-chevron"
           style={{
@@ -2368,6 +2441,8 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
           setDragOverFolder={setDragOverFolder}
           onDropPhoto={onDropPhoto}
           onContextMenu={onContextMenu}
+          checkedTreeFolders={checkedTreeFolders}
+          onToggleCheck={onToggleCheck}
         />
       ))}
       {/* skeleton while loading children */}
