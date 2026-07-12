@@ -25,6 +25,7 @@ import { useRenameQueue } from '../context/RenameQueueContext'
 import { useRenameRules } from '../hooks/useRenameRules'
 import MacroToolsMenu from '../components/MacroToolsMenu'
 import BetterRenamerModal from '../components/BetterRenamerModal'
+import CbDot from '../components/CbDot'
 import BatchOpsModal from '../components/BatchOpsModal'
 import RulesModal from '../components/RulesModal'
 
@@ -2401,14 +2402,13 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
         onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(folder, e) }}
       >
         {onToggleCheck && (
-          <input
-            type="checkbox"
-            checked={checkedTreeFolders?.has(folder.id) || false}
-            onChange={() => onToggleCheck(folder)}
-            onClick={e => e.stopPropagation()}
-            style={{ marginRight: 4, flexShrink: 0, cursor: 'pointer' }}
-            title="Seleziona per Better Renamer"
-          />
+          <span onClick={e => e.stopPropagation()} style={{ marginRight: 4, display: 'inline-flex' }}>
+            <CbDot
+              checked={checkedTreeFolders?.has(folder.id) || false}
+              onChange={() => onToggleCheck(folder)}
+              title="Seleziona per Better Renamer"
+            />
+          </span>
         )}
         <span
           className="tree-chevron"
