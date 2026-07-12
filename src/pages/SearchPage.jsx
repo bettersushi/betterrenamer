@@ -1415,7 +1415,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                   </button>
                 )
               })()}
-              <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
+              <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 6px', alignSelf: 'center' }} />
               {currentSubfolders.length > 0 && globalResults === null && similarTo === null && (
                 <button
                   onClick={() => setShowSubfolders(v => !v)}
@@ -1427,40 +1427,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                   </svg>
                 </button>
               )}
-              <button
-                onClick={() => handleCreateFolder(activeFolderId, activeFolderName)}
-                className="thumb-size-btn"
-                title="Nuova cartella qui"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
-                  <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
-                </svg>
-              </button>
-              <input
-                ref={uploadInputRef}
-                type="file"
-                multiple
-                accept="image/*,video/*"
-                style={{ display: 'none' }}
-                onChange={e => { enqueueUploads(e.target.files); e.target.value = '' }}
-              />
-              <button
-                onClick={() => uploadInputRef.current?.click()}
-                className="thumb-size-btn"
-                title="Carica file"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
-              </button>
-              <button
-                onClick={() => { setRenameMode(m => !m); setRenameDrafts({}); setSelectionMode(false); setSelectedIds(new Set()) }}
-                className={`thumb-size-btn${renameMode ? ' active' : ''}`}
-                title={renameMode ? 'Esci dal rename rapido' : 'Rinomina rapido'}
-              >
-                <IconPencilLine />
-              </button>
+              <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 6px', alignSelf: 'center' }} />
               <button
                 onClick={() => { setSelectionMode(m => !m); setSelectedIds(new Set()); setBulkDeleteConfirm(false); setRenameMode(false); setRenameDrafts({}) }}
                 className={`thumb-size-btn${selectionMode ? ' active' : ''}`}
@@ -1473,15 +1440,51 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                   {selectedIds.size > 0 ? `${selectedIds.size} sel.` : 'Seleziona'}
                 </span>
               )}
-              <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px', alignSelf: 'center' }} />
+              <button
+                onClick={() => { setRenameMode(m => !m); setRenameDrafts({}); setSelectionMode(false); setSelectedIds(new Set()) }}
+                className={`thumb-size-btn${renameMode ? ' active' : ''}`}
+                title={renameMode ? 'Esci dal rename rapido' : 'Rinomina rapido'}
+              >
+                <IconPencilLine />
+              </button>
+              <button
+                onClick={() => handleCreateFolder(activeFolderId, activeFolderName)}
+                className="thumb-size-btn"
+                title="Nuova cartella qui"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+                  <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+                </svg>
+              </button>
               <button
                 onClick={openBetterRenamerFromToolbar}
                 className="thumb-size-btn"
                 title="Better Renamer"
+                style={{ border: '1.5px solid var(--primary)', boxShadow: '0 0 0 1.5px var(--primary-dark)' }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M15 4V2m0 18v-2M8 12H2m18 0h-2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
                   <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
+              <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 6px', alignSelf: 'center' }} />
+              <input
+                ref={uploadInputRef}
+                type="file"
+                multiple
+                accept="image/*,video/*"
+                style={{ display: 'none' }}
+                onChange={e => { enqueueUploads(e.target.files); e.target.value = '' }}
+              />
+              <button
+                onClick={() => uploadInputRef.current?.click()}
+                className="thumb-size-btn"
+                title="Carica file"
+                style={{ border: '1.5px solid var(--primary)', boxShadow: '0 0 0 1.5px var(--primary-dark)' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
                 </svg>
               </button>
               {checkedTreeFolders.size > 0 && (
