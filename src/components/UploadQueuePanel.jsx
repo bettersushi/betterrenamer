@@ -26,7 +26,7 @@ export default function UploadQueuePanel({ queue, onRetry, onDismiss }) {
 
   return (
     <div style={{
-      position: 'fixed', bottom: 20, right: 20, zIndex: 3999,
+      position: 'fixed', bottom: 20, right: 20, zIndex: 6000,
       width: 340, maxWidth: 'calc(100vw - 40px)', maxHeight: '60vh',
       display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto',
     }}>

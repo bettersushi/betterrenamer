@@ -138,7 +138,7 @@ export default function RenameQueuePanel() {
 
   return (
     <div ref={panelRef} style={{
-      position: 'fixed', bottom: 20, zIndex: 3999,
+      position: 'fixed', bottom: 20, zIndex: 6000,
       width: '36%', maxWidth: 'calc(100vw - 40px)', maxHeight: '70vh',
       display: 'flex', flexDirection: 'column',
       background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14,

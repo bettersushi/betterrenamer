@@ -16,7 +16,7 @@ export default function VideoMontageBalloon() {
   }[job.status]
 
   return (
-    <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 4000 }}>
+    <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 6000 }}>
       {expanded ? (
         <div style={{ width: 380, maxHeight: '70vh', overflowY: 'auto', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', padding: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>

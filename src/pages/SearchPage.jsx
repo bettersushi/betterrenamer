@@ -1290,6 +1290,9 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                 onContextMenu={(folder, e) => setFolderContextMenu({ folder, x: e.clientX, y: e.clientY })}
                 checkedTreeFolders={checkedTreeFolders}
                 onToggleCheck={toggleTreeFolderCheck}
+                onFolderEnter={handleFolderGridEnter}
+                onFolderMove={handleFolderGridMove}
+                onFolderLeave={handleFolderGridLeave}
               />
             ))}
 
@@ -2360,7 +2363,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
 }
 
 // Recursive tree node with full tree state passed as props
-function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildren, treeLoading, activeId, onToggle, onSelect, dragOverFolder, setDragOverFolder, onDropPhoto, onContextMenu, checkedTreeFolders, onToggleCheck }) {
+function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildren, treeLoading, activeId, onToggle, onSelect, dragOverFolder, setDragOverFolder, onDropPhoto, onContextMenu, checkedTreeFolders, onToggleCheck, onFolderEnter, onFolderMove, onFolderLeave }) {
   const expanded = treeExpanded[folder.id]
   const loading = treeLoading[folder.id]
   const children = treeChildren[folder.id]
@@ -2400,6 +2403,9 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
           onDropPhoto(folder, e.dataTransfer.getData('photoId') || null, e.dataTransfer.getData('folderId') || null)
         }}
         onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(folder, e) }}
+        onMouseEnter={onFolderEnter ? (e => onFolderEnter(e, folder)) : undefined}
+        onMouseMove={onFolderMove}
+        onMouseLeave={onFolderLeave}
       >
         {onToggleCheck && (
           <span onClick={e => e.stopPropagation()} style={{ marginRight: 4, display: 'inline-flex' }}>
@@ -2443,6 +2449,9 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
           onContextMenu={onContextMenu}
           checkedTreeFolders={checkedTreeFolders}
           onToggleCheck={onToggleCheck}
+          onFolderEnter={onFolderEnter}
+          onFolderMove={onFolderMove}
+          onFolderLeave={onFolderLeave}
         />
       ))}
       {/* skeleton while loading children */}
