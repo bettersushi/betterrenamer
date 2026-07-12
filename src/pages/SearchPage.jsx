@@ -1462,7 +1462,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                 onClick={openBetterRenamerFromToolbar}
                 className="thumb-size-btn"
                 title="Better Renamer"
-                style={{ border: '1.5px solid var(--primary)', boxShadow: '0 0 0 1.5px var(--primary-dark)' }}
+                style={{ border: '1px solid color-mix(in srgb, var(--danger) 55%, transparent)', boxShadow: '0 0 6px 1px color-mix(in srgb, var(--danger) 30%, transparent)' }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M15 4V2m0 18v-2M8 12H2m18 0h-2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
@@ -1482,7 +1482,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                 onClick={() => uploadInputRef.current?.click()}
                 className="thumb-size-btn"
                 title="Carica file"
-                style={{ border: '1.5px solid var(--primary)', boxShadow: '0 0 0 1.5px var(--primary-dark)' }}
+                style={{ border: '1px solid color-mix(in srgb, var(--primary) 55%, transparent)', boxShadow: '0 0 6px 1px color-mix(in srgb, var(--primary) 30%, transparent)' }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
