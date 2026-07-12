@@ -24,7 +24,7 @@ import { useSearchState } from '../context/SearchStateContext'
 import { useRenameQueue } from '../context/RenameQueueContext'
 import { useRenameRules } from '../hooks/useRenameRules'
 import MacroToolsMenu from '../components/MacroToolsMenu'
-import RenameMegaModal from '../components/RenameMegaModal'
+import BetterRenamerModal from '../components/BetterRenamerModal'
 import BatchOpsModal from '../components/BatchOpsModal'
 import RulesModal from '../components/RulesModal'
 
@@ -429,6 +429,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const { wizardOpen, wizardMeta, openWizard } = useVideoMontage()
   const [showStatus, setShowStatus] = useState(false)
   const [showRenameMegaModal, setShowRenameMegaModal] = useState(false)
+  const [renameMegaModalFolder, setRenameMegaModalFolder] = useState(null)
   const [showBatchOps, setShowBatchOps] = useState(false)
   const [showRules, setShowRules] = useState(false)
   const { enqueueRaw } = useRenameQueue()
@@ -1202,7 +1203,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
       <motion.div variants={fadeItem} className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0, justifyContent: 'flex-end' }}>
         <div className="header-actions">
           <MacroToolsMenu onSelect={(key) => {
-            if (key === 'renamer') setShowRenameMegaModal(true)
+            if (key === 'renamer') { setRenameMegaModalFolder(null); setShowRenameMegaModal(true) }
             else if (key === 'batch') setShowBatchOps(true)
             else if (key === 'rules') setShowRules(true)
           }} />
@@ -1954,6 +1955,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
             onNewSubfolder: (f) => handleCreateFolder(f.id, f.name),
             onRename: (f) => setRenameFolder(f),
             onMove: (f) => setMovingFolder(f),
+            onBetterRenamer: (f) => { setRenameMegaModalFolder(f); setShowRenameMegaModal(true) },
             onColor: (f, hexColor) => handleColorFolder(f, hexColor),
             onDelete: async (f) => {
               if (!window.confirm(`Elimina la cartella "${f.name}"?`)) return
@@ -2209,7 +2211,12 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
       )}
       {showStatus && <StatusModal auth={auth} onClose={() => setShowStatus(false)} />}
       {showRenameMegaModal && (
-        <RenameMegaModal auth={auth} initialSelection={null} onClose={() => setShowRenameMegaModal(false)} />
+        <BetterRenamerModal
+          auth={auth} onLogout={onLogout} isDark={isDark} onToggleTheme={onToggleTheme}
+          colorScheme={colorScheme} onChangeScheme={onChangeScheme} onTokenRefresh={onTokenRefresh}
+          initialFolder={renameMegaModalFolder}
+          onClose={() => { setShowRenameMegaModal(false); setRenameMegaModalFolder(null) }}
+        />
       )}
       {showBatchOps && (
         <BatchOpsModal

@@ -8,6 +8,7 @@ const IMove = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" 
 const ITrash = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
 const IColor = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 22c-4.4 0-8-2.5-8-7 0-3.6 2.3-6.5 5-8.5"/><path d="M14.5 21.5c1.5-1 3.5-3 3.5-6 0-1-.5-2-1-2.5"/></svg>
 const IBack = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+const IWand = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 4V2m0 18v-2M8 12H2m18 0h-2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/><circle cx="12" cy="12" r="3"/></svg>
 
 export default function FolderContextMenu({ folder, x, y, onClose, actions }) {
   const menuRef = useRef(null)
@@ -104,6 +105,8 @@ export default function FolderContextMenu({ folder, x, y, onClose, actions }) {
             {sep}
             {item(IPencil, 'Rinomina', () => actions.onRename(folder))}
             {item(IMove, 'Sposta in…', () => actions.onMove(folder))}
+            {actions.onBetterRenamer && sep}
+            {actions.onBetterRenamer && item(IWand, 'Better Renamer…', () => actions.onBetterRenamer(folder))}
             <button
               onClick={() => setShowColors(true)}
               style={{

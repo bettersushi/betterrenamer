@@ -150,7 +150,9 @@ const CbDot = ({ checked, onChange, refProp, id }) => (
   </span>
 )
 
-export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, colorScheme, onChangeScheme, onTokenRefresh }) {
+// embedded/initialFolder/onClose: usati quando questo componente viene montato dentro
+// BetterRenamerModal (da SearchPage) invece che come pagina /  a sé stante.
+export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, colorScheme, onChangeScheme, onTokenRefresh, embedded = false, initialFolder = null, onClose = null }) {
   const navigate = useNavigate()
   const [logsOpen, setLogsOpen] = useState(false)
   const [logSessions, setLogSessions] = useState([])
@@ -304,7 +306,22 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
     }
   }
 
-  useEffect(() => { loadFolder('root') }, [auth.accessToken])
+  const autoPreviewDone = useRef(false)
+  useEffect(() => {
+    if (initialFolder) {
+      setFolderPath([{ id: 'root', name: 'My Drive' }, initialFolder])
+      loadFolder(initialFolder.id)
+    } else {
+      loadFolder('root')
+    }
+  }, [auth.accessToken])
+
+  useEffect(() => {
+    if (!initialFolder || autoPreviewDone.current || browserLoading) return
+    if (folderPath[folderPath.length - 1]?.id !== initialFolder.id) return
+    autoPreviewDone.current = true
+    handleGeneratePreview()
+  }, [initialFolder, browserLoading, folderPath]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFolderClick = (folder) => {
     const newPath = [...folderPath, folder]
@@ -479,7 +496,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
   const needsAnyAction = (item) => !item.skip || needsMediaMove(item, moveOnly, organizeMedia)
 
   return (
-    <motion.div variants={staggerContainer} initial="hidden" animate="visible" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+    <motion.div variants={staggerContainer} initial="hidden" animate="visible" style={{ display: 'flex', flexDirection: 'column', height: embedded ? '100%' : '100vh', overflow: 'hidden' }}>
       {lockedByOther && (
         <div style={{ background: '#f59e0b', color: '#000', fontSize: 12, fontWeight: 600, padding: '6px 20px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           ⚠️ Un'altra finestra sta eseguendo un task. I nuovi job verranno messi in attesa fino al termine.
@@ -489,6 +506,11 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
       {/* Header */}
       <motion.div variants={fadeItem} className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0, justifyContent: 'flex-end' }}>
         <div className="header-actions">
+          {embedded && onClose && (
+            <button onClick={onClose} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Chiudi">
+              <IconXSmall />
+            </button>
+          )}
           <button onClick={openLogs} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><IconList /> Logs</button>
           <ObliqueDivider />
           <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Tema">

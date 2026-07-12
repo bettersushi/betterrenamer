@@ -3,10 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { AnimatePresence, motion } from 'framer-motion'
 import LoginPage from './pages/LoginPage'
 import CallbackPage from './pages/CallbackPage'
-import DashboardPage from './pages/DashboardPage'
 import LogsPage from './pages/LogsPage'
 import SearchPage from './pages/SearchPage'
-import DebugRenameMegaModalPage from './pages/DebugRenameMegaModalPage'
 import { VideoMontageProvider, useVideoMontage } from './context/VideoMontageContext'
 import VideoMontageBalloon from './components/VideoMontageBalloon'
 import { RenameQueueProvider } from './context/RenameQueueContext'
@@ -64,11 +62,10 @@ function AnimatedRoutes({ auth, handleLogin, handleLogout, isDark, setIsDark, co
       <Routes location={location} key={location.pathname}>
         <Route path="/login" element={<PageFade><LoginPage onLogin={handleLogin} /></PageFade>} />
         <Route path="/callback" element={<PageFade><CallbackPage onLogin={handleLogin} /></PageFade>} />
-        <Route path="/" element={auth ? <PageFade><DashboardPage auth={auth} onLogout={handleLogout} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} colorScheme={colorScheme} onChangeScheme={handleScheme} onTokenRefresh={handleTokenRefresh} /></PageFade> : <Navigate to="/login" />} />
+        <Route path="/" element={<Navigate to="/search" />} />
         <Route path="/logs" element={auth ? <PageFade><LogsPage onLogout={handleLogout} /></PageFade> : <Navigate to="/login" />} />
-        <Route path="/debug/rename-mega-modal" element={auth ? <PageFade><DebugRenameMegaModalPage auth={auth} /></PageFade> : <Navigate to="/login" />} />
         <Route path="/search" element={auth ? <PageFade><SearchPage auth={auth} onLogout={handleLogout} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} colorScheme={colorScheme} onChangeScheme={handleScheme} onTokenRefresh={handleTokenRefresh} /></PageFade> : <Navigate to="/login" />} />
-        <Route path="*" element={<Navigate to="/" />} />
+        <Route path="*" element={<Navigate to="/search" />} />
       </Routes>
     </AnimatePresence>
   )
