@@ -53,6 +53,15 @@ export const listFiles = async (accessToken, folderId = 'root') => {
   return { files: allFiles }
 };
 
+export const fetchFolderTooltipItems = async (accessToken, folderId) => {
+  const data = await listFiles(accessToken, folderId)
+  return (data.files || [])
+    .filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
+    .sort((a, b) => new Date(b.modifiedTime || b.createdTime) - new Date(a.modifiedTime || a.createdTime))
+    .slice(0, 12)
+    .map(f => ({ name: f.name, thumb: f.thumbnailLink || null }))
+};
+
 const traverseFolder = async (accessToken, folderId, folderName, isRoot, includeRoot, results, onProgress) => {
   const data = await listFiles(accessToken, folderId)
   const allItems = data.files || []

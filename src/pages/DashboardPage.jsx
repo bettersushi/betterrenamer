@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { staggerContainer, fadeItem } from '../motionVariants'
-import { listFiles, listFilesRecursive, renameFile, getFolderAncestors } from '../drive'
+import { listFiles, listFilesRecursive, renameFile, getFolderAncestors, fetchFolderTooltipItems } from '../drive'
 import { getSessions, clearSessions, downloadCSV } from '../logs'
 import QuickLookModal from '../components/QuickLookModal'
 import BatchOpsModal from '../components/BatchOpsModal'
@@ -487,12 +487,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
         if (activeFolderRef.current !== folder.id) return
         let items = folderFileCache.current[folder.id]
         if (!items) {
-          const data = await listFiles(auth.accessToken, folder.id)
-          items = (data.files || [])
-            .filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
-            .sort((a, b) => new Date(b.modifiedTime || b.createdTime) - new Date(a.modifiedTime || a.createdTime))
-            .slice(0, 12)
-            .map(f => ({ name: f.name, thumb: f.thumbnailLink || null }))
+          items = await fetchFolderTooltipItems(auth.accessToken, folder.id)
           folderFileCache.current[folder.id] = items
         }
         if (activeFolderRef.current !== folder.id) return

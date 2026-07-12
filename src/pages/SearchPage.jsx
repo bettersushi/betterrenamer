@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { staggerContainer, fadeItem, staggerContainerFast, slideFadeItem } from '../motionVariants'
-import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata, patchFileMetadata, trashFile, restoreFile, copyFile, moveFile, renameFile, createFolder } from '../drive'
+import { listFiles, searchFilesGlobal, listFilesRecursive, updateFileContent, getFileMetadata, patchFileMetadata, trashFile, restoreFile, copyFile, moveFile, renameFile, createFolder, fetchFolderTooltipItems } from '../drive'
 import QuickLookModal from '../components/QuickLookModal'
 import PalettePicker from '../components/PalettePicker'
 import UserMenu from '../components/UserMenu'
@@ -989,11 +989,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
         if (Date.now() < tooltipSuppressUntilRef.current) return
         let items = folderFileCache.current[folder.id]
         if (!items) {
-          const data = await listFiles(auth.accessToken, folder.id)
-          items = (data.files || [])
-            .filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
-            .slice(0, 12)
-            .map(f => ({ name: f.name, thumb: f.thumbnailLink || null }))
+          items = await fetchFolderTooltipItems(auth.accessToken, folder.id)
           folderFileCache.current[folder.id] = items
         }
         if (activeFolderRef.current !== folder.id) return
