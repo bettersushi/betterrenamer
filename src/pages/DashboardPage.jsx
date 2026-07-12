@@ -354,15 +354,17 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
 
   const handleAddToQueue = () => {
     if (preview.length === 0 || !previewFolder) return
+    const effectiveOrganizeMedia = moveOnly ? true : organizeMedia
+    const toProcess = preview.filter(p => !p.skip || needsMediaMove(p, moveOnly, effectiveOrganizeMedia))
     enqueueJob({
       rootFolderName: previewFolder.name,
       rootFolderId: previewFolder.id,
       mode,
       moveOnly,
-      organizeMedia: moveOnly ? true : organizeMedia,
-      preview: preview.filter(p => !p.skip).map(p => ({ ...p })),
-      skipCount: preview.filter(p => p.skip).length,
-      progress: { current: 0, total: preview.filter(p => !p.skip).length, currentFile: '', phase: '' },
+      organizeMedia: effectiveOrganizeMedia,
+      preview: toProcess.map(p => ({ ...p })),
+      skipCount: preview.length - toProcess.length,
+      progress: { current: 0, total: toProcess.length, currentFile: '', phase: '' },
     })
     setPreview([])
     setPreviewFolder(null)
