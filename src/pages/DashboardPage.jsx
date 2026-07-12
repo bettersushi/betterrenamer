@@ -5,13 +5,12 @@ import { staggerContainer, fadeItem } from '../motionVariants'
 import { listFiles, listFilesRecursive, renameFile, fetchFolderTooltipItems } from '../drive'
 import { getSessions, clearSessions, downloadCSV } from '../logs'
 import QuickLookModal from '../components/QuickLookModal'
-import BatchOpsModal from '../components/BatchOpsModal'
-import RulesModal from '../components/RulesModal'
 import StatusModal from '../components/StatusModal'
 import PalettePicker from '../components/PalettePicker'
 import UserMenu from '../components/UserMenu'
 import ObliqueDivider from '../components/ObliqueDivider'
 import { useRenameQueue } from '../context/RenameQueueContext'
+import { useRenameRules } from '../hooks/useRenameRules'
 import { getExt, isVideoFile, buildLegacyPreview, formatETA, needsMediaMove, buildRenamePreviewForConfig } from '../renameQueueEngine'
 import './DashboardPage.css'
 
@@ -48,12 +47,6 @@ const IconEye = () => (
 const IconSearch = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-  </svg>
-)
-const IconWand = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M15 4V2m0 18v-2M8 12H2m18 0h-2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
-    <circle cx="12" cy="12" r="3"/>
   </svg>
 )
 const IconPlus = () => (
@@ -165,8 +158,6 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
   const [undoneEntries, setUndoneEntries] = useState(new Set())
   const [undoingEntries, setUndoingEntries] = useState(new Set())
 
-  const [showBatchOps, setShowBatchOps] = useState(false)
-  const [showRules, setShowRules] = useState(false)
   const [showStatus, setShowStatus] = useState(false)
 
   const openLogs = () => { setLogSessions(getSessions()); setLogsOpen(true) }
@@ -213,15 +204,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
   const [customSeqSeparator, setCustomSeqSeparator] = useState('-')
   const [customRecursive, setCustomRecursive] = useState(false)
 
-  const [rules, setRules] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('br_rename_rules') || '[]') } catch { return [] }
-  })
-  const persistRules = (next) => {
-    setRules(next)
-    localStorage.setItem('br_rename_rules', JSON.stringify(next))
-  }
-  const [rulesApplying, setRulesApplying] = useState(false)
-  const [rulesApplyMessage, setRulesApplyMessage] = useState('')
+  const { rules, persistRules, rulesApplying, rulesApplyMessage, setRulesApplyMessage, handleApplyRulesNow } = useRenameRules(auth)
   const customPrefixRef = useRef(null)
 
   const insertPlaceholder = (token) => {
@@ -296,47 +279,6 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
     setPreviewFolder(null)
     setCheckedFolders(new Set())
   }
-
-  const handleApplyRulesNow = useCallback(async () => {
-    if (rules.length === 0) return
-    setRulesApplying(true)
-    setRulesApplyMessage('')
-    let queuedCount = 0
-    let errorCount = 0
-    try {
-      for (const rule of rules) {
-        try {
-          const previewList = await buildRenamePreviewForConfig(
-            auth.accessToken,
-            { id: rule.folderId, name: rule.folderName },
-            { ...rule.patternConfig, recursive: rule.recursive }
-          )
-          const toRename = previewList.filter(p => !p.skip)
-          if (toRename.length === 0) continue
-          enqueueRaw({
-            rootFolderName: rule.folderName,
-            rootFolderId: rule.folderId,
-            mode: 'custom',
-            preview: toRename,
-            skipCount: previewList.length - toRename.length,
-            status: 'pending',
-            progress: { current: 0, total: toRename.length, currentFile: '', phase: '' },
-          })
-          queuedCount++
-        } catch (e) {
-          console.error(`Regola "${rule.name}" fallita:`, e)
-          errorCount++
-        }
-      }
-      setRulesApplyMessage(
-        queuedCount === 0 && errorCount === 0
-          ? 'Nessun file da rinominare — tutte le regole sono già rispettate.'
-          : `${queuedCount} regola/e accodata/e${errorCount > 0 ? `, ${errorCount} fallita/e` : ''}.`
-      )
-    } finally {
-      setRulesApplying(false)
-    }
-  }, [rules, auth.accessToken, enqueueRaw])
 
   const loadFolder = async (folderId, token) => {
     setBrowserLoading(true)
@@ -887,55 +829,10 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
             )}
           </div>
 
-          {/* Strumenti */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: '0 0 auto', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Strumenti</h3>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                onClick={() => setShowBatchOps(true)}
-                className="btn-secondary"
-                style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '16px 10px' }}
-              >
-                <IconWand />
-                Operazioni batch
-              </button>
-              <button
-                onClick={() => setShowRules(true)}
-                className="btn-secondary"
-                style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '16px 10px' }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0H5a2 2 0 0 1-2-2v-4m6 6h10a2 2 0 0 0 2-2v-4"/></svg>
-                Regole
-              </button>
-            </div>
-          </div>
         </motion.div>
       </div>
 
       {showStatus && <StatusModal auth={auth} onClose={() => setShowStatus(false)} />}
-      {showBatchOps && (
-        <BatchOpsModal
-          currentFolder={folderPath.length > 1 ? folderPath[folderPath.length - 1] : null}
-          accessToken={auth.accessToken}
-          onClose={() => setShowBatchOps(false)}
-          onAddJob={(job) => {
-            const enriched = { ...job, rootFolderName: job.label, mode: job.scope === 'drive' ? 'Drive' : job.folderName }
-            enqueueRaw(enriched)
-            setShowBatchOps(false)
-          }}
-        />
-      )}
-      {showRules && (
-        <RulesModal
-          rules={rules}
-          accessToken={auth.accessToken}
-          onSave={persistRules}
-          onClose={() => { setShowRules(false); setRulesApplyMessage('') }}
-          onApplyNow={handleApplyRulesNow}
-          applying={rulesApplying}
-          applyMessage={rulesApplyMessage}
-        />
-      )}
       {/* Logs sidebar */}
       {logsOpen && (
         <div onClick={closeLogs} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.33)', zIndex: 3000 }} />

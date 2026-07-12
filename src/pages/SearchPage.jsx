@@ -21,6 +21,12 @@ import VideoMontageModal from '../components/VideoMontageModal'
 import { useVideoMontage } from '../context/VideoMontageContext'
 import { useSimilarity } from '../context/SimilarityContext'
 import { useSearchState } from '../context/SearchStateContext'
+import { useRenameQueue } from '../context/RenameQueueContext'
+import { useRenameRules } from '../hooks/useRenameRules'
+import MacroToolsMenu from '../components/MacroToolsMenu'
+import RenameMegaModal from '../components/RenameMegaModal'
+import BatchOpsModal from '../components/BatchOpsModal'
+import RulesModal from '../components/RulesModal'
 
 import StatusModal from '../components/StatusModal'
 import { MEDIA_EXTENSIONS, VIDEO_EXTENSIONS, getExt, isMediaFile, isVideoFile } from '../mediaTypes'
@@ -422,6 +428,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
   const [undoToast, setUndoToast] = useState(null) // { photo, insertIdx, timer }
   const { wizardOpen, wizardMeta, openWizard } = useVideoMontage()
   const [showStatus, setShowStatus] = useState(false)
+  const [showRenameMegaModal, setShowRenameMegaModal] = useState(false)
+  const [showBatchOps, setShowBatchOps] = useState(false)
+  const [showRules, setShowRules] = useState(false)
+  const { enqueueRaw } = useRenameQueue()
+  const { rules, persistRules, rulesApplying, rulesApplyMessage, setRulesApplyMessage, handleApplyRulesNow } = useRenameRules(auth)
   const [croppingIds, setCroppingIds] = useState(new Set())
   const [cropDoneIds, setCropDoneIds] = useState(new Set())
   const [rotatingIds, setRotatingIds] = useState(new Set())
@@ -1190,6 +1201,11 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
       {/* Header */}
       <motion.div variants={fadeItem} className="header" style={{ padding: '12px 24px', flexShrink: 0, marginBottom: 0, justifyContent: 'flex-end' }}>
         <div className="header-actions">
+          <MacroToolsMenu onSelect={(key) => {
+            if (key === 'renamer') setShowRenameMegaModal(true)
+            else if (key === 'batch') setShowBatchOps(true)
+            else if (key === 'rules') setShowRules(true)
+          }} />
           <button onClick={onToggleTheme} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, padding: 0 }} title="Tema">
             {isDark ? <IconSun /> : <IconMoon />}
           </button>
@@ -2192,6 +2208,32 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
         />
       )}
       {showStatus && <StatusModal auth={auth} onClose={() => setShowStatus(false)} />}
+      {showRenameMegaModal && (
+        <RenameMegaModal auth={auth} initialSelection={null} onClose={() => setShowRenameMegaModal(false)} />
+      )}
+      {showBatchOps && (
+        <BatchOpsModal
+          currentFolder={null}
+          accessToken={auth.accessToken}
+          onClose={() => setShowBatchOps(false)}
+          onAddJob={(job) => {
+            const enriched = { ...job, rootFolderName: job.label, mode: job.scope === 'drive' ? 'Drive' : job.folderName }
+            enqueueRaw(enriched)
+            setShowBatchOps(false)
+          }}
+        />
+      )}
+      {showRules && (
+        <RulesModal
+          rules={rules}
+          accessToken={auth.accessToken}
+          onSave={persistRules}
+          onClose={() => { setShowRules(false); setRulesApplyMessage('') }}
+          onApplyNow={handleApplyRulesNow}
+          applying={rulesApplying}
+          applyMessage={rulesApplyMessage}
+        />
+      )}
 
       {folderTooltip?.items && (() => {
         const margin = 8
