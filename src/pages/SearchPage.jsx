@@ -1457,6 +1457,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
                   <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
                 </svg>
               </button>
+              <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 6px', alignSelf: 'center' }} />
               <button
                 onClick={openBetterRenamerFromToolbar}
                 className="thumb-size-btn"
