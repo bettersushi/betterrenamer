@@ -12,7 +12,7 @@ import PalettePicker from '../components/PalettePicker'
 import UserMenu from '../components/UserMenu'
 import ObliqueDivider from '../components/ObliqueDivider'
 import { useRenameQueue } from '../context/RenameQueueContext'
-import { getExt, isVideoFile, buildLegacyPreview, formatETA } from '../renameQueueEngine'
+import { getExt, isVideoFile, buildLegacyPreview, formatETA, needsMediaMove } from '../renameQueueEngine'
 import './DashboardPage.css'
 
 const PLACEHOLDERS = [
@@ -609,6 +609,9 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
     [...queuedJobs, ...runningJobs, ...pendingJobs].flatMap(j => [j.rootFolderId, ...(j.preview || []).map(p => p.folderId)])
   )
 
+  const showMoveColumn = moveOnly || organizeMedia
+  const needsAnyAction = (item) => !item.skip || needsMediaMove(item, moveOnly, organizeMedia)
+
   return (
     <motion.div variants={staggerContainer} initial="hidden" animate="visible" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       {lockedByOther && (
@@ -914,15 +917,19 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
                     <tr>
                       <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>Cartella</th>
                       <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>Originale</th>
-                      <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>Nuovo nome</th>
+                      <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{showMoveColumn ? 'Rename' : 'Nuovo nome'}</th>
+                      {showMoveColumn && (
+                        <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>Spostamento</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
-                    {[...preview.filter(p => !p.skip), ...preview.filter(p => p.skip)].map((item, idx, arr) => {
-                      const firstSkipIdx = arr.findIndex(p => p.skip)
-                      const isSeparator = firstSkipIdx > 0 && idx === firstSkipIdx
+                    {[...preview.filter(needsAnyAction), ...preview.filter(p => !needsAnyAction(p))].map((item, idx, arr) => {
+                      const firstDoneIdx = arr.findIndex(p => !needsAnyAction(p))
+                      const isSeparator = firstDoneIdx > 0 && idx === firstDoneIdx
+                      const itemNeedsMove = needsMediaMove(item, moveOnly, organizeMedia)
                       return (
-                      <tr key={idx} style={{ borderTop: isSeparator ? '2px dotted var(--primary)' : idx > 0 ? '1px solid var(--border)' : 'none', opacity: item.skip ? 0.45 : 1 }}>
+                      <tr key={idx} style={{ borderTop: isSeparator ? '2px dotted var(--primary)' : idx > 0 ? '1px solid var(--border)' : 'none', opacity: needsAnyAction(item) ? 1 : 0.45 }}>
                         <td style={{ padding: '4px 10px', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontSize: '11px' }}>{item.folderName}</td>
                         <td style={{ padding: '4px 6px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -931,9 +938,16 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
                         </td>
                         <td style={{ padding: '4px 10px', fontWeight: 500, fontSize: '13px', color: item.skip ? 'var(--text-muted)' : 'var(--success, #16a34a)' }}>
                           {moveOnly
-                            ? <span style={{ color: 'var(--primary)' }}>→ {item.folderName} {isVideoFile(item.oldName, item.mimeType) ? 'Vid' : 'Gif'}</span>
+                            ? <span style={{ color: 'var(--text-muted)' }}>già ok ✓</span>
                             : item.skip ? 'già ok ✓' : item.newName}
                         </td>
+                        {showMoveColumn && (
+                          <td style={{ padding: '4px 10px', fontWeight: 500, fontSize: '13px', color: itemNeedsMove ? 'var(--primary)' : 'var(--text-muted)' }}>
+                            {itemNeedsMove
+                              ? <span>→ {item.folderName} {isVideoFile(item.oldName, item.mimeType) ? 'Vid' : 'Gif'}</span>
+                              : 'già ok ✓'}
+                          </td>
+                        )}
                       </tr>
                       )
                     })}
