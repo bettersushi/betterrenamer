@@ -490,6 +490,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
           const data = await listFiles(auth.accessToken, folder.id)
           items = (data.files || [])
             .filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
+            .sort((a, b) => new Date(b.modifiedTime || b.createdTime) - new Date(a.modifiedTime || a.createdTime))
             .slice(0, 12)
             .map(f => ({ name: f.name, thumb: f.thumbnailLink || null }))
           folderFileCache.current[folder.id] = items
