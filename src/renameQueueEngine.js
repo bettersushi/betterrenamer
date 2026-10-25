@@ -35,7 +35,10 @@ export function jobSubfolders(job) {
   return [...new Set(source.map(p => p.folderName).filter(n => n && n !== job.rootFolderName))]
 }
 export function baseFolderName(folderName) {
-  return folderName.replace(/ (Vid|Gif)$/, '').replace(/^[-_*]+/, '')
+  // Non toglie prefissi come "_"/"-"/"*": il risultato deve corrispondere esattamente
+  // al nome reale della cartella "già a posto" (es. "_IG Vid"), altrimenti il controllo
+  // "è già nella cartella giusta?" fallisce sempre e ne viene creata una annidata in più.
+  return folderName.replace(/ (Vid|Gif)$/, '')
 }
 // Strips every trailing " Vid"/" Gif" token (handles compounded names like "Foo Vid Vid Vid")
 export function splitMediaSuffixChain(folderName) {
