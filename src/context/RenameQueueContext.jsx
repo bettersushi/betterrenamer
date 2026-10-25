@@ -1,9 +1,9 @@
 import { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react'
-import { listFiles, listFilesRecursive, getOrCreateFolder, moveFile, renameFile, listSubfolders, patchFileMetadata } from '../drive'
+import { listFiles, listFilesRecursive, getOrCreateFolder, moveFile, renameFile, listSubfolders, patchFileMetadata, trashFile } from '../drive'
 import { saveSession } from '../logs'
 import {
   MAX_PARALLEL, nextJobId,
-  isVideoFile, getExt, baseFolderName, buildLegacyPreview,
+  isVideoFile, getExt, baseFolderName, splitMediaSuffixChain, buildLegacyPreview,
   TAB_ID, LOCK_KEY, readLock, acquireLock, refreshLock, releaseLock,
 } from '../renameQueueEngine'
 
@@ -142,14 +142,15 @@ export function RenameQueueProvider({ auth, children }) {
     for (const item of moveItems) {
       current++
       const suffix = isVideoFile(item.oldName, item.mimeType) ? 'Vid' : 'Gif'
-      const alreadyInPlace = item.folderName === `${baseFolderName(item.folderName)} ${suffix}`
+      const base = baseFolderName(item.folderName)
+      const alreadyInPlace = item.folderName === `${base} ${suffix}`
       if (alreadyInPlace) {
         entries.push({ type: 'move', oldName: item.oldName, newName: item.newName, folderName: item.folderName, success: true, skipped: true })
         continue
       }
-      updateJob(job.id, { progress: { current, total, currentFile: item.oldName, phase: `Sposto → ${item.folderName} ${suffix}` } })
+      updateJob(job.id, { progress: { current, total, currentFile: item.oldName, phase: `Sposto → ${base} ${suffix}` } })
       try {
-        const destFolder = await getMediaFolder(item.folderId, item.folderName, suffix)
+        const destFolder = await getMediaFolder(item.folderId, base, suffix)
         await moveFile(auth.accessToken, item.id, destFolder.id, item.folderId)
         item.folderId = destFolder.id
         item.folderName = destFolder.name
@@ -270,6 +271,36 @@ export function RenameQueueProvider({ auth, children }) {
           await renameFile(auth.accessToken, f.id, newName)
         }
         updateJob(job.id, { status: 'done', progress: { current: done, total: toRename.length, currentFile: '', phase: `${done} file rinominati` } })
+
+      } else if (job.type === 'fixNestedMediaFolders') {
+        let fixed = 0
+        let moved = 0
+        const processFolder = async (folderId) => {
+          const subs = await listSubfolders(auth.accessToken, folderId)
+          for (const sub of subs) {
+            await processFolder(sub.id) // depth-first: risolvi prima le cartelle più annidate
+          }
+          for (const sub of subs) {
+            const { base, tokens } = splitMediaSuffixChain(sub.name)
+            if (tokens.length < 2) continue // non è una cartella "Vid Vid"/"Gif Gif" compattata
+            const lastSuffix = tokens[tokens.length - 1]
+            const targetName = `${base} ${lastSuffix}`
+            updateJob(job.id, { progress: { current: ++fixed, total: fixed, currentFile: sub.name, phase: `Risolvo → ${targetName}` } })
+            const targetFolder = await getOrCreateFolder(auth.accessToken, targetName, folderId)
+            if (targetFolder.id !== sub.id) {
+              const { files } = await listFiles(auth.accessToken, sub.id)
+              for (const f of (files || []).filter(f => f.mimeType !== 'application/vnd.google-apps.folder')) {
+                await moveFile(auth.accessToken, f.id, targetFolder.id, sub.id)
+                moved++
+              }
+              const { files: remaining } = await listFiles(auth.accessToken, sub.id)
+              if (!remaining || remaining.length === 0) await trashFile(auth.accessToken, sub.id)
+            }
+          }
+        }
+        const rootFolderId = job.scope === 'drive' ? 'root' : job.folderId
+        await processFolder(rootFolderId)
+        updateJob(job.id, { status: 'done', progress: { current: fixed, total: fixed, currentFile: '', phase: `${fixed} cartelle risolte, ${moved} file spostati` } })
       }
     } catch (err) {
       updateJob(job.id, { status: 'error', progress: { current: 0, total: 0, currentFile: '', phase: err.message } })
@@ -284,7 +315,7 @@ export function RenameQueueProvider({ auth, children }) {
     while (runningCount.current < MAX_PARALLEL) {
       const next = queueRef.current.find(j => j.status === 'pending')
       if (!next) break
-      if (next.type === 'colorByKeyword' || next.type === 'colorAllSubfolders' || next.type === 'normalizeNames') {
+      if (next.type === 'colorByKeyword' || next.type === 'colorAllSubfolders' || next.type === 'normalizeNames' || next.type === 'fixNestedMediaFolders') {
         processBatchOp(next)
       } else {
         processJob(next)

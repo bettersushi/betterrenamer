@@ -37,6 +37,17 @@ export function jobSubfolders(job) {
 export function baseFolderName(folderName) {
   return folderName.replace(/ (Vid|Gif)$/, '').replace(/^[-_*]+/, '')
 }
+// Strips every trailing " Vid"/" Gif" token (handles compounded names like "Foo Vid Vid Vid")
+export function splitMediaSuffixChain(folderName) {
+  const tokens = []
+  let rest = folderName
+  let m
+  while ((m = /^(.*) (Vid|Gif)$/.exec(rest))) {
+    tokens.unshift(m[2])
+    rest = m[1]
+  }
+  return { base: rest.replace(/^[-_*]+/, ''), tokens }
+}
 export function needsMediaMove(item, moveOnly, organizeMedia) {
   if (!moveOnly && !organizeMedia) return false
   const isVideo = isVideoFile(item.oldName, item.mimeType)
