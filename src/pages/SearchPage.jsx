@@ -2291,7 +2291,7 @@ export default function SearchPage({ auth, onLogout, isDark, onToggleTheme, colo
       )}
       {showBatchOps && (
         <BatchOpsModal
-          currentFolder={null}
+          currentFolder={activeFolderId && activeFolderId !== 'root' ? { id: activeFolderId, name: activeFolderName } : null}
           accessToken={auth.accessToken}
           onClose={() => setShowBatchOps(false)}
           onAddJob={(job) => {

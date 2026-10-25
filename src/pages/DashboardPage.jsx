@@ -12,7 +12,7 @@ import UserMenu from '../components/UserMenu'
 import ObliqueDivider from '../components/ObliqueDivider'
 import { useRenameQueue } from '../context/RenameQueueContext'
 import { useRenameRules } from '../hooks/useRenameRules'
-import { getExt, isVideoFile, buildLegacyPreview, formatETA, needsMediaMove, buildRenamePreviewForConfig } from '../renameQueueEngine'
+import { getExt, isVideoFile, baseFolderName, buildLegacyPreview, formatETA, needsMediaMove, buildRenamePreviewForConfig } from '../renameQueueEngine'
 import './DashboardPage.css'
 
 const PLACEHOLDERS = [
@@ -851,7 +851,7 @@ export default function DashboardPage({ auth, onLogout, isDark, onToggleTheme, c
                         {showMoveColumn && (
                           <td style={{ padding: '4px 10px', fontWeight: itemNeedsMove ? 700 : 400, fontSize: '13px', color: itemNeedsMove ? 'var(--primary)' : 'var(--text-muted)' }}>
                             {itemNeedsMove
-                              ? <span>→ {item.folderName} {isVideoFile(item.oldName, item.mimeType) ? 'Vid' : 'Gif'}</span>
+                              ? <span>→ {baseFolderName(item.folderName)} {isVideoFile(item.oldName, item.mimeType) ? 'Vid' : 'Gif'}</span>
                               : 'già ok ✓'}
                           </td>
                         )}

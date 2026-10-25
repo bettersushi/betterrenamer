@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { FOLDER_COLORS } from '../driveFolderColors'
 import { listSubfolders, listFiles } from '../drive'
 import { splitMediaSuffixChain } from '../renameQueueEngine'
@@ -112,17 +112,28 @@ export default function BatchOpsModal({ currentFolder, onClose, onAddJob, access
     if (id === 'fixNestedMediaFolders') setFixScan(null)
   }
 
+  const fixScanCancelRef = useRef(false)
+
+  const cancelFixScan = () => { fixScanCancelRef.current = true }
+
   const runFixScan = useCallback(async () => {
     const isFolder = scopes.fixNestedMediaFolders === 'folder'
     if (isFolder && !currentFolder) return
-    setFixScan({ loading: true })
+    fixScanCancelRef.current = false
+    let scanned = 0
+    setFixScan({ loading: true, scanned: 0 })
     const rootFolderId = isFolder ? currentFolder.id : 'root'
     const found = []
     try {
       const walk = async (folderId) => {
+        if (fixScanCancelRef.current) return
         const subs = await listSubfolders(accessToken, folderId)
+        scanned += subs.length
+        setFixScan({ loading: true, scanned })
+        // Esplora le sottocartelle in parallelo: la latenza di rete domina, non la CPU
+        await Promise.all(subs.map(sub => walk(sub.id)))
+        if (fixScanCancelRef.current) return
         for (const sub of subs) {
-          await walk(sub.id)
           const { base, tokens } = splitMediaSuffixChain(sub.name)
           if (tokens.length < 2) continue
           const { files } = await listFiles(accessToken, sub.id)
@@ -131,8 +142,10 @@ export default function BatchOpsModal({ currentFolder, onClose, onAddJob, access
         }
       }
       await walk(rootFolderId)
+      if (fixScanCancelRef.current) { setFixScan(null); return }
       setFixScan({ folders: found })
     } catch (err) {
+      if (fixScanCancelRef.current) { setFixScan(null); return }
       setFixScan({ folders: [], error: err.message })
     }
   }, [accessToken, currentFolder, scopes.fixNestedMediaFolders])
@@ -295,7 +308,10 @@ export default function BatchOpsModal({ currentFolder, onClose, onAddJob, access
             </div>
 
             {fixScan?.loading && (
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>Analisi in corso...</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+                <span>Analisi in corso... {fixScan.scanned > 0 ? `${fixScan.scanned} cartelle esaminate` : ''}</span>
+                <button onClick={cancelFixScan} className="btn-secondary" style={{ fontSize: 11, padding: '2px 8px' }}>Annulla</button>
+              </div>
             )}
 
             {fixScan && !fixScan.loading && fixScan.error && (
