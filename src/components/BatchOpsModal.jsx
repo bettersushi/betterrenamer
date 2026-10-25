@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { FOLDER_COLORS } from '../driveFolderColors'
+import { listSubfolders, listFiles } from '../drive'
+import { splitMediaSuffixChain } from '../renameQueueEngine'
 
 const IColor = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -47,12 +49,6 @@ const SIMPLE_ACTIVITIES = [
     title: 'Normalizza nomi file',
     description: 'Lowercase + trattini, rimuove caratteri speciali dai nomi file.',
   },
-  {
-    id: 'fixNestedMediaFolders',
-    icon: IFix,
-    title: 'Risolvi cartelle Vid/Gif annidate',
-    description: 'Trova le sottocartelle "... Vid Vid" / "... Gif Gif" generate dal bug, sposta i file nella cartella corretta ed elimina quelle vuote.',
-  },
 ]
 
 function ScopeToggle({ id, scope, setScope, currentFolder }) {
@@ -95,10 +91,11 @@ function AddButton({ onClick, disabled, added }) {
 }
 
 export default function BatchOpsModal({ currentFolder, onClose, onAddJob, accessToken }) {
-  const [scopes, setScopes] = useState({ colorByKeyword: 'folder', colorAllSubfolders: 'folder', normalizeNames: 'folder' })
+  const [scopes, setScopes] = useState({ colorByKeyword: 'folder', colorAllSubfolders: 'folder', normalizeNames: 'folder', fixNestedMediaFolders: 'folder' })
   const [added, setAdded] = useState({})
   const [kwRules, setKwRules] = useState(DEFAULT_RULES)
   const [palette, setPalette] = useState(FOLDER_COLORS)
+  const [fixScan, setFixScan] = useState(null) // null | { loading: true } | { folders: [...], error? }
 
   useEffect(() => {
     if (!accessToken) return
@@ -110,7 +107,51 @@ export default function BatchOpsModal({ currentFolder, onClose, onAddJob, access
       .catch(() => {})
   }, [accessToken])
 
-  const setScope = (id, scope) => setScopes(s => ({ ...s, [id]: scope }))
+  const setScope = (id, scope) => {
+    setScopes(s => ({ ...s, [id]: scope }))
+    if (id === 'fixNestedMediaFolders') setFixScan(null)
+  }
+
+  const runFixScan = useCallback(async () => {
+    const isFolder = scopes.fixNestedMediaFolders === 'folder'
+    if (isFolder && !currentFolder) return
+    setFixScan({ loading: true })
+    const rootFolderId = isFolder ? currentFolder.id : 'root'
+    const found = []
+    try {
+      const walk = async (folderId) => {
+        const subs = await listSubfolders(accessToken, folderId)
+        for (const sub of subs) {
+          await walk(sub.id)
+          const { base, tokens } = splitMediaSuffixChain(sub.name)
+          if (tokens.length < 2) continue
+          const { files } = await listFiles(accessToken, sub.id)
+          const fileCount = (files || []).filter(f => f.mimeType !== 'application/vnd.google-apps.folder').length
+          found.push({ id: sub.id, name: sub.name, targetName: `${base} ${tokens[tokens.length - 1]}`, fileCount })
+        }
+      }
+      await walk(rootFolderId)
+      setFixScan({ folders: found })
+    } catch (err) {
+      setFixScan({ folders: [], error: err.message })
+    }
+  }, [accessToken, currentFolder, scopes.fixNestedMediaFolders])
+
+  const handleConfirmFix = () => {
+    onAddJob({
+      id: Date.now() + Math.random(),
+      type: 'fixNestedMediaFolders',
+      label: 'Risolvi cartelle Vid/Gif annidate',
+      scope: scopes.fixNestedMediaFolders,
+      folderId: currentFolder?.id || 'root',
+      folderName: currentFolder?.name || 'My Drive',
+      status: 'queued',
+      progress: { current: 0, total: 0, currentFile: '', phase: '' },
+      entries: [],
+    })
+    markAdded('fixNestedMediaFolders')
+    setFixScan(null)
+  }
 
   const markAdded = (id) => {
     setAdded(a => ({ ...a, [id]: true }))
@@ -240,6 +281,64 @@ export default function BatchOpsModal({ currentFolder, onClose, onAddJob, access
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <ScopeToggle id="colorByKeyword" scope={scopes.colorByKeyword} setScope={setScope} currentFolder={currentFolder} />
               <AddButton onClick={handleAddKw} disabled={scopes.colorByKeyword === 'folder' && !currentFolder} added={added.colorByKeyword} />
+            </div>
+          </div>
+
+          {/* Risolvi cartelle Vid/Gif annidate — con analisi/anteprima prima di eseguire */}
+          <div style={cardStyle}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <div style={iconBox}><IFix /></div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Risolvi cartelle Vid/Gif annidate</div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Trova le sottocartelle "... Vid Vid" / "... Gif Gif" generate dal bug, sposta i file in quella corretta ed elimina quelle vuote.</div>
+              </div>
+            </div>
+
+            {fixScan?.loading && (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>Analisi in corso...</div>
+            )}
+
+            {fixScan && !fixScan.loading && fixScan.error && (
+              <div style={{ fontSize: 12, color: 'var(--danger)', marginBottom: 10 }}>Errore durante l'analisi: {fixScan.error}</div>
+            )}
+
+            {fixScan && !fixScan.loading && !fixScan.error && fixScan.folders.length === 0 && (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>Nessuna cartella annidata trovata nello scope selezionato.</div>
+            )}
+
+            {fixScan && !fixScan.loading && !fixScan.error && fixScan.folders.length > 0 && (
+              <div style={{ marginBottom: 10, maxHeight: 140, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px' }}>
+                {fixScan.folders.map(f => (
+                  <div key={f.id} style={{ fontSize: 11.5, padding: '3px 0', color: 'var(--text-secondary)', display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{f.name}</span>
+                    <span style={{ opacity: 0.6 }}>→</span>
+                    <span>{f.targetName}</span>
+                    <span style={{ opacity: 0.6, marginLeft: 'auto', whiteSpace: 'nowrap' }}>{f.fileCount} file</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <ScopeToggle id="fixNestedMediaFolders" scope={scopes.fixNestedMediaFolders} setScope={setScope} currentFolder={currentFolder} />
+              {fixScan && !fixScan.loading && !fixScan.error && fixScan.folders.length > 0 ? (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={runFixScan} className="btn-secondary" style={{ fontSize: 11.5, padding: '4px 10px', borderRadius: 7 }}>Ri-analizza</button>
+                  <AddButton onClick={handleConfirmFix} added={added.fixNestedMediaFolders} disabled={false} />
+                </div>
+              ) : (
+                <button
+                  onClick={runFixScan}
+                  disabled={(scopes.fixNestedMediaFolders === 'folder' && !currentFolder) || fixScan?.loading}
+                  style={{
+                    fontSize: 11.5, padding: '4px 12px', borderRadius: 7, cursor: 'pointer',
+                    background: 'var(--primary)', color: '#fff', border: 'none', fontFamily: 'inherit', fontWeight: 600,
+                    opacity: (scopes.fixNestedMediaFolders === 'folder' && !currentFolder) || fixScan?.loading ? 0.4 : 1,
+                  }}
+                >
+                  Analizza
+                </button>
+              )}
             </div>
           </div>
 

@@ -300,10 +300,10 @@ export function RenameQueueProvider({ auth, onTokenRefresh, children }) {
       } else if (job.type === 'fixNestedMediaFolders') {
         let fixed = 0
         let moved = 0
-        const processFolder = async (folderId) => {
+        const processFolder = async (folderId, folderName) => {
           const subs = await listSubfolders(auth.accessToken, folderId)
           for (const sub of subs) {
-            await processFolder(sub.id) // depth-first: risolvi prima le cartelle più annidate
+            await processFolder(sub.id, sub.name) // depth-first: risolvi prima le cartelle più annidate
           }
           for (const sub of subs) {
             const { base, tokens } = splitMediaSuffixChain(sub.name)
@@ -311,7 +311,11 @@ export function RenameQueueProvider({ auth, onTokenRefresh, children }) {
             const lastSuffix = tokens[tokens.length - 1]
             const targetName = `${base} ${lastSuffix}`
             updateJob(job.id, { progress: { current: ++fixed, total: fixed, currentFile: sub.name, phase: `Risolvo → ${targetName}` } })
-            const targetFolder = await getOrCreateFolder(auth.accessToken, targetName, folderId)
+            // Se la cartella genitore si chiama già come il target, i file vanno spostati DIRETTAMENTE
+            // nel genitore, non in un'altra sottocartella omonima creata dentro di esso
+            const targetFolder = folderName === targetName
+              ? { id: folderId, name: folderName }
+              : await getOrCreateFolder(auth.accessToken, targetName, folderId)
             if (targetFolder.id !== sub.id) {
               const { files } = await listFiles(auth.accessToken, sub.id)
               for (const f of (files || []).filter(f => f.mimeType !== 'application/vnd.google-apps.folder')) {
@@ -324,7 +328,7 @@ export function RenameQueueProvider({ auth, onTokenRefresh, children }) {
           }
         }
         const rootFolderId = job.scope === 'drive' ? 'root' : job.folderId
-        await processFolder(rootFolderId)
+        await processFolder(rootFolderId, job.folderName)
         updateJob(job.id, { status: 'done', progress: { current: fixed, total: fixed, currentFile: '', phase: `${fixed} cartelle risolte, ${moved} file spostati` } })
       }
     } catch (err) {
