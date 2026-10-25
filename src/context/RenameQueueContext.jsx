@@ -9,9 +9,18 @@ import {
 
 const RenameQueueCtx = createContext(null)
 
-export function RenameQueueProvider({ auth, children }) {
+export function RenameQueueProvider({ auth, onTokenRefresh, children }) {
   const authRef = useRef(auth)
   useEffect(() => { authRef.current = auth }, [auth])
+  const tokenRefreshRef = useRef(onTokenRefresh)
+  useEffect(() => { tokenRefreshRef.current = onTokenRefresh }, [onTokenRefresh])
+
+  // Riprova una volta dopo refresh del token se la chiamata fallisce per 401 (token Google scaduto)
+  const refreshToken = async () => {
+    if (!tokenRefreshRef.current) return null
+    const newToken = await tokenRefreshRef.current()
+    return newToken
+  }
 
   // Cross-tab lock — prevent two windows from running jobs simultaneously
   const [lockedByOther, setLockedByOther] = useState(() => {
@@ -102,12 +111,28 @@ export function RenameQueueProvider({ auth, children }) {
 
     const entries = []
     const folderCache = {}
-    const auth = authRef.current
+    let accessToken = authRef.current.accessToken
+
+    // Esegue fn(accessToken); se fallisce per token scaduto (401), aggiorna il token e riprova una volta
+    const withRetry = async (fn) => {
+      try {
+        return await fn(accessToken)
+      } catch (err) {
+        if (err.status === 401) {
+          const newToken = await refreshToken()
+          if (newToken) {
+            accessToken = newToken
+            return await fn(accessToken)
+          }
+        }
+        throw err
+      }
+    }
 
     const getMediaFolder = async (parentId, parentName, suffix) => {
       const key = `${parentId}:${suffix}`
       if (!folderCache[key]) {
-        folderCache[key] = await getOrCreateFolder(auth.accessToken, `${parentName} ${suffix}`, parentId)
+        folderCache[key] = await withRetry(token => getOrCreateFolder(token, `${parentName} ${suffix}`, parentId))
       }
       return folderCache[key]
     }
@@ -130,7 +155,7 @@ export function RenameQueueProvider({ auth, children }) {
       }
       updateJob(job.id, { progress: { current, total, currentFile: item.oldName, currentNewName: item.newName, phase: 'Rinomino' } })
       try {
-        await renameFile(auth.accessToken, item.id, item.newName)
+        await withRetry(token => renameFile(token, item.id, item.newName))
         entries.push({ type: 'rename', ...item, success: true })
       } catch (err) {
         entries.push({ type: 'rename', ...item, success: false, error: err.message })
@@ -151,7 +176,7 @@ export function RenameQueueProvider({ auth, children }) {
       updateJob(job.id, { progress: { current, total, currentFile: item.oldName, phase: `Sposto → ${base} ${suffix}` } })
       try {
         const destFolder = await getMediaFolder(item.folderId, base, suffix)
-        await moveFile(auth.accessToken, item.id, destFolder.id, item.folderId)
+        await withRetry(token => moveFile(token, item.id, destFolder.id, item.folderId))
         item.folderId = destFolder.id
         item.folderName = destFolder.name
         entries.push({ type: 'move', oldName: item.oldName, newName: item.newName, folderName: destFolder.name, success: true })
@@ -173,7 +198,7 @@ export function RenameQueueProvider({ auth, children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateJob])
 
-  const processBatchOp = useCallback(async (job) => {
+  const processBatchOp = useCallback(async (job, retried = false) => {
     runningCount.current++
     updateJob(job.id, { status: 'running', progress: { current: 0, total: 0, currentFile: '', phase: 'Avvio...' } })
     const auth = authRef.current
@@ -303,6 +328,14 @@ export function RenameQueueProvider({ auth, children }) {
         updateJob(job.id, { status: 'done', progress: { current: fixed, total: fixed, currentFile: '', phase: `${fixed} cartelle risolte, ${moved} file spostati` } })
       }
     } catch (err) {
+      if (err.status === 401 && !retried) {
+        const newToken = await refreshToken()
+        if (newToken) {
+          runningCount.current--
+          await processBatchOp(job, true)
+          return
+        }
+      }
       updateJob(job.id, { status: 'error', progress: { current: 0, total: 0, currentFile: '', phase: err.message } })
     }
 

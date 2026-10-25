@@ -99,6 +99,7 @@ export const createFolder = async (accessToken, name, parentId) => {
       parents: [parentId],
     }),
   })
+  if (response.status === 401) throw Object.assign(new Error('Failed to create folder'), { status: 401 })
   if (!response.ok) throw new Error('Failed to create folder')
   return response.json()
 }
@@ -112,6 +113,7 @@ export const findFolder = async (accessToken, name, parentId) => {
   const response = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   })
+  if (response.status === 401) throw Object.assign(new Error('Failed to search folder'), { status: 401 })
   if (!response.ok) throw new Error('Failed to search folder')
   const data = await response.json()
   return data.files?.[0] || null
@@ -135,6 +137,7 @@ export const moveFile = async (accessToken, fileId, newParentId, oldParentId) =>
       body: JSON.stringify({}),
     }
   )
+  if (response.status === 401) throw Object.assign(new Error('Failed to move file'), { status: 401 })
   if (!response.ok) throw new Error('Failed to move file')
   return response.json()
 }
@@ -156,6 +159,7 @@ export const renameFile = async (accessToken, fileId, newName) => {
 
     if (response.ok) return response.json();
 
+    if (response.status === 401) throw Object.assign(new Error('Failed to rename file'), { status: 401 })
     const isRateLimited = response.status === 403 || response.status === 429
     if (!isRateLimited || attempt === maxRetries) throw new Error('Failed to rename file');
     await new Promise(r => setTimeout(r, 1000 * 2 ** attempt));
@@ -227,6 +231,7 @@ export const patchFileMetadata = async (accessToken, fileId, fields) => {
       body: JSON.stringify(fields),
     }
   )
+  if (response.status === 401) throw Object.assign(new Error('Failed to patch file metadata'), { status: 401 })
   if (!response.ok) throw new Error('Failed to patch file metadata')
   return response.json()
 }
@@ -266,6 +271,7 @@ export const listSubfolders = async (accessToken, parentId) => {
   const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   })
+  if (res.status === 401) throw Object.assign(new Error('Failed to list subfolders'), { status: 401 })
   if (!res.ok) throw new Error('Failed to list subfolders')
   return (await res.json()).files || []
 }

@@ -156,7 +156,7 @@ function App() {
     <ErrorBoundary>
     <BrowserRouter>
       <VideoMontageProvider auth={auth} onTokenRefresh={handleTokenRefresh}>
-      <RenameQueueProvider auth={auth}>
+      <RenameQueueProvider auth={auth} onTokenRefresh={handleTokenRefresh}>
       <SimilarityProvider auth={auth}>
       <SearchStateProvider auth={auth} onTokenRefresh={handleTokenRefresh}>
         <VideoMontageWizardGuard />
