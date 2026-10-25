@@ -46,7 +46,9 @@ export function splitMediaSuffixChain(folderName) {
     tokens.unshift(m[2])
     rest = m[1]
   }
-  return { base: rest.replace(/^[-_*]+/, ''), tokens }
+  // Non toglie prefissi come "_"/"-"/"*": servono a confrontare il target con il nome REALE
+  // della cartella genitore (che li mantiene), per capire se i file vanno fusi lì dentro.
+  return { base: rest, tokens }
 }
 export function needsMediaMove(item, moveOnly, organizeMedia) {
   if (!moveOnly && !organizeMedia) return false
