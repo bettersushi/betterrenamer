@@ -300,6 +300,8 @@ export function RenameQueueProvider({ auth, onTokenRefresh, children }) {
       } else if (job.type === 'fixNestedMediaFolders') {
         let fixed = 0
         let moved = 0
+        let moveFailures = 0
+        const fixEntries = []
         const processFolder = async (folderId, folderName) => {
           const subs = await listSubfolders(auth.accessToken, folderId)
           for (const sub of subs) {
@@ -318,18 +320,33 @@ export function RenameQueueProvider({ auth, onTokenRefresh, children }) {
               : await getOrCreateFolder(auth.accessToken, targetName, folderId)
             if (targetFolder.id !== sub.id) {
               const { files } = await listFiles(auth.accessToken, sub.id)
-              for (const f of (files || []).filter(f => f.mimeType !== 'application/vnd.google-apps.folder')) {
-                await moveFile(auth.accessToken, f.id, targetFolder.id, sub.id)
-                moved++
+              const fileList = (files || []).filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
+              const subfolderList = (files || []).filter(f => f.mimeType === 'application/vnd.google-apps.folder')
+              let allMoved = true
+              for (const f of fileList) {
+                try {
+                  await moveFile(auth.accessToken, f.id, targetFolder.id, sub.id)
+                  moved++
+                } catch (err) {
+                  allMoved = false
+                  moveFailures++
+                  fixEntries.push({ folder: sub.name, file: f.name, error: err.message })
+                }
               }
-              const { files: remaining } = await listFiles(auth.accessToken, sub.id)
-              if (!remaining || remaining.length === 0) await trashFile(auth.accessToken, sub.id)
+              // Cestina la cartella SOLO se ogni singolo file è stato spostato con successo
+              // e non restano sottocartelle: non ci si fida di un controllo "è vuota?" a posteriori
+              if (allMoved && subfolderList.length === 0) {
+                await trashFile(auth.accessToken, sub.id)
+              }
             }
           }
         }
         const rootFolderId = job.scope === 'drive' ? 'root' : job.folderId
         await processFolder(rootFolderId, job.folderName)
-        updateJob(job.id, { status: 'done', progress: { current: fixed, total: fixed, currentFile: '', phase: `${fixed} cartelle risolte, ${moved} file spostati` } })
+        const phase = moveFailures > 0
+          ? `${fixed} cartelle esaminate, ${moved} file spostati, ${moveFailures} falliti (cartelle non cancellate)`
+          : `${fixed} cartelle risolte, ${moved} file spostati`
+        updateJob(job.id, { status: 'done', entries: fixEntries, progress: { current: fixed, total: fixed, currentFile: '', phase } })
       }
     } catch (err) {
       if (err.status === 401 && !retried) {
