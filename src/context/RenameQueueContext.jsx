@@ -419,6 +419,14 @@ export function RenameQueueProvider({ auth, onTokenRefresh, children }) {
     setQueue([...queueRef.current])
   }, [])
 
+  // Rimuove tutta la coda, inclusi i job bloccati/in esecuzione (es. coda "incastrata")
+  const clearAll = useCallback(() => {
+    queueRef.current = []
+    setQueue([])
+    runningCount.current = 0
+    releaseLock()
+  }, [])
+
   const queueHasItems = queue.length > 0
   const interruptedJobs = queue.filter(j => j.status === 'interrupted')
   const queuedJobs = queue.filter(j => j.status === 'queued')
@@ -431,7 +439,7 @@ export function RenameQueueProvider({ auth, onTokenRefresh, children }) {
     lockedByOther, setLockedByOther,
     enqueueJob, enqueueRaw,
     startJob, startAll, removeQueued, removeJob,
-    restartJob, restartAll, clearCompleted,
+    restartJob, restartAll, clearCompleted, clearAll,
   }
 
   return <RenameQueueCtx.Provider value={value}>{children}</RenameQueueCtx.Provider>

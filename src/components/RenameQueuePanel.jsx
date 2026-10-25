@@ -63,7 +63,7 @@ const btnAvviaTutto = { display: 'flex', alignItems: 'center', gap: 4, fontSize:
 export default function RenameQueuePanel() {
   const {
     queue, queueHasItems, interruptedJobs, queuedJobs, runningJobs, pendingJobs, doneJobs,
-    startJob, startAll, removeQueued, restartJob, restartAll, clearCompleted,
+    startJob, startAll, removeQueued, removeJob, restartJob, restartAll, clearCompleted, clearAll,
   } = useRenameQueue()
   const [collapsed, setCollapsed] = useState(false)
   const [position, setPositionRaw] = useState(() => localStorage.getItem(PANEL_POSITION_KEY) || 'left')
@@ -178,6 +178,14 @@ export default function RenameQueuePanel() {
               Svuota
             </button>
           )}
+          <button
+            onClick={() => { if (window.confirm('Svuotare tutta la coda? I job in esecuzione o bloccati verranno rimossi.')) clearAll() }}
+            className="btn-secondary"
+            style={{ fontSize: 11, padding: '4px 9px', color: 'var(--danger)' }}
+            title="Rimuove tutti i job dalla coda, inclusi quelli bloccati o in esecuzione"
+          >
+            Svuota tutto
+          </button>
         </div>
         <span style={{ display: 'flex', color: 'var(--text-muted)' }}><IconChevron up={!collapsed} /></span>
       </div>
@@ -245,6 +253,16 @@ export default function RenameQueuePanel() {
                         {job.skipCount > 0 && <span style={{ color: 'var(--text-muted)', marginLeft: 6, opacity: 0.6 }}>{job.skipCount} già ok</span>}
                         {failCount > 0 && <span style={{ color: '#dc2626', marginLeft: 6 }}>{failCount} errori</span>}
                       </>
+                    )}
+                    {(job.status === 'running' || job.status === 'pending' || job.status === 'done' || job.status === 'error' || job.status === 'interrupted') && (
+                      <button
+                        onClick={() => { if (job.status !== 'running' && job.status !== 'pending' || window.confirm('Rimuovere questo job bloccato/in esecuzione dalla coda?')) removeJob(job.id) }}
+                        className="btn-secondary"
+                        style={{ fontSize: 11, padding: '3px 6px', color: 'var(--danger)' }}
+                        title="Rimuovi job"
+                      >
+                        <IconXSmall />
+                      </button>
                     )}
                   </div>
                 </div>
