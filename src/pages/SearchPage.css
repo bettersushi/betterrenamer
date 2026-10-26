@@ -90,14 +90,15 @@
   background: var(--border);
   margin: 5px 0;
   opacity: 0;
-  animation: tree-skeleton-fade-in 0.3s ease forwards;
+  animation: tree-skeleton-fade-in 0.45s ease-out forwards;
+  animation-fill-mode: both;
 }
 
 .tree-skeleton::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--border) 65%, transparent), transparent);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--border) 85%, transparent), transparent);
   transform: translateX(-100%);
   animation: shimmer-slide 1.4s infinite;
 }
@@ -589,8 +590,8 @@
 }
 
 @keyframes tree-skeleton-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes contextMenuIn {

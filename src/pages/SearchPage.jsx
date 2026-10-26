@@ -2375,6 +2375,9 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
 
   const childSiblingIds = (children || []).map(c => c.id)
 
+  // Larghezze casuali e diverse tra loro, stabili per l'intera durata del caricamento
+  const skeletonWidths = useMemo(() => [1, 2, 3, 4].map(() => 40 + Math.random() * 45), [folder.id, loading])
+
   const springTimerRef = useRef(null)
   const clearSpringTimer = () => {
     if (springTimerRef.current) { clearTimeout(springTimerRef.current); springTimerRef.current = null }
@@ -2461,8 +2464,8 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
       {/* skeleton while loading children */}
       {expanded && loading && !children && (
         <div style={{ paddingLeft: 8 + (depth + 1) * 12 }}>
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="tree-skeleton" style={{ width: '66%', animationDelay: `${i * 90}ms` }} />
+          {skeletonWidths.map((w, i) => (
+            <div key={i} className="tree-skeleton" style={{ width: `${w}%`, animationDelay: `${i * 120}ms` }} />
           ))}
         </div>
       )}
