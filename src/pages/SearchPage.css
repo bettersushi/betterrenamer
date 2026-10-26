@@ -90,7 +90,7 @@
   background: var(--border);
   margin: 5px 0;
   opacity: 0;
-  animation: tree-skeleton-fade-in 0.45s ease-out forwards;
+  animation: tree-skeleton-pulse 2.2s ease-in-out infinite;
   animation-fill-mode: both;
 }
 
@@ -589,9 +589,11 @@
   to { transform: rotate(360deg); }
 }
 
-@keyframes tree-skeleton-fade-in {
-  from { opacity: 0; transform: translateY(3px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes tree-skeleton-pulse {
+  0% { opacity: 0; transform: translateY(3px); }
+  18% { opacity: 0.8; transform: translateY(0); }
+  50% { opacity: 0.4; }
+  100% { opacity: 0.8; }
 }
 
 @keyframes contextMenuIn {
