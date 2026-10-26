@@ -2461,8 +2461,8 @@ function TreeNodeFull({ folder, depth, siblingIds = [], treeExpanded, treeChildr
       {/* skeleton while loading children */}
       {expanded && loading && !children && (
         <div style={{ paddingLeft: 8 + (depth + 1) * 12 }}>
-          {[1, 2].map(i => (
-            <div key={i} className="tree-skeleton" style={{ width: `${60 + i * 15}%` }} />
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="tree-skeleton" style={{ width: '66%', animationDelay: `${i * 90}ms` }} />
           ))}
         </div>
       )}
